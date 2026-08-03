@@ -15,10 +15,10 @@ void main() {
     );
 
     expect(find.text('분석할 유튜브 영상 URL을 입력하세요'), findsOneWidget);
-    expect(find.byType(TextField), findsOneWidget);
+    expect(find.byKey(const Key('urlField')), findsOneWidget);
     expect(find.text('분석하기'), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField), '');
+    await tester.enterText(find.byKey(const Key('urlField')), '');
     await tester.tap(find.text('분석하기'));
     await tester.pump();
 

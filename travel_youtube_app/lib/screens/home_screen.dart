@@ -98,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
+                key: const Key('urlField'),
                 controller: _urlController,
                 keyboardType: TextInputType.url,
                 decoration: InputDecoration(
@@ -129,6 +130,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
+                key: const Key('hashtagField'),
                 controller: _hashtagController,
                 textInputAction: TextInputAction.search,
                 decoration: const InputDecoration(
