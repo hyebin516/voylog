@@ -70,6 +70,51 @@ void main() {
       throwsA(isA<ApiException>().having((e) => e.code, 'code', 'NETWORK_ERROR')),
     );
   });
+
+  test('searchByHashtag sends the hashtag as a query param and maps the video list', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 200,
+      body: {
+        'success': true,
+        'data': {
+          'videos': [
+            {
+              'videoId': 'v1',
+              'youtubeUrl': 'https://youtu.be/v1',
+              'title': '부산 여행',
+              'thumbnailUrl': null,
+              'channelName': null,
+              'publishedAt': null,
+            },
+          ],
+        },
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    final results = await VideoRepository().searchByHashtag('부산여행');
+
+    expect(results, hasLength(1));
+    expect(results.first.title, '부산 여행');
+    expect(adapter.lastOptions?.path, '/videos/search');
+    expect(adapter.lastOptions?.queryParameters, {'hashtag': '부산여행'});
+  });
+
+  test('a 503 search failure is surfaced as an ApiException', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 503,
+      body: {
+        'success': false,
+        'error': {'code': 'AI_PROVIDER_ERROR', 'message': 'AI Worker request failed'},
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      VideoRepository().searchByHashtag('부산여행'),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 'AI_PROVIDER_ERROR')),
+    );
+  });
 }
 
 class _ThrowingAdapter implements HttpClientAdapter {

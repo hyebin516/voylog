@@ -24,3 +24,8 @@ class AiProviderError(AiWorkerError):
 class GeocodingFailedError(AiWorkerError):
     def __init__(self, message: str = "Kakao geocoding failed"):
         super().__init__(503, "GEOCODING_FAILED", message)
+
+
+class YoutubeSearchError(AiWorkerError):
+    def __init__(self, message: str = "YouTube hashtag search failed"):
+        super().__init__(503, "YOUTUBE_SEARCH_FAILED", message)

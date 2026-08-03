@@ -89,4 +89,9 @@ async function analyzeVideo(youtubeUrl) {
   return response;
 }
 
-module.exports = { analyzeVideo };
+async function searchByHashtag(hashtag) {
+  const result = await callAiWorker('/search-hashtag', { hashtag }, 10000);
+  return { videos: result.videos };
+}
+
+module.exports = { analyzeVideo, searchByHashtag };

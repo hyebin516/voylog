@@ -15,6 +15,14 @@ describe('unknown routes', () => {
   });
 });
 
+describe('GET /api/v1/videos/search', () => {
+  it('rejects a missing hashtag before reaching the controller', async () => {
+    const res = await request(app).get('/api/v1/videos/search');
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
 describe('POST /api/v1/videos/analyze', () => {
   it('rejects a missing youtubeUrl before reaching the controller', async () => {
     const res = await request(app).post('/api/v1/videos/analyze').send({});

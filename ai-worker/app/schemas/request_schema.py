@@ -7,6 +7,11 @@ class TranscriptRequest(BaseModel):
     youtubeUrl: str
 
 
+class HashtagSearchRequest(BaseModel):
+    hashtag: str
+    maxResults: int = 20
+
+
 class VideoMeta(BaseModel):
     videoId: str
     youtubeUrl: str

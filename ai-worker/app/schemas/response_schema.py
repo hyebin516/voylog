@@ -15,6 +15,19 @@ class TranscriptResponse(BaseModel):
     segments: List[dict]
 
 
+class VideoSearchResult(BaseModel):
+    videoId: str
+    youtubeUrl: str
+    title: str
+    thumbnailUrl: Optional[str] = None
+    channelName: Optional[str] = None
+    publishedAt: Optional[str] = None
+
+
+class HashtagSearchResponse(BaseModel):
+    videos: List[VideoSearchResult]
+
+
 class PlaceCandidate(BaseModel):
     name: str
     timestampSec: Optional[int] = None

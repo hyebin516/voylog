@@ -1,4 +1,4 @@
-const { validateAnalyzeRequest } = require('../../src/validators/video.validator');
+const { validateAnalyzeRequest, validateSearchRequest } = require('../../src/validators/video.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
@@ -31,6 +31,28 @@ describe('validateAnalyzeRequest', () => {
     const req = mockReq({ body: { youtubeUrl: 'https://example.com/video' } });
     const next = jest.fn();
     validateAnalyzeRequest(req, mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateSearchRequest', () => {
+  it('passes for a non-empty hashtag', () => {
+    const next = jest.fn();
+    validateSearchRequest(mockReq({ query: { hashtag: '부산여행' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing hashtag', () => {
+    const next = jest.fn();
+    validateSearchRequest(mockReq({ query: {} }), mockRes(), next);
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(400);
+  });
+
+  it('rejects a whitespace-only hashtag', () => {
+    const next = jest.fn();
+    validateSearchRequest(mockReq({ query: { hashtag: '   ' } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

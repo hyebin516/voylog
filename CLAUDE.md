@@ -89,6 +89,7 @@ GradudtionProject/
 | Method | Endpoint | 인증 | 설명 |
 | --- | --- | --- | --- |
 | POST | `/api/v1/videos/analyze` | 불필요 | YouTube URL 분석. body: `{ youtubeUrl }` |
+| GET | `/api/v1/videos/search` | 불필요 | 해시태그로 브이로그 탐색 (FR-02). query: `?hashtag=`. AI Worker의 YouTube Data API 검색 결과(영상 후보 목록)를 그대로 전달, DB 저장 없음 |
 | POST | `/api/v1/bookmarks` | 필수 (JWT) | 북마크 저장. body: `{ placeId }` |
 | GET/DELETE | `/api/v1/bookmarks`, `/api/v1/bookmarks/:id` | 필수 (JWT) | 북마크 조회/삭제 |
 | POST/GET/PUT/DELETE | `/api/v1/hotels`, `/api/v1/hotels/:id` | 필수 (JWT) | 호텔 CRUD |
@@ -103,7 +104,7 @@ GradudtionProject/
 - `409` BOOKMARK_EXISTS
 - `422` TRANSCRIPT_NOT_FOUND (자막 없는 영상)
 - `500` 내부 오류
-- `503` AI_TIMEOUT / AI_PROVIDER_ERROR / GEOCODING_FAILED (외부 API 실패)
+- `503` AI_TIMEOUT / AI_PROVIDER_ERROR / GEOCODING_FAILED / YOUTUBE_SEARCH_FAILED (외부 API 실패)
 
 ## DB 스키마 (핵심 테이블)
 

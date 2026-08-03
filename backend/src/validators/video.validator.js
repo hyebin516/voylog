@@ -12,4 +12,14 @@ function validateAnalyzeRequest(req, res, next) {
   return next();
 }
 
-module.exports = { validateAnalyzeRequest };
+function validateSearchRequest(req, res, next) {
+  const { hashtag } = req.query;
+
+  if (!hashtag || typeof hashtag !== 'string' || !hashtag.trim()) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A non-empty hashtag query parameter is required'));
+  }
+
+  return next();
+}
+
+module.exports = { validateAnalyzeRequest, validateSearchRequest };

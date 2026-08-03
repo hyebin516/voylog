@@ -7,7 +7,7 @@ const pool = require('../../src/config/db');
 const redis = require('../../src/config/redis');
 const videoRepository = require('../../src/repositories/video.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { analyzeVideo } = require('../../src/services/video.service');
+const { analyzeVideo, searchByHashtag } = require('../../src/services/video.service');
 
 const YOUTUBE_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 
@@ -81,5 +81,23 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
     expect(client.release).toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('searchByHashtag', () => {
+  it('forwards the hashtag to the AI worker and returns its video list', async () => {
+    callAiWorker.mockResolvedValue({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
+
+    const result = await searchByHashtag('부산여행');
+
+    expect(callAiWorker).toHaveBeenCalledWith('/search-hashtag', { hashtag: '부산여행' }, 10000);
+    expect(result).toEqual({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
+  });
+
+  it('propagates the AppError raised by callAiWorker when the AI worker fails', async () => {
+    const AppError = require('../../src/utils/AppError');
+    callAiWorker.mockRejectedValue(new AppError(503, 'AI_PROVIDER_ERROR', 'AI Worker request failed'));
+
+    await expect(searchByHashtag('부산여행')).rejects.toMatchObject({ statusCode: 503, code: 'AI_PROVIDER_ERROR' });
   });
 });

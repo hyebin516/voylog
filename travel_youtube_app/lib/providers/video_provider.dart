@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/api_exception.dart';
 import '../models/video_model.dart';
+import '../models/video_search_result_model.dart';
 import '../repositories/video_repository.dart';
 import '../utils/view_state.dart';
 
@@ -19,6 +20,15 @@ class VideoProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   bool get isLoading => _state == ViewState.loading;
 
+  ViewState _searchState = ViewState.idle;
+  List<VideoSearchResultModel> _searchResults = [];
+  String? _searchErrorMessage;
+
+  ViewState get searchState => _searchState;
+  List<VideoSearchResultModel> get searchResults => _searchResults;
+  String? get searchErrorMessage => _searchErrorMessage;
+  bool get isSearching => _searchState == ViewState.loading;
+
   Future<void> analyze(String youtubeUrl) async {
     _state = ViewState.loading;
     _errorMessage = null;
@@ -32,6 +42,29 @@ class VideoProvider extends ChangeNotifier {
       _errorMessage = e.friendlyMessage;
     }
 
+    notifyListeners();
+  }
+
+  Future<void> searchByHashtag(String hashtag) async {
+    _searchState = ViewState.loading;
+    _searchErrorMessage = null;
+    notifyListeners();
+
+    try {
+      _searchResults = await _repository.searchByHashtag(hashtag);
+      _searchState = ViewState.success;
+    } on ApiException catch (e) {
+      _searchState = ViewState.error;
+      _searchErrorMessage = e.friendlyMessage;
+    }
+
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchState = ViewState.idle;
+    _searchResults = [];
+    _searchErrorMessage = null;
     notifyListeners();
   }
 

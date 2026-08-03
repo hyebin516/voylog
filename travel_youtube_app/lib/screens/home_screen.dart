@@ -2,12 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../models/video_search_result_model.dart';
 import '../providers/video_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
+import '../widgets/loading_indicator.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
+import '../widgets/video_search_result_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,11 +21,13 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _urlController = TextEditingController();
+  final TextEditingController _hashtagController = TextEditingController();
   String? _inputError;
 
   @override
   void dispose() {
     _urlController.dispose();
+    _hashtagController.dispose();
     super.dispose();
   }
 
@@ -36,6 +41,21 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _inputError = null);
 
     await videoProvider.analyze(url);
+
+    if (!mounted) return;
+    if (videoProvider.state == ViewState.success) {
+      Navigator.pushNamed(context, AppRoutes.videoAnalysis);
+    }
+  }
+
+  void _onSearchPressed(VideoProvider videoProvider) {
+    final hashtag = _hashtagController.text.trim();
+    if (hashtag.isEmpty) return;
+    videoProvider.searchByHashtag(hashtag);
+  }
+
+  Future<void> _onSearchResultTap(VideoProvider videoProvider, VideoSearchResultModel result) async {
+    await videoProvider.analyze(result.youtubeUrl);
 
     if (!mounted) return;
     if (videoProvider.state == ViewState.success) {
@@ -99,6 +119,57 @@ class _HomeScreenState extends State<HomeScreen> {
                   message: videoProvider.errorMessage ?? '분석에 실패했습니다.',
                   onRetry: () => _onAnalyzePressed(videoProvider),
                 ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              const Divider(),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '해시태그로 브이로그 탐색',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: _hashtagController,
+                textInputAction: TextInputAction.search,
+                decoration: const InputDecoration(
+                  hintText: '#부산여행',
+                  prefixIcon: Icon(Icons.tag_rounded),
+                ),
+                onSubmitted: (_) => _onSearchPressed(videoProvider),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              PrimaryButton(
+                label: '탐색하기',
+                icon: Icons.search_rounded,
+                isLoading: videoProvider.isSearching,
+                onPressed: () => _onSearchPressed(videoProvider),
+              ),
+              if (videoProvider.isSearching) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const LoadingIndicator(),
+              ] else if (videoProvider.searchState == ViewState.error) ...[
+                const SizedBox(height: AppSpacing.lg),
+                ErrorView(
+                  message: videoProvider.searchErrorMessage ?? '탐색에 실패했습니다.',
+                  onRetry: () => _onSearchPressed(videoProvider),
+                ),
+              ] else if (videoProvider.searchState == ViewState.success) ...[
+                const SizedBox(height: AppSpacing.lg),
+                if (videoProvider.searchResults.isEmpty)
+                  const Text('검색 결과가 없습니다.')
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: videoProvider.searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = videoProvider.searchResults[index];
+                      return VideoSearchResultCard(
+                        result: result,
+                        onTap: () => _onSearchResultTap(videoProvider, result),
+                      );
+                    },
+                  ),
               ],
             ],
           ),

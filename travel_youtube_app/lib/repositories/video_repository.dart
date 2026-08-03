@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../core/network/dio_client.dart';
 import '../models/video_model.dart';
+import '../models/video_search_result_model.dart';
 import '../utils/dio_error_handler.dart';
 
 class VideoRepository {
@@ -11,6 +12,16 @@ class VideoRepository {
     try {
       final response = await _dio.post('/videos/analyze', data: {'youtubeUrl': youtubeUrl});
       return VideoModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<List<VideoSearchResultModel>> searchByHashtag(String hashtag) async {
+    try {
+      final response = await _dio.get('/videos/search', queryParameters: {'hashtag': hashtag});
+      final videos = response.data['data']['videos'] as List<dynamic>;
+      return videos.map((e) => VideoSearchResultModel.fromJson(e as Map<String, dynamic>)).toList();
     } on DioException catch (e) {
       throwApiException(e);
     }

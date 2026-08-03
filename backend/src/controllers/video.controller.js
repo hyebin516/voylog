@@ -11,4 +11,14 @@ async function analyze(req, res, next) {
   }
 }
 
-module.exports = { analyze };
+async function search(req, res, next) {
+  try {
+    const { hashtag } = req.query;
+    const result = await videoService.searchByHashtag(hashtag);
+    return success(res, result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { analyze, search };
