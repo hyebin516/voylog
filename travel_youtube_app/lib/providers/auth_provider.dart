@@ -61,6 +61,21 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> deleteAccount() async {
+    try {
+      await _repository.deleteAccount();
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    _currentUser = null;
+    _state = ViewState.idle;
+    notifyListeners();
+    return true;
+  }
+
   void _handleUnauthorized() {
     _currentUser = null;
     _state = ViewState.idle;

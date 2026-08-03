@@ -96,6 +96,7 @@ GradudtionProject/
 | POST | `/api/v1/itineraries` | 필수 (JWT) | 동선 생성. body: `{ startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
 | GET | `/api/v1/auth/profile` | 필수 (JWT) | 내 정보 조회 |
+| DELETE | `/api/v1/auth/profile` | 필수 (JWT) | 회원 탈퇴 (users 소프트 삭제) |
 
 ### 주요 오류 코드
 - `400` INVALID_URL / 유효하지 않은 요청 / 장소 2개 미만

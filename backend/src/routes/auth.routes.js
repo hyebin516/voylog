@@ -7,5 +7,6 @@ const router = express.Router();
 
 router.post('/kakao', validateKakaoLogin, authController.kakaoLogin);
 router.get('/profile', authenticate, authController.profile);
+router.delete('/profile', authenticate, authController.deleteAccount);
 
 module.exports = router;

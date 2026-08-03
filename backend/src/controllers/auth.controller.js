@@ -28,4 +28,13 @@ async function profile(req, res, next) {
   }
 }
 
-module.exports = { kakaoLogin, profile };
+async function deleteAccount(req, res, next) {
+  try {
+    await authService.deleteAccount(req.user.userId);
+    return res.status(204).send();
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { kakaoLogin, profile, deleteAccount };

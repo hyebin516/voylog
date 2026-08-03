@@ -44,4 +44,13 @@ class AuthRepository {
     await _secureStorage.delete(key: StorageKeys.jwt);
     await _secureStorage.delete(key: StorageKeys.userId);
   }
+
+  Future<void> deleteAccount() async {
+    try {
+      await _dio.delete('/auth/profile');
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+    await logout();
+  }
 }

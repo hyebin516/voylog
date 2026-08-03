@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../utils/timestamp_format.dart';
 import 'bookmark_button.dart';
 
 class PlaceCard extends StatelessWidget {
@@ -7,6 +8,7 @@ class PlaceCard extends StatelessWidget {
   final String name;
   final String? address;
   final int? timestampSec;
+  final VoidCallback? onTap;
   final VoidCallback? onTimestampTap;
   final VoidCallback? onMapTap;
   final bool showBookmarkButton;
@@ -22,6 +24,7 @@ class PlaceCard extends StatelessWidget {
     required this.name,
     this.address,
     this.timestampSec,
+    this.onTap,
     this.onTimestampTap,
     this.onMapTap,
     this.showBookmarkButton = true,
@@ -29,55 +32,60 @@ class PlaceCard extends StatelessWidget {
     this.onSelectedChanged,
   });
 
-  String _formatTimestamp(int seconds) {
-    final minutes = seconds ~/ 60;
-    final remaining = seconds % 60;
-    return '${minutes.toString().padLeft(2, '0')}:${remaining.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          children: [
-            if (selected != null)
-              Checkbox(value: selected, onChanged: onSelectedChanged),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: textTheme.titleMedium, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  if (address != null && address!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              if (selected != null)
+                Checkbox(value: selected, onChanged: onSelectedChanged),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Text(
-                      address!,
-                      style: textTheme.bodySmall,
-                      maxLines: 1,
+                      name,
+                      style: textTheme.titleMedium,
+                      maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (address != null && address!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        address!,
+                        style: textTheme.bodySmall,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                    if (timestampSec != null) ...[
+                      const SizedBox(height: 8),
+                      ActionChip(
+                        avatar: const Icon(
+                          Icons.play_circle_outline_rounded,
+                          size: 18,
+                        ),
+                        label: Text(formatTimestamp(timestampSec!)),
+                        onPressed: onTimestampTap,
+                      ),
+                    ],
                   ],
-                  if (timestampSec != null) ...[
-                    const SizedBox(height: 8),
-                    ActionChip(
-                      avatar: const Icon(Icons.play_circle_outline_rounded, size: 18),
-                      label: Text(_formatTimestamp(timestampSec!)),
-                      onPressed: onTimestampTap,
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
-            IconButton(
-              onPressed: onMapTap,
-              icon: const Icon(Icons.map_outlined),
-              tooltip: '지도 보기',
-            ),
-            if (showBookmarkButton) BookmarkButton(placeId: placeId),
-          ],
+              IconButton(
+                onPressed: onMapTap,
+                icon: const Icon(Icons.map_outlined),
+                tooltip: '지도 보기',
+              ),
+              if (showBookmarkButton) BookmarkButton(placeId: placeId),
+            ],
+          ),
         ),
       ),
     );

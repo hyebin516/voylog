@@ -40,6 +40,7 @@ describe('protected routes require a Bearer token', () => {
     ['GET', '/api/v1/hotels'],
     ['POST', '/api/v1/itineraries'],
     ['GET', '/api/v1/auth/profile'],
+    ['DELETE', '/api/v1/auth/profile'],
   ])('%s %s returns 401 JWT_INVALID without an Authorization header', async (method, path) => {
     const res = await request(app)[method.toLowerCase()](path);
     expect(res.status).toBe(401);

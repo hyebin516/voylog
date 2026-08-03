@@ -23,4 +23,8 @@ async function create(user) {
   return rows[0];
 }
 
-module.exports = { findByProviderId, findById, create };
+async function softDelete(userId) {
+  await pool.query('UPDATE users SET deleted_at = now() WHERE user_id = $1', [userId]);
+}
+
+module.exports = { findByProviderId, findById, create, softDelete };

@@ -44,4 +44,8 @@ async function getProfile(userId) {
   return user;
 }
 
-module.exports = { kakaoLogin, getProfile };
+async function deleteAccount(userId) {
+  await userRepository.softDelete(userId);
+}
+
+module.exports = { kakaoLogin, getProfile, deleteAccount };

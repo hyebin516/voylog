@@ -84,3 +84,13 @@ describe('getProfile', () => {
     });
   });
 });
+
+describe('deleteAccount', () => {
+  it('soft-deletes the user by id', async () => {
+    userRepository.softDelete.mockResolvedValue();
+
+    await authService.deleteAccount('u1');
+
+    expect(userRepository.softDelete).toHaveBeenCalledWith('u1');
+  });
+});

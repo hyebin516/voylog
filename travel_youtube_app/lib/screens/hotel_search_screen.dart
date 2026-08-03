@@ -89,6 +89,27 @@ class _HotelSearchScreenState extends State<HotelSearchScreen> {
     }
   }
 
+  Future<void> _confirmDelete(HotelModel hotel) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('호텔 삭제'),
+        content: Text('${hotel.name}을(를) 삭제하시겠습니까?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await context.read<HotelProvider>().deleteHotel(hotel.hotelId);
+    if (success || !mounted) return;
+
+    final message = context.read<HotelProvider>().errorMessage ?? '호텔 삭제에 실패했습니다.';
+    showErrorDialog(context, message);
+  }
+
   void _confirmSelection(HotelModel hotel) {
     final hotelProvider = context.read<HotelProvider>();
     if (widget.role == HotelSelectionRole.start) {
@@ -170,7 +191,11 @@ class _HotelSearchScreenState extends State<HotelSearchScreen> {
                     separatorBuilder: (context, _) => const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
                       final hotel = hotelProvider.hotels[index];
-                      return HotelCard(hotel: hotel, onTap: () => _confirmSelection(hotel));
+                      return HotelCard(
+                        hotel: hotel,
+                        onTap: () => _confirmSelection(hotel),
+                        onDelete: () => _confirmDelete(hotel),
+                      );
                     },
                   ),
           ),

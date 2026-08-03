@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../models/place_model.dart';
 import '../screens/bookmark_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/hotel_search_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_page_screen.dart';
+import '../screens/place_detail_screen.dart';
 import '../screens/route_planner_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/splash_screen.dart';
@@ -17,6 +19,7 @@ class AppRoutes {
   static const String login = '/login';
   static const String home = '/home';
   static const String videoAnalysis = '/video-analysis';
+  static const String placeDetail = '/place-detail';
   static const String bookmarks = '/bookmarks';
   static const String hotelSearch = '/hotel-search';
   static const String routePlanner = '/route-planner';
@@ -33,6 +36,9 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const HomeScreen());
       case AppRoutes.videoAnalysis:
         return MaterialPageRoute(builder: (_) => const VideoAnalysisScreen());
+      case AppRoutes.placeDetail:
+        final place = settings.arguments as PlaceModel;
+        return MaterialPageRoute(builder: (_) => PlaceDetailScreen(place: place));
       case AppRoutes.bookmarks:
         return MaterialPageRoute(builder: (_) => const BookmarkScreen());
       case AppRoutes.hotelSearch:

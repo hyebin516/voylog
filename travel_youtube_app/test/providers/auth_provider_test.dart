@@ -15,6 +15,8 @@ class FakeAuthRepository extends AuthRepository {
   UserModel? loginResult;
   ApiException? loginError;
   int logoutCallCount = 0;
+  ApiException? deleteAccountError;
+  int deleteAccountCallCount = 0;
 
   @override
   Future<bool> hasValidSession() async => sessionIsValid;
@@ -34,6 +36,12 @@ class FakeAuthRepository extends AuthRepository {
   @override
   Future<void> logout() async {
     logoutCallCount++;
+  }
+
+  @override
+  Future<void> deleteAccount() async {
+    deleteAccountCallCount++;
+    if (deleteAccountError != null) throw deleteAccountError!;
   }
 }
 
@@ -126,5 +134,31 @@ void main() {
 
     expect(provider.isAuthenticated, isFalse);
     expect(provider.state, ViewState.idle);
+  });
+
+  group('deleteAccount', () {
+    test('clears the current user and returns true on success', () async {
+      repository.loginResult = _user;
+      await provider.loginWithKakao('kakao-token');
+
+      final result = await provider.deleteAccount();
+
+      expect(result, isTrue);
+      expect(repository.deleteAccountCallCount, 1);
+      expect(provider.isAuthenticated, isFalse);
+      expect(provider.state, ViewState.idle);
+    });
+
+    test('keeps the user logged in and returns false on failure', () async {
+      repository.loginResult = _user;
+      await provider.loginWithKakao('kakao-token');
+      repository.deleteAccountError = const ApiException(code: 'INTERNAL_ERROR', message: 'boom');
+
+      final result = await provider.deleteAccount();
+
+      expect(result, isFalse);
+      expect(provider.isAuthenticated, isTrue);
+      expect(provider.errorMessage, isNotNull);
+    });
   });
 }

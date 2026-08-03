@@ -58,6 +58,22 @@ class HotelProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> deleteHotel(String hotelId) async {
+    try {
+      await _repository.deleteHotel(hotelId);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    _hotels = _hotels.where((h) => h.hotelId != hotelId).toList();
+    if (_selectedStartHotel?.hotelId == hotelId) _selectedStartHotel = null;
+    if (_selectedEndHotel?.hotelId == hotelId) _selectedEndHotel = null;
+    notifyListeners();
+    return true;
+  }
+
   void selectStartHotel(HotelModel hotel) {
     _selectedStartHotel = hotel;
     notifyListeners();

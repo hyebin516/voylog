@@ -13,6 +13,8 @@ class FakeHotelRepository extends HotelRepository {
   ApiException? listError;
   ApiException? createError;
   HotelModel? createdHotel;
+  ApiException? deleteError;
+  final List<String> deleteCalls = [];
 
   @override
   Future<List<HotelModel>> listHotels() async {
@@ -24,6 +26,12 @@ class FakeHotelRepository extends HotelRepository {
   Future<HotelModel> createHotel(HotelModel hotel) async {
     if (createError != null) throw createError!;
     return createdHotel ?? hotel;
+  }
+
+  @override
+  Future<void> deleteHotel(String hotelId) async {
+    deleteCalls.add(hotelId);
+    if (deleteError != null) throw deleteError!;
   }
 }
 
@@ -110,6 +118,43 @@ void main() {
       expect(provider.selectedStartHotel, isNull);
       expect(provider.selectedEndHotel, isNull);
       expect(provider.isRoundTrip, isFalse);
+    });
+  });
+
+  group('deleteHotel', () {
+    test('removes the hotel from the list on success', () async {
+      repository.hotelsToReturn = [_hotelA, _hotelB];
+      await provider.loadHotels();
+
+      final result = await provider.deleteHotel('h-a');
+
+      expect(result, isTrue);
+      expect(repository.deleteCalls, ['h-a']);
+      expect(provider.hotels, [_hotelB]);
+    });
+
+    test('clears the deleted hotel from start/end selection if it was selected', () async {
+      repository.hotelsToReturn = [_hotelA, _hotelB];
+      await provider.loadHotels();
+      provider.selectStartHotel(_hotelA);
+      provider.selectEndHotel(_hotelB);
+
+      await provider.deleteHotel('h-a');
+
+      expect(provider.selectedStartHotel, isNull);
+      expect(provider.selectedEndHotel, _hotelB);
+    });
+
+    test('returns false and sets a friendly error message on failure, keeping the hotel in the list', () async {
+      repository.hotelsToReturn = [_hotelA];
+      await provider.loadHotels();
+      repository.deleteError = const ApiException(code: 'HOTEL_NOT_FOUND', message: 'boom');
+
+      final result = await provider.deleteHotel('h-a');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, isNotNull);
+      expect(provider.hotels, [_hotelA]);
     });
   });
 }

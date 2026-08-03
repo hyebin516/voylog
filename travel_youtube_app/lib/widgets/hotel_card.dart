@@ -6,12 +6,14 @@ class HotelCard extends StatelessWidget {
   final HotelModel hotel;
   final bool selected;
   final VoidCallback onTap;
+  final VoidCallback? onDelete;
 
   const HotelCard({
     super.key,
     required this.hotel,
     required this.onTap,
     this.selected = false,
+    this.onDelete,
   });
 
   @override
@@ -24,7 +26,18 @@ class HotelCard extends StatelessWidget {
         leading: Icon(Icons.hotel_rounded, color: colorScheme.primary),
         title: Text(hotel.name),
         subtitle: Text(hotel.address, maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: selected ? Icon(Icons.check_circle_rounded, color: colorScheme.primary) : null,
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (selected) Icon(Icons.check_circle_rounded, color: colorScheme.primary),
+            if (onDelete != null)
+              IconButton(
+                onPressed: onDelete,
+                icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error),
+                tooltip: '삭제',
+              ),
+          ],
+        ),
         onTap: onTap,
       ),
     );

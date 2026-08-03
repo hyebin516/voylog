@@ -7,6 +7,7 @@ import '../models/map_view_types.dart';
 import '../models/place_model.dart';
 import '../providers/video_provider.dart';
 import '../repositories/map_repository.dart';
+import '../routes/app_routes.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/place_card.dart';
 import '../widgets/video_player_section.dart';
@@ -45,6 +46,13 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
 
   void _seekTo(int seconds) {
     _playerController.seekTo(seconds: seconds.toDouble(), allowSeekAhead: true);
+  }
+
+  Future<void> _openDetail(PlaceModel place) async {
+    final seekTo = await Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: place);
+    if (seekTo is int) {
+      _seekTo(seekTo);
+    }
   }
 
   void _showOnMap(PlaceModel place) {
@@ -125,6 +133,7 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
                           name: place.name,
                           address: place.address,
                           timestampSec: place.timestampSec,
+                          onTap: () => _openDetail(place),
                           onTimestampTap: place.timestampSec != null ? () => _seekTo(place.timestampSec!) : null,
                           onMapTap: place.hasCoordinates ? () => _showOnMap(place) : null,
                         ),
