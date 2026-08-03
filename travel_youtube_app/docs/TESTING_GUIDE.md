@@ -280,7 +280,9 @@ WinDbg 등으로 크래시 덤프를 직접 분석해야 하는데, 이는 이 �
 실행/지도 동작 검증은 이 머신의 에뮬레이터 대신 다음 방법으로 진행하세요.
 
 - **실제 Android 기기를 USB로 연결** (권장 — 개발자 옵션 → USB 디버깅 켜기,
-  케이블 연결 후 `flutter devices`에 잡히면 `flutter run -d <device-id>`)
+  케이블 연결 후 `flutter devices`에 잡히면 `flutter run -d <device-id>`).
+  전체 절차(로컬 백엔드 연결, Kakao 키 해시, 골든 패스 체크리스트)는
+  [REAL_DEVICE_TESTING.md](REAL_DEVICE_TESTING.md) 참고
 - **다른 PC/노트북에서 에뮬레이터 실행** (Intel CPU 머신이거나 정식 릴리스
   Windows 빌드라면 이 문제가 재현되지 않을 가능성이 높음)
 - **GitHub Actions 등 CI에서 Android 에뮬레이터 액션 사용** — Linux CI 러너
