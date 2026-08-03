@@ -1,0 +1,8 @@
+// Copy this file to KakaoKeys.xcconfig (git-ignored, see .gitignore) and
+// fill in the real value. See docs/KAKAO_SETUP.md.
+//
+// Unlike Android (which reads ../.env directly in build.gradle.kts), Xcode
+// build settings can't parse a .env file without a custom Run Script build
+// phase, so this value has to be kept in sync with travel_youtube_app/.env's
+// KAKAO_NATIVE_APP_KEY by hand.
+KAKAO_NATIVE_APP_KEY = your_native_app_key_here

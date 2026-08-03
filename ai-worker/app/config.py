@@ -1,0 +1,15 @@
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+AI_WORKER_PORT = int(os.getenv("AI_WORKER_PORT", "8000"))
+
+LLM_TIMEOUT_SECONDS = 30
+KAKAO_TIMEOUT_SECONDS = 10
+ROUTE_OPTIMIZATION_TIMEOUT_SECONDS = 15

@@ -1,0 +1,34 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../core/theme/app_theme.dart';
+import '../providers/auth_provider.dart';
+import '../providers/bookmark_provider.dart';
+import '../providers/hotel_provider.dart';
+import '../providers/itinerary_provider.dart';
+import '../providers/video_provider.dart';
+import '../routes/app_routes.dart';
+
+class TravelYoutubeApp extends StatelessWidget {
+  const TravelYoutubeApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => VideoProvider()),
+        ChangeNotifierProvider(create: (_) => BookmarkProvider()),
+        ChangeNotifierProvider(create: (_) => HotelProvider()),
+        ChangeNotifierProvider(create: (_) => ItineraryProvider()),
+      ],
+      child: MaterialApp(
+        title: '여행 유튜브 요약',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.light(),
+        initialRoute: AppRoutes.splash,
+        onGenerateRoute: AppRoutes.onGenerateRoute,
+      ),
+    );
+  }
+}

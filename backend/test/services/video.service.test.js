@@ -1,0 +1,85 @@
+jest.mock('../../src/config/db');
+jest.mock('../../src/config/redis');
+jest.mock('../../src/repositories/video.repository');
+jest.mock('../../src/services/aiWorkerClient');
+
+const pool = require('../../src/config/db');
+const redis = require('../../src/config/redis');
+const videoRepository = require('../../src/repositories/video.repository');
+const { callAiWorker } = require('../../src/services/aiWorkerClient');
+const { analyzeVideo } = require('../../src/services/video.service');
+
+const YOUTUBE_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
+
+function mockDbClient() {
+  const client = { query: jest.fn().mockResolvedValue({ rows: [] }), release: jest.fn() };
+  pool.connect = jest.fn().mockResolvedValue(client);
+  return client;
+}
+
+beforeEach(() => {
+  redis.get = jest.fn().mockResolvedValue(null);
+  redis.set = jest.fn().mockResolvedValue('OK');
+});
+
+afterEach(() => jest.clearAllMocks());
+
+describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of truth)', () => {
+  it('returns the Redis-cached response as isCached:true, without touching the DB or AI worker', async () => {
+    redis.get.mockResolvedValue(JSON.stringify({ videoId: 'v1', title: 't', isCached: false, places: [] }));
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(result.isCached).toBe(true);
+    expect(videoRepository.findByUrl).not.toHaveBeenCalled();
+    expect(callAiWorker).not.toHaveBeenCalled();
+  });
+
+  it('returns an already-analyzed DB row as isCached:true and warms the Redis cache', async () => {
+    videoRepository.findByUrl.mockResolvedValue({ video_id: 'v1', title: 'Existing', is_analyzed: true });
+    videoRepository.findPlacesByVideoId.mockResolvedValue([]);
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(result.isCached).toBe(true);
+    expect(result.videoId).toBe('v1');
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(redis.set).toHaveBeenCalledWith('video:dQw4w9WgXcQ', expect.any(String), 'EX', expect.any(Number));
+  });
+
+  it('runs the full transcript+places pipeline and returns isCached:false for a brand-new video', async () => {
+    videoRepository.findByUrl.mockResolvedValue(null);
+    callAiWorker
+      .mockResolvedValueOnce({ title: 'New video', segments: [{ text: 'hi', timestampSec: 0 }] }) // /extract-transcript
+      .mockResolvedValueOnce({ places: [] }); // /extract-places
+    const client = mockDbClient();
+    client.query.mockImplementation((sql) => {
+      if (sql === 'BEGIN' || sql === 'COMMIT') return Promise.resolve();
+      return Promise.resolve({ rows: [{ video_id: 'new-id', title: 'New video' }] });
+    });
+    videoRepository.createVideo.mockResolvedValue({ video_id: 'new-id', title: 'New video' });
+    videoRepository.createPlaces.mockResolvedValue([]);
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(callAiWorker).toHaveBeenNthCalledWith(1, '/extract-transcript', { youtubeUrl: YOUTUBE_URL }, 30000);
+    expect(result.isCached).toBe(false);
+    expect(result.videoId).toBe('new-id');
+    expect(client.query).toHaveBeenCalledWith('COMMIT');
+    expect(redis.set).toHaveBeenCalled();
+  });
+
+  it('rolls back the transaction and propagates the error when saving places fails', async () => {
+    videoRepository.findByUrl.mockResolvedValue(null);
+    callAiWorker.mockResolvedValueOnce({ title: 't', segments: [] }).mockResolvedValueOnce({ places: [] });
+    const client = mockDbClient();
+    videoRepository.createVideo.mockResolvedValue({ video_id: 'new-id' });
+    videoRepository.createPlaces.mockRejectedValue(new Error('insert failed'));
+
+    await expect(analyzeVideo(YOUTUBE_URL)).rejects.toThrow('insert failed');
+
+    expect(client.query).toHaveBeenCalledWith('ROLLBACK');
+    expect(client.release).toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+});

@@ -1,0 +1,44 @@
+import 'package:flutter/material.dart';
+
+import '../models/map_view_types.dart';
+import '../widgets/kakao_map_widget.dart';
+
+/// Abstraction over "build a map view". Screens depend on this, not on
+/// any concrete map SDK — so map code stays out of UI code, and widget
+/// tests can substitute a fake instead of loading a real native map.
+abstract class MapRepository {
+  const MapRepository();
+
+  Widget buildMap({
+    required double initialLatitude,
+    required double initialLongitude,
+    List<MapMarkerData> markers,
+    bool drawRoutePolyline,
+    ValueChanged<MapCenter>? onCenterChanged,
+    ValueChanged<String>? onMarkerTap,
+  });
+}
+
+/// Production implementation, backed by the native `kakao_map_plugin`.
+class KakaoMapRepository extends MapRepository {
+  const KakaoMapRepository();
+
+  @override
+  Widget buildMap({
+    required double initialLatitude,
+    required double initialLongitude,
+    List<MapMarkerData> markers = const [],
+    bool drawRoutePolyline = false,
+    ValueChanged<MapCenter>? onCenterChanged,
+    ValueChanged<String>? onMarkerTap,
+  }) {
+    return KakaoMapWidget(
+      initialLatitude: initialLatitude,
+      initialLongitude: initialLongitude,
+      markers: markers,
+      drawRoutePolyline: drawRoutePolyline,
+      onCenterChanged: onCenterChanged,
+      onMarkerTap: onMarkerTap,
+    );
+  }
+}
