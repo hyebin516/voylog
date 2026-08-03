@@ -49,5 +49,6 @@ jobs:
           flutter-version: '3.44.4'
           channel: 'stable'
       - run: flutter pub get
+      - run: cp .env.example .env # mirrors local setup; .env is a declared pubspec asset
       - run: flutter analyze
       - run: flutter test
