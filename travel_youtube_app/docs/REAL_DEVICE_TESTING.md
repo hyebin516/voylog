@@ -38,6 +38,7 @@ flutter devices
 
 ```bash
 adb reverse tcp:4000 tcp:4000
+
 ```
 
 이 명령 하나로 폰이 보내는 `localhost:4000` 요청이 USB 케이블을 통해 이 PC의
@@ -56,6 +57,17 @@ USB 연결이 가능하면 `adb reverse` 쪽이 훨씬 간단하니 그쪽을 �
 ## 4. 백엔드/AI Worker/DB/Redis 실행 확인
 
 `backend/README.md`, `ai-worker/README.md`에 정리된 순서대로 전부 떠 있어야 합니다.
+
+PowerShell(`&` 호출 연산자로 따옴표 붙은 경로를 실행):
+
+```powershell
+& "C:\PostgreSQL17\pgsql\bin\pg_isready.exe" -h localhost -p 5432
+& "C:\Redis\redis-cli.exe" ping
+curl "http://localhost:4000/api/v1/videos/search?hashtag=test"   # 백엔드
+curl "http://localhost:8000/health"                              # AI Worker
+```
+
+Git Bash라면:
 
 ```bash
 "/c/PostgreSQL17/pgsql/bin/pg_isready.exe" -h localhost -p 5432
@@ -106,9 +118,11 @@ flutter run -d <device-id>   # device-id는 `flutter devices` 출력값
 
 - `flutter run` 콘솔: Dart/Flutter 레벨 로그, 앱 내 `print`/예외
 - 더 상세한 Android 네이티브 로그가 필요하면 별도 터미널에서:
-  ```bash
-  "c:\Android\Sdk\platform-tools\adb.exe" logcat *:E flutter:V
   ```
+  adb logcat *:E flutter:V
+  ```
+  (`adb`가 PATH에 없다는 오류가 나면 `C:\Android\Sdk\platform-tools`를 PATH에 추가—
+  아래 "자주 겪는 문제" 참고)
 - 백엔드/AI Worker 쪽 요청 로그는 각각 `backend/server.log`, `ai-worker/uvicorn.log`
   (둘 다 `.gitignore` 처리되어 있으니 커밋하지 않도록 주의)
 
@@ -121,6 +135,8 @@ flutter run -d <device-id>   # device-id는 `flutter devices` 출력값
 | 지도/장소 분석은 되는데 카카오 로그인만 실패 | 이 PC의 디버그 키 해시가 Kakao 콘솔에 등록 안 됨 — 5번 항목 참고 |
 | 호텔 저장/동선 생성이 401로 실패 | 로그인이 안 된 상태이거나 JWT 만료 — 다시 로그인 |
 | `Waiting for another flutter command to release the startup lock` | 이전 `flutter run`/`flutter build` 프로세스가 아직 안 끝남 — 해당 터미널 종료 후 재시도 |
+| PowerShell에서 `adb : 'adb' 용어가 ... 인식되지 않습니다` | `C:\Android\Sdk\platform-tools`가 PATH에 없음. `[Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Android\Sdk\platform-tools", "User")` 실행 후 **VS Code를 완전히 종료했다가 재시작** (VS Code 통합 터미널은 새 탭을 열어도 VS Code 프로세스 자체가 시작될 때의 PATH를 그대로 물려주므로, 탭만 새로 여는 걸로는 반영 안 됨) |
+| PC 재부팅 후 hashtag 검색/영상 분석이 전부 실패 | PostgreSQL/Redis/backend/ai-worker 넷 다 일반 프로세스라 재부팅 시 전부 꺼짐 — 4번 항목의 재시작 순서를 처음부터 다시 |
 
 이 문서에서 다루는 "실기기 수동 검증"은 [TESTING_GUIDE.md](TESTING_GUIDE.md)의
 `integration_test/`(자동화된 실기기 테스트)와는 별개입니다. 시간이 있다면
