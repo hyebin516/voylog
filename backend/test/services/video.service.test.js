@@ -7,7 +7,7 @@ const pool = require('../../src/config/db');
 const redis = require('../../src/config/redis');
 const videoRepository = require('../../src/repositories/video.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { analyzeVideo, searchByHashtag } = require('../../src/services/video.service');
+const { analyzeVideo, searchByHashtag, getRecommendations } = require('../../src/services/video.service');
 
 const YOUTUBE_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 
@@ -99,5 +99,30 @@ describe('searchByHashtag', () => {
     callAiWorker.mockRejectedValue(new AppError(503, 'AI_PROVIDER_ERROR', 'AI Worker request failed'));
 
     await expect(searchByHashtag('부산여행')).rejects.toMatchObject({ statusCode: 503, code: 'AI_PROVIDER_ERROR' });
+  });
+});
+
+describe('getRecommendations', () => {
+  it('composes regions + themes + duration into a single query and forwards it to the AI worker', async () => {
+    callAiWorker.mockResolvedValue({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
+
+    const result = await getRecommendations(['제주', '부산'], ['자연', '먹방'], '1박2일');
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/search-videos',
+      { query: '제주 부산 자연 먹방 1박2일 브이로그' },
+      10000
+    );
+    expect(result).toEqual({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
+  });
+
+  it('propagates the AppError raised by callAiWorker when the AI worker fails', async () => {
+    const AppError = require('../../src/utils/AppError');
+    callAiWorker.mockRejectedValue(new AppError(503, 'AI_PROVIDER_ERROR', 'AI Worker request failed'));
+
+    await expect(getRecommendations(['제주'], ['자연'], '당일치기')).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'AI_PROVIDER_ERROR',
+    });
   });
 });

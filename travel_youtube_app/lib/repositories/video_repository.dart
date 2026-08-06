@@ -26,4 +26,22 @@ class VideoRepository {
       throwApiException(e);
     }
   }
+
+  Future<List<VideoSearchResultModel>> getRecommendations({
+    required List<String> regions,
+    required List<String> themes,
+    required String duration,
+  }) async {
+    try {
+      final response = await _dio.post('/videos/recommendations', data: {
+        'regions': regions,
+        'themes': themes,
+        'duration': duration,
+      });
+      final videos = response.data['data']['videos'] as List<dynamic>;
+      return videos.map((e) => VideoSearchResultModel.fromJson(e as Map<String, dynamic>)).toList();
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
 }

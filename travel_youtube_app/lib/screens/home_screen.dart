@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/video_search_result_model.dart';
+import '../providers/recommendation_wizard_provider.dart';
 import '../providers/video_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
@@ -61,6 +62,11 @@ class _HomeScreenState extends State<HomeScreen> {
     if (videoProvider.state == ViewState.success) {
       Navigator.pushNamed(context, AppRoutes.videoAnalysis);
     }
+  }
+
+  void _onRecommendationWizardPressed() {
+    context.read<RecommendationWizardProvider>().reset();
+    Navigator.pushNamed(context, AppRoutes.recommendationRegion);
   }
 
   @override
@@ -173,6 +179,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     },
                   ),
               ],
+              const SizedBox(height: AppSpacing.xl),
+              const Divider(),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                '지역/테마로 브이로그 추천받기',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              OutlinedButton.icon(
+                key: const Key('recommendationWizardButton'),
+                icon: const Icon(Icons.explore_outlined),
+                label: const Text('추천 마법사 시작하기'),
+                onPressed: _onRecommendationWizardPressed,
+              ),
             ],
           ),
         ),

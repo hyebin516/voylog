@@ -1,4 +1,8 @@
-const { validateAnalyzeRequest, validateSearchRequest } = require('../../src/validators/video.validator');
+const {
+  validateAnalyzeRequest,
+  validateSearchRequest,
+  validateRecommendationRequest,
+} = require('../../src/validators/video.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
@@ -54,5 +58,49 @@ describe('validateSearchRequest', () => {
     const next = jest.fn();
     validateSearchRequest(mockReq({ query: { hashtag: '   ' } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateRecommendationRequest', () => {
+  const VALID_BODY = { regions: ['제주'], themes: ['자연'], duration: '1박2일' };
+
+  it('passes for a valid regions/themes/duration combination', () => {
+    const next = jest.fn();
+    validateRecommendationRequest(mockReq({ body: { ...VALID_BODY } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('accepts multiple regions and themes', () => {
+    const next = jest.fn();
+    validateRecommendationRequest(
+      mockReq({ body: { regions: ['제주', '부산'], themes: ['자연', '먹방'], duration: '당일치기' } }),
+      mockRes(),
+      next
+    );
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it.each([undefined, [], ['  '], 'not-an-array'])('rejects an invalid regions value (%p)', (regions) => {
+    const next = jest.fn();
+    validateRecommendationRequest(mockReq({ body: { ...VALID_BODY, regions } }), mockRes(), next);
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/region/);
+  });
+
+  it.each([undefined, [], ['  ']])('rejects an invalid themes value (%p)', (themes) => {
+    const next = jest.fn();
+    validateRecommendationRequest(mockReq({ body: { ...VALID_BODY, themes } }), mockRes(), next);
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/theme/);
+  });
+
+  it('rejects a duration outside the fixed set of options', () => {
+    const next = jest.fn();
+    validateRecommendationRequest(mockReq({ body: { ...VALID_BODY, duration: '일주일' } }), mockRes(), next);
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/duration/);
   });
 });

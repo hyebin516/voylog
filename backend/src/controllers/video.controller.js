@@ -21,4 +21,14 @@ async function search(req, res, next) {
   }
 }
 
-module.exports = { analyze, search };
+async function recommendations(req, res, next) {
+  try {
+    const { regions, themes, duration } = req.body;
+    const result = await videoService.getRecommendations(regions, themes, duration);
+    return success(res, result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { analyze, search, recommendations };

@@ -45,3 +45,37 @@ def test_search_hashtag_defaults_max_results_to_20():
     from app.schemas.request_schema import HashtagSearchRequest
 
     assert HashtagSearchRequest(hashtag="부산여행").maxResults == 20
+
+
+def test_search_videos_returns_mapped_results(monkeypatch):
+    async def fake_search(request):
+        from app.schemas.response_schema import HashtagSearchResponse, VideoSearchResult
+
+        return HashtagSearchResponse(
+            videos=[
+                VideoSearchResult(
+                    videoId="dQw4w9WgXcQ",
+                    youtubeUrl="https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+                    title="title",
+                )
+            ]
+        )
+
+    monkeypatch.setattr(video_search_service, "search_by_query", fake_search)
+
+    res = client.post("/search-videos", json={"query": "제주도 자연 1박2일 브이로그"})
+
+    assert res.status_code == 200
+    assert res.json()["videos"][0]["videoId"] == "dQw4w9WgXcQ"
+
+
+def test_search_videos_maps_youtube_search_error_to_503(monkeypatch):
+    async def fake_search(request):
+        raise YoutubeSearchError()
+
+    monkeypatch.setattr(video_search_service, "search_by_query", fake_search)
+
+    res = client.post("/search-videos", json={"query": "제주도 자연"})
+
+    assert res.status_code == 503
+    assert res.json()["error"]["code"] == "YOUTUBE_SEARCH_FAILED"

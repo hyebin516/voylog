@@ -24,6 +24,10 @@ class FakeVideoRepository extends VideoRepository {
   ApiException? searchError;
   String? lastHashtag;
 
+  List<String>? lastRegions;
+  List<String>? lastThemes;
+  String? lastDuration;
+
   @override
   Future<VideoModel> analyze(String youtubeUrl) async {
     lastUrl = youtubeUrl;
@@ -34,6 +38,19 @@ class FakeVideoRepository extends VideoRepository {
   @override
   Future<List<VideoSearchResultModel>> searchByHashtag(String hashtag) async {
     lastHashtag = hashtag;
+    if (searchError != null) throw searchError!;
+    return searchResultsToReturn;
+  }
+
+  @override
+  Future<List<VideoSearchResultModel>> getRecommendations({
+    required List<String> regions,
+    required List<String> themes,
+    required String duration,
+  }) async {
+    lastRegions = regions;
+    lastThemes = themes;
+    lastDuration = duration;
     if (searchError != null) throw searchError!;
     return searchResultsToReturn;
   }
@@ -122,6 +139,30 @@ void main() {
       expect(provider.state, ViewState.success);
       expect(provider.currentVideo?.videoId, 'v1');
       expect(provider.searchState, ViewState.success);
+    });
+  });
+
+  group('searchByRecommendation', () {
+    test('transitions to success and stores the results', () async {
+      repository.searchResultsToReturn = [_searchResult];
+
+      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+
+      expect(repository.lastRegions, ['제주']);
+      expect(repository.lastThemes, ['자연']);
+      expect(repository.lastDuration, '1박2일');
+      expect(provider.searchState, ViewState.success);
+      expect(provider.searchResults, [_searchResult]);
+    });
+
+    test('transitions to error with a friendly message on failure', () async {
+      repository.searchError = const ApiException(code: 'YOUTUBE_SEARCH_FAILED', message: 'boom');
+
+      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+
+      expect(provider.searchState, ViewState.error);
+      expect(provider.searchErrorMessage, isNotNull);
+      expect(provider.searchResults, isEmpty);
     });
   });
 

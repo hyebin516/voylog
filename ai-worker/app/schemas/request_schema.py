@@ -12,6 +12,11 @@ class HashtagSearchRequest(BaseModel):
     maxResults: int = 20
 
 
+class VideoSearchRequest(BaseModel):
+    query: str
+    maxResults: int = 20
+
+
 class VideoMeta(BaseModel):
     videoId: str
     youtubeUrl: str

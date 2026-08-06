@@ -31,6 +31,14 @@ describe('POST /api/v1/videos/analyze', () => {
   });
 });
 
+describe('POST /api/v1/videos/recommendations', () => {
+  it('rejects a missing regions/themes/duration before reaching the controller', async () => {
+    const res = await request(app).post('/api/v1/videos/recommendations').send({});
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
 describe('protected routes require a Bearer token', () => {
   it.each([
     ['POST', '/api/v1/bookmarks'],

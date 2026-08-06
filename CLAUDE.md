@@ -90,6 +90,7 @@ GradudtionProject/
 | --- | --- | --- | --- |
 | POST | `/api/v1/videos/analyze` | 불필요 | YouTube URL 분석. body: `{ youtubeUrl }` |
 | GET | `/api/v1/videos/search` | 불필요 | 해시태그로 브이로그 탐색 (FR-02). query: `?hashtag=`. AI Worker의 YouTube Data API 검색 결과(영상 후보 목록)를 그대로 전달, DB 저장 없음 |
+| POST | `/api/v1/videos/recommendations` | 불필요 | 지역/테마/기간 선택 기반 브이로그 추천 마법사. body: `{ regions[], themes[], duration }` (`duration`은 `당일치기 / 1박2일 / 2박3일 / 3박4일 / 4박5일이상` 중 하나). 서버가 지역+테마+기간을 하나의 검색어로 조합해 AI Worker의 YouTube Data API 키워드 검색(`/search-videos`)을 호출 — 해시태그 탐색과 동일한 검색 인프라 재사용, 응답 형식도 동일(`{ videos: [] }`), DB 저장 없음 |
 | POST | `/api/v1/bookmarks` | 필수 (JWT) | 북마크 저장. body: `{ placeId }` |
 | GET/DELETE | `/api/v1/bookmarks`, `/api/v1/bookmarks/:id` | 필수 (JWT) | 북마크 조회/삭제 |
 | POST/GET/PUT/DELETE | `/api/v1/hotels`, `/api/v1/hotels/:id` | 필수 (JWT) | 호텔 CRUD |

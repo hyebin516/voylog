@@ -7,6 +7,10 @@ import '../screens/hotel_search_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_page_screen.dart';
 import '../screens/place_detail_screen.dart';
+import '../screens/recommendation_duration_screen.dart';
+import '../screens/recommendation_region_screen.dart';
+import '../screens/recommendation_results_screen.dart';
+import '../screens/recommendation_theme_screen.dart';
 import '../screens/route_planner_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/splash_screen.dart';
@@ -29,6 +33,10 @@ class AppRoutes {
   static const String tripDetail = '/trip-detail';
   static const String myPage = '/my-page';
   static const String settings = '/settings';
+  static const String recommendationRegion = '/recommendation/region';
+  static const String recommendationTheme = '/recommendation/theme';
+  static const String recommendationDuration = '/recommendation/duration';
+  static const String recommendationResults = '/recommendation/results';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -59,6 +67,14 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const MyPageScreen(), settings: settings);
       case AppRoutes.settings:
         return MaterialPageRoute(builder: (_) => const SettingsScreen(), settings: settings);
+      case AppRoutes.recommendationRegion:
+        return MaterialPageRoute(builder: (_) => const RecommendationRegionScreen(), settings: settings);
+      case AppRoutes.recommendationTheme:
+        return MaterialPageRoute(builder: (_) => const RecommendationThemeScreen(), settings: settings);
+      case AppRoutes.recommendationDuration:
+        return MaterialPageRoute(builder: (_) => const RecommendationDurationScreen(), settings: settings);
+      case AppRoutes.recommendationResults:
+        return MaterialPageRoute(builder: (_) => const RecommendationResultsScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

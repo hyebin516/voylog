@@ -61,6 +61,29 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Backs the region/theme/duration recommendation wizard. Shares the same
+  /// searchResults/searchState as [searchByHashtag] — both are "browse for a
+  /// video to analyze" flows and are never shown on screen at the same time.
+  Future<void> searchByRecommendation({
+    required List<String> regions,
+    required List<String> themes,
+    required String duration,
+  }) async {
+    _searchState = ViewState.loading;
+    _searchErrorMessage = null;
+    notifyListeners();
+
+    try {
+      _searchResults = await _repository.getRecommendations(regions: regions, themes: themes, duration: duration);
+      _searchState = ViewState.success;
+    } on ApiException catch (e) {
+      _searchState = ViewState.error;
+      _searchErrorMessage = e.friendlyMessage;
+    }
+
+    notifyListeners();
+  }
+
   void clearSearch() {
     _searchState = ViewState.idle;
     _searchResults = [];

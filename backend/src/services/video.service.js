@@ -94,4 +94,14 @@ async function searchByHashtag(hashtag) {
   return { videos: result.videos };
 }
 
-module.exports = { analyzeVideo, searchByHashtag };
+function buildRecommendationQuery(regions, themes, duration) {
+  return [...regions, ...themes, duration, '브이로그'].join(' ');
+}
+
+async function getRecommendations(regions, themes, duration) {
+  const query = buildRecommendationQuery(regions, themes, duration);
+  const result = await callAiWorker('/search-videos', { query }, 10000);
+  return { videos: result.videos };
+}
+
+module.exports = { analyzeVideo, searchByHashtag, getRecommendations };

@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
 import 'package:travel_youtube_app/providers/video_provider.dart';
 import 'package:travel_youtube_app/screens/home_screen.dart';
 import 'package:travel_youtube_app/utils/view_state.dart';
+
+Widget _wrapWithWizard() {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => VideoProvider()),
+      ChangeNotifierProvider(create: (_) => RecommendationWizardProvider()),
+    ],
+    child: MaterialApp(
+      home: const HomeScreen(),
+      onGenerateRoute: (settings) => MaterialPageRoute(builder: (_) => const Scaffold(body: Text('region screen'))),
+    ),
+  );
+}
 
 void main() {
   testWidgets('HomeScreen shows the URL input and analyze button', (tester) async {
@@ -52,5 +66,14 @@ void main() {
 
     expect(videoProvider.searchState, ViewState.idle);
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('tapping the recommendation wizard button resets wizard state and navigates', (tester) async {
+    await tester.pumpWidget(_wrapWithWizard());
+
+    await tester.tap(find.byKey(const Key('recommendationWizardButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('region screen'), findsOneWidget);
   });
 }

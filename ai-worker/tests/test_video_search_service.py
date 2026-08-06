@@ -2,7 +2,7 @@ import asyncio
 
 import pytest
 
-from app.schemas.request_schema import HashtagSearchRequest
+from app.schemas.request_schema import HashtagSearchRequest, VideoSearchRequest
 from app.services import video_search_service
 from app.utils.exceptions import YoutubeSearchError
 
@@ -116,3 +116,40 @@ def test_search_by_hashtag_raises_when_the_http_call_fails(monkeypatch):
 
     with pytest.raises(YoutubeSearchError):
         asyncio.run(video_search_service.search_by_hashtag(HashtagSearchRequest(hashtag="부산여행")))
+
+
+def test_search_by_query_sends_the_composed_query_unmodified_no_hash_prefix(monkeypatch):
+    monkeypatch.setattr(video_search_service, "YOUTUBE_API_KEY", "fake-key")
+    client = FakeAsyncClient(payload={"items": []})
+    monkeypatch.setattr(video_search_service.httpx, "AsyncClient", lambda timeout=None: client)
+
+    asyncio.run(video_search_service.search_by_query(VideoSearchRequest(query="제주도 자연 1박2일 브이로그")))
+
+    assert client.last_params["q"] == "제주도 자연 1박2일 브이로그"
+
+
+def test_search_by_query_raises_without_an_api_key(monkeypatch):
+    monkeypatch.setattr(video_search_service, "YOUTUBE_API_KEY", None)
+
+    with pytest.raises(YoutubeSearchError):
+        asyncio.run(video_search_service.search_by_query(VideoSearchRequest(query="제주도 자연")))
+
+
+def test_search_by_query_maps_results_the_same_way_as_hashtag_search(monkeypatch):
+    monkeypatch.setattr(video_search_service, "YOUTUBE_API_KEY", "fake-key")
+    payload = {
+        "items": [
+            {
+                "id": {"videoId": "dQw4w9WgXcQ"},
+                "snippet": {"title": "제주도 자연 브이로그", "channelTitle": "채널", "thumbnails": {}},
+            }
+        ]
+    }
+    monkeypatch.setattr(
+        video_search_service.httpx, "AsyncClient", lambda timeout=None: FakeAsyncClient(payload=payload)
+    )
+
+    result = asyncio.run(video_search_service.search_by_query(VideoSearchRequest(query="제주도 자연")))
+
+    assert len(result.videos) == 1
+    assert result.videos[0].videoId == "dQw4w9WgXcQ"
