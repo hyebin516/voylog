@@ -27,4 +27,19 @@ async function softDelete(userId) {
   await pool.query('UPDATE users SET deleted_at = now() WHERE user_id = $1', [userId]);
 }
 
-module.exports = { findByProviderId, findById, create, softDelete };
+async function findByEmail(email) {
+  const { rows } = await pool.query('SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL', [email]);
+  return rows[0] || null;
+}
+
+async function createEmailUser({ email, passwordHash, nickname }) {
+  const { rows } = await pool.query(
+    `INSERT INTO users (provider, provider_id, email, nickname, password_hash)
+     VALUES ('email', $1, $1, $2, $3)
+     RETURNING *`,
+    [email, nickname, passwordHash]
+  );
+  return rows[0];
+}
+
+module.exports = { findByProviderId, findById, create, softDelete, findByEmail, createEmailUser };

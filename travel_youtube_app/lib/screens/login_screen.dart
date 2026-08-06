@@ -10,8 +10,31 @@ import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
 import '../widgets/primary_button.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _emailController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onEmailLoginPressed(AuthProvider authProvider) async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) return;
+
+    await authProvider.loginWithEmail(email, password);
+  }
 
   Future<void> _onKakaoLoginPressed(BuildContext context) async {
     final authProvider = context.read<AuthProvider>();
@@ -59,6 +82,38 @@ class LoginScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: AppSpacing.xl),
+              TextField(
+                key: const Key('loginEmailField'),
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  hintText: '이메일',
+                  prefixIcon: Icon(Icons.mail_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                key: const Key('loginPasswordField'),
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  hintText: '비밀번호',
+                  prefixIcon: Icon(Icons.lock_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              PrimaryButton(
+                label: '이메일로 로그인',
+                isLoading: authProvider.isLoading,
+                onPressed: () => _onEmailLoginPressed(authProvider),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.signupEmail),
+                child: const Text('이메일로 회원가입'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Divider(),
+              const SizedBox(height: AppSpacing.md),
               PrimaryButton(
                 label: '카카오로 로그인',
                 icon: Icons.chat_bubble_rounded,

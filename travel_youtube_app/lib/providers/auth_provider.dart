@@ -54,6 +54,76 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> requestSignupOtp(String email) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.requestSignupOtp(email);
+      _state = ViewState.idle;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifySignupOtp(String email, String code) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.verifySignupOtp(email, code);
+      _state = ViewState.idle;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> signup({required String email, required String password, required String nickname}) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _currentUser = await _repository.signup(email: email, password: password, nickname: nickname);
+      _state = ViewState.success;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<void> loginWithEmail(String email, String password) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      _currentUser = await _repository.loginWithEmail(email, password);
+      _state = ViewState.success;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+    }
+
+    notifyListeners();
+  }
+
   Future<void> logout() async {
     await _repository.logout();
     _currentUser = null;

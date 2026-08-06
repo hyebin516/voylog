@@ -104,6 +104,10 @@ GradudtionProject/
 | POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | GET/PUT | `/api/v1/notification-settings` | 필수 (JWT) | 알림 설정 조회(저장된 값이 없으면 기본값 반환) / 수정. body(PUT): `{ tripAlerts, serviceAlerts, marketingAlerts }` (모두 boolean 필수). 실제 푸시 발송 인프라는 없음 — 설정값만 저장 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
+| POST | `/api/v1/auth/signup/request-otp` | 불필요 | 네이티브 회원가입 1단계: body `{ email }`. 이미 가입된 이메일이면 409 EMAIL_EXISTS. 6자리 인증코드를 생성해 SMTP로 이메일 발송(5분 유효) |
+| POST | `/api/v1/auth/signup/verify-otp` | 불필요 | 네이티브 회원가입 2단계: body `{ email, code }` (`code`는 6자리 숫자). 코드 불일치 시 400 OTP_INVALID(시도 횟수 누적), 만료·시도 초과·미발급 시 400 OTP_EXPIRED |
+| POST | `/api/v1/auth/signup` | 불필요 | 네이티브 회원가입 3단계: body `{ email, password, nickname }` (`password` 8자 이상). 직전에 verify-otp로 인증된 이메일(15분 이내)이 없으면 400 OTP_NOT_VERIFIED. 성공 시 `users`(`provider='email'`)에 저장, 사용한 인증코드 삭제, JWT 발급(카카오 로그인과 동일 응답 형태: `{ token, user }`) |
+| POST | `/api/v1/auth/login` | 불필요 | 네이티브 이메일/비밀번호 로그인. body `{ email, password }`. 일치하는 계정이 없거나 비밀번호 불일치(카카오 전용 계정 포함, `password_hash`가 없는 경우) 시 401 INVALID_CREDENTIALS |
 | GET | `/api/v1/auth/profile` | 필수 (JWT) | 내 정보 조회 |
 | DELETE | `/api/v1/auth/profile` | 필수 (JWT) | 회원 탈퇴 (users 소프트 삭제) |
 
@@ -114,7 +118,9 @@ GradudtionProject/
 - `401` JWT_INVALID / 미인증
 - `403` JWT_EXPIRED
 - `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행) / FOLDER_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 북마크 폴더)
-- `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜)
+- `400` OTP_INVALID / OTP_EXPIRED / OTP_NOT_VERIFIED (네이티브 회원가입 이메일 인증 관련)
+- `401` INVALID_CREDENTIALS (네이티브 로그인 이메일/비밀번호 불일치)
+- `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜) / EMAIL_EXISTS (이미 가입된 이메일로 회원가입 시도)
 - `422` TRANSCRIPT_NOT_FOUND (자막 없는 영상)
 - `500` 내부 오류
 - `503` AI_TIMEOUT / AI_PROVIDER_ERROR / GEOCODING_FAILED / YOUTUBE_SEARCH_FAILED (외부 API 실패)
@@ -123,7 +129,8 @@ GradudtionProject/
 
 모든 PK는 UUID, 모든 테이블에 `created_at`/`updated_at`(TIMESTAMPTZ) 포함, 하드 삭제 대신 `deleted_at` 소프트 삭제 원칙.
 
-- **users**: `user_id(PK)`, `provider`(kakao), `provider_id`(UNIQUE), `email`(nullable), `nickname`, `profile_image`, `created_at`, `updated_at`
+- **users**: `user_id(PK)`, `provider`(kakao | email), `provider_id`(UNIQUE — kakao는 카카오 회원번호, email 계정은 `email`과 동일한 값), `email`(nullable — email 계정은 UNIQUE 부분 인덱스로 중복 가입 방지), `password_hash`(nullable — email 계정만 bcrypt 해시 보유, kakao 계정은 null), `nickname`, `profile_image`, `created_at`, `updated_at`
+- **email_otps**: `otp_id(PK)`, `email`, `code_hash`(6자리 코드의 SHA-256 해시, 평문 미저장), `expires_at`(발급 5분 후), `verified_at`(nullable), `attempts`(기본 0, 5회 초과 시 만료 취급), `created_at` — 네이티브 회원가입 이메일 인증용. `POST /auth/signup` 성공 시 해당 이메일의 행을 모두 삭제(소프트 삭제 대상 아님, 단기 토큰성 데이터)
 - **videos**: `video_id(PK)`, `youtube_url`(UNIQUE), `title`, `description`, `thumbnail_url`, `channel_name`, `published_at`, `duration_sec`, `language`, `is_analyzed`, `analysis_version`, `created_at`, `updated_at`
 - **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `created_at`, `updated_at`
 - **hotels**: `hotel_id(PK)`, `user_id(FK)`, `name`, `address`, `latitude`, `longitude`(NOT NULL — Kakao Maps 검색으로만 저장), `created_at`, `updated_at`
@@ -189,6 +196,7 @@ GradudtionProject/
 - **FR-01** URL 분석 / **FR-02** 해시태그 탐색 / **FR-03** 장소 카드 / **FR-04** 타임스탬프 이동
 - **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
 - **FR-10** 지역/테마/기간 추천 마법사 / **FR-11** 북마크 폴더(다대다 태그) / **FR-12** 알림 설정(서버 저장, 발송 인프라 없음) / **FR-13** 고객센터(정적 FAQ + 연락처 안내)
+- **FR-14** 네이티브 회원가입/로그인(이메일+비밀번호, OTP 이메일 인증) — 카카오 소셜 로그인(FR-08)과 별개의 로그인 수단, 두 provider 모두 동일한 JWT 발급 흐름을 공유
 
 ## 자주 쓰는 명령어
 

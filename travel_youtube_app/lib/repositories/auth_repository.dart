@@ -13,17 +13,58 @@ class AuthRepository {
   Future<UserModel> loginWithKakao(String kakaoAccessToken) async {
     try {
       final response = await _dio.post('/auth/kakao', data: {'kakaoAccessToken': kakaoAccessToken});
-      final data = response.data['data'] as Map<String, dynamic>;
-      final token = data['token'] as String;
-      final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
-
-      await _secureStorage.write(key: StorageKeys.jwt, value: token);
-      await _secureStorage.write(key: StorageKeys.userId, value: user.userId);
-
-      return user;
+      return _storeSession(response.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {
       throwApiException(e);
     }
+  }
+
+  Future<void> requestSignupOtp(String email) async {
+    try {
+      await _dio.post('/auth/signup/request-otp', data: {'email': email});
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<void> verifySignupOtp(String email, String code) async {
+    try {
+      await _dio.post('/auth/signup/verify-otp', data: {'email': email, 'code': code});
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<UserModel> signup({required String email, required String password, required String nickname}) async {
+    try {
+      final response = await _dio.post('/auth/signup', data: {
+        'email': email,
+        'password': password,
+        'nickname': nickname,
+      });
+      return _storeSession(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<UserModel> loginWithEmail(String email, String password) async {
+    try {
+      final response = await _dio.post('/auth/login', data: {'email': email, 'password': password});
+      return _storeSession(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<UserModel> _storeSession(Map<String, dynamic> data) async {
+    final token = data['token'] as String;
+    final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
+
+    await _secureStorage.write(key: StorageKeys.jwt, value: token);
+    await _secureStorage.write(key: StorageKeys.userId, value: user.userId);
+
+    return user;
   }
 
   Future<UserModel> fetchProfile() async {

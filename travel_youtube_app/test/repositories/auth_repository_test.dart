@@ -29,6 +29,98 @@ void main() {
     expect(adapter.lastOptions?.data, {'kakaoAccessToken': 'kakao-token'});
   });
 
+  test('requestSignupOtp posts the email', () async {
+    final adapter = FakeDioAdapter(statusCode: 200, body: {'success': true, 'data': {}});
+    DioClient().dio.httpClientAdapter = adapter;
+
+    await AuthRepository().requestSignupOtp('a@b.com');
+
+    expect(adapter.lastOptions?.path, '/auth/signup/request-otp');
+    expect(adapter.lastOptions?.data, {'email': 'a@b.com'});
+  });
+
+  test('requestSignupOtp surfaces a 409 EMAIL_EXISTS error', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 409,
+      body: {
+        'success': false,
+        'error': {'code': 'EMAIL_EXISTS', 'message': 'This email is already registered'},
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      AuthRepository().requestSignupOtp('a@b.com'),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 'EMAIL_EXISTS')),
+    );
+  });
+
+  test('verifySignupOtp posts the email and code', () async {
+    final adapter = FakeDioAdapter(statusCode: 200, body: {'success': true, 'data': {}});
+    DioClient().dio.httpClientAdapter = adapter;
+
+    await AuthRepository().verifySignupOtp('a@b.com', '123456');
+
+    expect(adapter.lastOptions?.path, '/auth/signup/verify-otp');
+    expect(adapter.lastOptions?.data, {'email': 'a@b.com', 'code': '123456'});
+  });
+
+  test('signup posts email/password/nickname and maps the response into a UserModel', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 201,
+      body: {
+        'success': true,
+        'data': {
+          'token': 'jwt-token',
+          'user': {'userId': 'u1', 'email': 'a@b.com', 'nickname': 'Nagyeong', 'profileImage': null},
+        },
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    final user = await AuthRepository().signup(email: 'a@b.com', password: 'password123', nickname: 'Nagyeong');
+
+    expect(user.userId, 'u1');
+    expect(adapter.lastOptions?.path, '/auth/signup');
+    expect(adapter.lastOptions?.data, {'email': 'a@b.com', 'password': 'password123', 'nickname': 'Nagyeong'});
+  });
+
+  test('loginWithEmail posts email/password and maps the response into a UserModel', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 200,
+      body: {
+        'success': true,
+        'data': {
+          'token': 'jwt-token',
+          'user': {'userId': 'u1', 'email': 'a@b.com', 'nickname': 'Nagyeong', 'profileImage': null},
+        },
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    final user = await AuthRepository().loginWithEmail('a@b.com', 'password123');
+
+    expect(user.userId, 'u1');
+    expect(adapter.lastOptions?.path, '/auth/login');
+    expect(adapter.lastOptions?.data, {'email': 'a@b.com', 'password': 'password123'});
+  });
+
+  test('loginWithEmail surfaces a 401 INVALID_CREDENTIALS error', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 401,
+      body: {
+        'success': false,
+        'error': {'code': 'INVALID_CREDENTIALS', 'message': 'Invalid email or password'},
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    await expectLater(
+      AuthRepository().loginWithEmail('a@b.com', 'wrong-password'),
+      throwsA(isA<ApiException>().having((e) => e.code, 'code', 'INVALID_CREDENTIALS')),
+    );
+  });
+
   test('fetchProfile maps the response into a UserModel', () async {
     final adapter = FakeDioAdapter(
       statusCode: 200,

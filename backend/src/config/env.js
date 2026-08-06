@@ -10,4 +10,9 @@ module.exports = {
   kakaoClientId: process.env.KAKAO_CLIENT_ID,
   kakaoClientSecret: process.env.KAKAO_CLIENT_SECRET,
   aiWorkerUrl: process.env.AI_WORKER_URL,
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT) || 587,
+  smtpUser: process.env.SMTP_USER,
+  smtpPassword: process.env.SMTP_PASSWORD,
+  smtpFrom: process.env.SMTP_FROM || 'Voylog <no-reply@voylog.app>',
 };

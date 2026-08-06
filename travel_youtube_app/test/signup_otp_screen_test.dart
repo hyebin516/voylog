@@ -1,0 +1,68 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:travel_youtube_app/models/api_exception.dart';
+import 'package:travel_youtube_app/providers/auth_provider.dart';
+import 'package:travel_youtube_app/repositories/auth_repository.dart';
+import 'package:travel_youtube_app/screens/signup_otp_screen.dart';
+
+class FakeAuthRepository extends AuthRepository {
+  ApiException? verifyOtpError;
+  String? lastEmail;
+  String? lastCode;
+
+  @override
+  Future<void> verifySignupOtp(String email, String code) async {
+    lastEmail = email;
+    lastCode = code;
+    if (verifyOtpError != null) throw verifyOtpError!;
+  }
+}
+
+Widget _wrap(AuthProvider provider) {
+  return ChangeNotifierProvider.value(
+    value: provider,
+    child: MaterialApp(
+      home: const SignupOtpScreen(email: 'a@b.com'),
+      onGenerateRoute: (settings) => MaterialPageRoute(builder: (_) => const Scaffold(body: Text('details screen'))),
+    ),
+  );
+}
+
+void main() {
+  testWidgets('shows an inline error for a code shorter than 6 digits', (tester) async {
+    final repository = FakeAuthRepository();
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+
+    await tester.enterText(find.byKey(const Key('signupOtpField')), '123');
+    await tester.tap(find.text('인증하기'));
+    await tester.pump();
+
+    expect(find.text('6자리 인증번호를 입력해 주세요.'), findsOneWidget);
+    expect(repository.lastEmail, isNull);
+  });
+
+  testWidgets('verifying successfully navigates to the details screen', (tester) async {
+    final repository = FakeAuthRepository();
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+
+    await tester.enterText(find.byKey(const Key('signupOtpField')), '123456');
+    await tester.tap(find.text('인증하기'));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastEmail, 'a@b.com');
+    expect(repository.lastCode, '123456');
+    expect(find.text('details screen'), findsOneWidget);
+  });
+
+  testWidgets('shows an error view for an incorrect code', (tester) async {
+    final repository = FakeAuthRepository()..verifyOtpError = const ApiException(code: 'OTP_INVALID', message: 'boom');
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+
+    await tester.enterText(find.byKey(const Key('signupOtpField')), '000000');
+    await tester.tap(find.text('인증하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('인증번호가 올바르지 않습니다.'), findsOneWidget);
+  });
+}

@@ -18,6 +18,16 @@ class FakeAuthRepository extends AuthRepository {
   ApiException? deleteAccountError;
   int deleteAccountCallCount = 0;
 
+  ApiException? requestOtpError;
+  String? lastOtpEmail;
+  ApiException? verifyOtpError;
+  String? lastVerifyEmail;
+  String? lastVerifyCode;
+  UserModel? signupResult;
+  ApiException? signupError;
+  UserModel? emailLoginResult;
+  ApiException? emailLoginError;
+
   @override
   Future<bool> hasValidSession() async => sessionIsValid;
 
@@ -42,6 +52,31 @@ class FakeAuthRepository extends AuthRepository {
   Future<void> deleteAccount() async {
     deleteAccountCallCount++;
     if (deleteAccountError != null) throw deleteAccountError!;
+  }
+
+  @override
+  Future<void> requestSignupOtp(String email) async {
+    lastOtpEmail = email;
+    if (requestOtpError != null) throw requestOtpError!;
+  }
+
+  @override
+  Future<void> verifySignupOtp(String email, String code) async {
+    lastVerifyEmail = email;
+    lastVerifyCode = code;
+    if (verifyOtpError != null) throw verifyOtpError!;
+  }
+
+  @override
+  Future<UserModel> signup({required String email, required String password, required String nickname}) async {
+    if (signupError != null) throw signupError!;
+    return signupResult!;
+  }
+
+  @override
+  Future<UserModel> loginWithEmail(String email, String password) async {
+    if (emailLoginError != null) throw emailLoginError!;
+    return emailLoginResult!;
   }
 }
 
@@ -134,6 +169,85 @@ void main() {
 
     expect(provider.isAuthenticated, isFalse);
     expect(provider.state, ViewState.idle);
+  });
+
+  group('requestSignupOtp', () {
+    test('returns true on success', () async {
+      final result = await provider.requestSignupOtp('a@b.com');
+
+      expect(result, isTrue);
+      expect(repository.lastOtpEmail, 'a@b.com');
+    });
+
+    test('returns false and sets an error message on failure', () async {
+      repository.requestOtpError = const ApiException(code: 'EMAIL_EXISTS', message: 'boom');
+
+      final result = await provider.requestSignupOtp('a@b.com');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, isNotNull);
+    });
+  });
+
+  group('verifySignupOtp', () {
+    test('returns true on success', () async {
+      final result = await provider.verifySignupOtp('a@b.com', '123456');
+
+      expect(result, isTrue);
+      expect(repository.lastVerifyEmail, 'a@b.com');
+      expect(repository.lastVerifyCode, '123456');
+    });
+
+    test('returns false and sets an error message on failure', () async {
+      repository.verifyOtpError = const ApiException(code: 'OTP_INVALID', message: 'boom');
+
+      final result = await provider.verifySignupOtp('a@b.com', '000000');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, isNotNull);
+    });
+  });
+
+  group('signup', () {
+    test('authenticates the user on success', () async {
+      repository.signupResult = _user;
+
+      final result = await provider.signup(email: 'a@b.com', password: 'password123', nickname: 'Nagyeong');
+
+      expect(result, isTrue);
+      expect(provider.isAuthenticated, isTrue);
+      expect(provider.currentUser, _user);
+    });
+
+    test('returns false and sets an error message on failure', () async {
+      repository.signupError = const ApiException(code: 'OTP_NOT_VERIFIED', message: 'boom');
+
+      final result = await provider.signup(email: 'a@b.com', password: 'password123', nickname: 'Nagyeong');
+
+      expect(result, isFalse);
+      expect(provider.isAuthenticated, isFalse);
+    });
+  });
+
+  group('loginWithEmail', () {
+    test('authenticates the user on success', () async {
+      repository.emailLoginResult = _user;
+
+      await provider.loginWithEmail('a@b.com', 'password123');
+
+      expect(provider.isAuthenticated, isTrue);
+      expect(provider.currentUser, _user);
+      expect(provider.state, ViewState.success);
+    });
+
+    test('sets an error state with a friendly message on failure', () async {
+      repository.emailLoginError = const ApiException(code: 'INVALID_CREDENTIALS', message: 'boom');
+
+      await provider.loginWithEmail('a@b.com', 'wrong-password');
+
+      expect(provider.state, ViewState.error);
+      expect(provider.isAuthenticated, isFalse);
+    });
   });
 
   group('deleteAccount', () {

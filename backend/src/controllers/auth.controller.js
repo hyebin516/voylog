@@ -37,4 +37,40 @@ async function deleteAccount(req, res, next) {
   }
 }
 
-module.exports = { kakaoLogin, profile, deleteAccount };
+async function requestOtp(req, res, next) {
+  try {
+    await authService.requestSignupOtp(req.body.email);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function verifyOtp(req, res, next) {
+  try {
+    await authService.verifySignupOtp(req.body.email, req.body.code);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function signup(req, res, next) {
+  try {
+    const { token, user } = await authService.signup(req.body.email, req.body.password, req.body.nickname);
+    return success(res, { token, user: toUserResponse(user) }, 201);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function login(req, res, next) {
+  try {
+    const { token, user } = await authService.login(req.body.email, req.body.password);
+    return success(res, { token, user: toUserResponse(user) });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { kakaoLogin, profile, deleteAccount, requestOtp, verifyOtp, signup, login };

@@ -18,6 +18,9 @@ import '../screens/recommendation_results_screen.dart';
 import '../screens/recommendation_theme_screen.dart';
 import '../screens/route_planner_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/signup_details_screen.dart';
+import '../screens/signup_email_screen.dart';
+import '../screens/signup_otp_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/trip_detail_screen.dart';
 import '../screens/trip_list_screen.dart';
@@ -47,6 +50,9 @@ class AppRoutes {
   static const String bookmarkFolderPicker = '/bookmark-folder-picker';
   static const String notificationSettings = '/notification-settings';
   static const String customerService = '/customer-service';
+  static const String signupEmail = '/signup/email';
+  static const String signupOtp = '/signup/otp';
+  static const String signupDetails = '/signup/details';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -97,6 +103,14 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const NotificationSettingsScreen(), settings: settings);
       case AppRoutes.customerService:
         return MaterialPageRoute(builder: (_) => const CustomerServiceScreen(), settings: settings);
+      case AppRoutes.signupEmail:
+        return MaterialPageRoute(builder: (_) => const SignupEmailScreen(), settings: settings);
+      case AppRoutes.signupOtp:
+        final email = settings.arguments as String;
+        return MaterialPageRoute(builder: (_) => SignupOtpScreen(email: email), settings: settings);
+      case AppRoutes.signupDetails:
+        final email = settings.arguments as String;
+        return MaterialPageRoute(builder: (_) => SignupDetailsScreen(email: email), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

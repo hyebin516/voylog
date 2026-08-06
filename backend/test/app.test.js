@@ -75,3 +75,37 @@ describe('POST /api/v1/auth/kakao', () => {
     expect(res.body.error.code).toBe('INVALID_REQUEST');
   });
 });
+
+describe('POST /api/v1/auth/signup/request-otp', () => {
+  it('rejects an invalid email before reaching the controller', async () => {
+    const res = await request(app).post('/api/v1/auth/signup/request-otp').send({ email: 'not-an-email' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
+describe('POST /api/v1/auth/signup/verify-otp', () => {
+  it('rejects a missing code before reaching the controller', async () => {
+    const res = await request(app).post('/api/v1/auth/signup/verify-otp').send({ email: 'a@b.com' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
+describe('POST /api/v1/auth/signup', () => {
+  it('rejects a password shorter than 8 characters before reaching the controller', async () => {
+    const res = await request(app)
+      .post('/api/v1/auth/signup')
+      .send({ email: 'a@b.com', password: 'short', nickname: 'Nagyeong' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
+describe('POST /api/v1/auth/login', () => {
+  it('rejects a missing password before reaching the controller', async () => {
+    const res = await request(app).post('/api/v1/auth/login').send({ email: 'a@b.com' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
