@@ -4,11 +4,15 @@ import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/itinerary_model.dart';
 import 'package:travel_youtube_app/models/trip_model.dart';
+import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/hotel_provider.dart';
 import 'package:travel_youtube_app/providers/itinerary_provider.dart';
 import 'package:travel_youtube_app/providers/trip_provider.dart';
 import 'package:travel_youtube_app/repositories/trip_repository.dart';
+import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/trip_detail_screen.dart';
+
+import 'helpers/mock_secure_storage_channel.dart';
 
 ItineraryModel _day(int dayNumber) {
   return ItineraryModel(
@@ -46,12 +50,22 @@ Widget _wrap(TripProvider tripProvider) {
       ChangeNotifierProvider.value(value: tripProvider),
       ChangeNotifierProvider(create: (_) => HotelProvider()),
       ChangeNotifierProvider(create: (_) => ItineraryProvider()),
+      ChangeNotifierProvider(create: (_) => BookmarkProvider()),
     ],
-    child: const MaterialApp(home: TripDetailScreen(tripId: 't1')),
+    child: MaterialApp(
+      // `home:` builds the initial screen directly (AppRoutes.tripDetail
+      // needs a `tripId` argument, which `initialRoute:` can't carry).
+      // `onGenerateRoute:` is still wired so that in-app pushNamed calls
+      // (e.g. "일차 추가" -> /bookmarks) resolve correctly.
+      home: const TripDetailScreen(tripId: 't1'),
+      onGenerateRoute: AppRoutes.onGenerateRoute,
+    ),
   );
 }
 
 void main() {
+  setUpAll(installMockSecureStorageChannel);
+
   testWidgets('shows an empty state and an "1일차 추가" button when the trip has no days yet', (tester) async {
     final repository = FakeTripRepository()
       ..tripDetailToReturn = TripDetailModel(tripId: 't1', name: '제주도 여행', createdAt: DateTime(2026, 1, 1), days: []);
