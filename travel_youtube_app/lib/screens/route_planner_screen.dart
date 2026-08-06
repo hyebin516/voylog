@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../models/map_view_types.dart';
 import '../providers/hotel_provider.dart';
 import '../providers/itinerary_provider.dart';
+import '../providers/trip_provider.dart';
 import '../repositories/map_repository.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
@@ -33,21 +34,42 @@ class RoutePlannerScreen extends StatelessWidget {
   Future<void> _optimize(BuildContext context) async {
     final hotelProvider = context.read<HotelProvider>();
     final itineraryProvider = context.read<ItineraryProvider>();
+    final tripProvider = context.read<TripProvider>();
 
     final startHotel = hotelProvider.selectedStartHotel;
     final endHotel = hotelProvider.selectedEndHotel;
-    if (startHotel == null || endHotel == null) return;
+    final tripId = tripProvider.activeTripId;
+    final dayNumber = tripProvider.activeDayNumber;
+    if (startHotel == null || endHotel == null || tripId == null || dayNumber == null) return;
 
     await itineraryProvider.optimize(
+      tripId: tripId,
+      dayNumber: dayNumber,
       startHotelId: startHotel.hotelId,
       endHotelId: endHotel.hotelId,
     );
+  }
+
+  void _backToTrip(BuildContext context) {
+    final tripProvider = context.read<TripProvider>();
+    final tripId = tripProvider.activeTripId;
+    tripProvider.clearActiveDay();
+    Navigator.of(context).popUntil((route) => route.settings.name == AppRoutes.tripDetail);
+    if (tripId != null) tripProvider.loadTrip(tripId);
   }
 
   @override
   Widget build(BuildContext context) {
     final hotelProvider = context.watch<HotelProvider>();
     final itineraryProvider = context.watch<ItineraryProvider>();
+    final tripProvider = context.watch<TripProvider>();
+
+    if (tripProvider.activeTripId == null || tripProvider.activeDayNumber == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('AI 동선 플래너')),
+        body: const Center(child: Text('여행 상세 화면에서 "일차 추가"를 눌러 시작해주세요.')),
+      );
+    }
 
     final startHotel = hotelProvider.selectedStartHotel;
     final endHotel = hotelProvider.selectedEndHotel;
@@ -55,7 +77,7 @@ class RoutePlannerScreen extends StatelessWidget {
         startHotel != null && endHotel != null && itineraryProvider.canOptimize;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('AI 동선 플래너')),
+      appBar: AppBar(title: Text('${tripProvider.activeDayNumber}일차 동선 플래너')),
       body: SingleChildScrollView(
         child: ResponsiveCenter(
           child: Column(
@@ -88,12 +110,13 @@ class RoutePlannerScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.md),
-              PrimaryButton(
-                label: '동선 최적화',
-                icon: Icons.route_rounded,
-                isLoading: itineraryProvider.isLoading,
-                onPressed: canOptimize ? () => _optimize(context) : null,
-              ),
+              if (itineraryProvider.result == null)
+                PrimaryButton(
+                  label: '동선 최적화',
+                  icon: Icons.route_rounded,
+                  isLoading: itineraryProvider.isLoading,
+                  onPressed: canOptimize ? () => _optimize(context) : null,
+                ),
               const SizedBox(height: AppSpacing.lg),
               if (itineraryProvider.isLoading)
                 const LoadingIndicator(message: '최적 동선을 계산하고 있어요...'),
@@ -132,6 +155,12 @@ class RoutePlannerScreen extends StatelessWidget {
                       ),
                     );
                   },
+                ),
+                const SizedBox(height: AppSpacing.md),
+                PrimaryButton(
+                  label: '저장 완료 — 여행으로 돌아가기',
+                  icon: Icons.check_rounded,
+                  onPressed: () => _backToTrip(context),
                 ),
               ],
             ],

@@ -8,6 +8,8 @@ import 'package:travel_youtube_app/utils/view_state.dart';
 ItineraryModel _result({required String startHotelId, required String endHotelId}) {
   return ItineraryModel(
     itineraryId: 'it1',
+    tripId: 'trip1',
+    dayNumber: 1,
     startHotelId: startHotelId,
     endHotelId: endHotelId,
     routeType: startHotelId == endHotelId ? 'roundTrip' : 'hotelToHotel',
@@ -25,11 +27,19 @@ class FakeItineraryRepository extends ItineraryRepository {
 
   @override
   Future<ItineraryModel> createItinerary({
+    required String tripId,
+    required int dayNumber,
     required String startHotelId,
     required String endHotelId,
     required List<String> placeIds,
   }) async {
-    lastCallArgs = {'startHotelId': startHotelId, 'endHotelId': endHotelId, 'placeIds': placeIds};
+    lastCallArgs = {
+      'tripId': tripId,
+      'dayNumber': dayNumber,
+      'startHotelId': startHotelId,
+      'endHotelId': endHotelId,
+      'placeIds': placeIds,
+    };
     if (error != null) throw error!;
     return resultToReturn!;
   }
@@ -80,21 +90,23 @@ void main() {
     test('does nothing when fewer than 2 places are selected (guarded by canOptimize)', () async {
       provider.togglePlaceSelection('p1');
 
-      await provider.optimize(startHotelId: 'h1', endHotelId: 'h1');
+      await provider.optimize(tripId: 'trip1', dayNumber: 1, startHotelId: 'h1', endHotelId: 'h1');
 
       expect(provider.state, ViewState.idle);
       expect(repository.lastCallArgs, isNull);
     });
 
-    test('sends the selected place ids and derives the result on success', () async {
+    test('sends the trip/day and selected place ids, and derives the result on success', () async {
       provider.togglePlaceSelection('p1');
       provider.togglePlaceSelection('p2');
       repository.resultToReturn = _result(startHotelId: 'h1', endHotelId: 'h1');
 
-      await provider.optimize(startHotelId: 'h1', endHotelId: 'h1');
+      await provider.optimize(tripId: 'trip1', dayNumber: 2, startHotelId: 'h1', endHotelId: 'h1');
 
       expect(provider.state, ViewState.success);
       expect(provider.result?.isRoundTrip, isTrue);
+      expect(repository.lastCallArgs?['tripId'], 'trip1');
+      expect(repository.lastCallArgs?['dayNumber'], 2);
       expect(repository.lastCallArgs?['startHotelId'], 'h1');
       expect(repository.lastCallArgs?['endHotelId'], 'h1');
       expect((repository.lastCallArgs?['placeIds'] as List).toSet(), {'p1', 'p2'});
@@ -105,7 +117,7 @@ void main() {
       provider.togglePlaceSelection('p2');
       repository.error = const ApiException(code: 'HOTEL_NOT_FOUND', message: 'boom');
 
-      await provider.optimize(startHotelId: 'h1', endHotelId: 'h2');
+      await provider.optimize(tripId: 'trip1', dayNumber: 1, startHotelId: 'h1', endHotelId: 'h2');
 
       expect(provider.state, ViewState.error);
       expect(provider.errorMessage, '선택한 호텔을 찾을 수 없습니다.');
@@ -116,7 +128,7 @@ void main() {
     provider.togglePlaceSelection('p1');
     provider.togglePlaceSelection('p2');
     repository.resultToReturn = _result(startHotelId: 'h1', endHotelId: 'h1');
-    await provider.optimize(startHotelId: 'h1', endHotelId: 'h1');
+    await provider.optimize(tripId: 'trip1', dayNumber: 1, startHotelId: 'h1', endHotelId: 'h1');
 
     provider.reset();
 

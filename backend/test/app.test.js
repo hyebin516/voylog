@@ -39,6 +39,10 @@ describe('protected routes require a Bearer token', () => {
     ['POST', '/api/v1/hotels'],
     ['GET', '/api/v1/hotels'],
     ['POST', '/api/v1/itineraries'],
+    ['POST', '/api/v1/trips'],
+    ['GET', '/api/v1/trips'],
+    ['GET', '/api/v1/trips/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
+    ['DELETE', '/api/v1/trips/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
     ['GET', '/api/v1/auth/profile'],
     ['DELETE', '/api/v1/auth/profile'],
   ])('%s %s returns 401 JWT_INVALID without an Authorization header', async (method, path) => {

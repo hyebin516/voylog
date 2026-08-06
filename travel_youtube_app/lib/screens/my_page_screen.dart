@@ -55,6 +55,12 @@ class MyPageScreen extends StatelessWidget {
             onTap: () => Navigator.pushNamed(context, AppRoutes.bookmarks),
           ),
           ListTile(
+            leading: const Icon(Icons.card_travel_rounded),
+            title: const Text('내 여행'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.tripList),
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_outlined),
             title: const Text('설정'),
             trailing: const Icon(Icons.chevron_right_rounded),

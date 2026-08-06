@@ -1,6 +1,7 @@
 const itineraryRepository = require('../repositories/itinerary.repository');
 const placeRepository = require('../repositories/place.repository');
 const hotelService = require('./hotel.service');
+const tripService = require('./trip.service');
 const { callAiWorker } = require('./aiWorkerClient');
 const AppError = require('../utils/AppError');
 
@@ -14,7 +15,14 @@ function toHotelPayload(hotel) {
   };
 }
 
-async function createItinerary(userId, startHotelId, endHotelId, placeIds) {
+async function createItinerary(userId, tripId, dayNumber, startHotelId, endHotelId, placeIds) {
+  await tripService.getOwnedTrip(userId, tripId);
+
+  const existingDay = await itineraryRepository.findByTripAndDay(tripId, dayNumber);
+  if (existingDay) {
+    throw new AppError(409, 'DAY_EXISTS', `Day ${dayNumber} already exists for this trip`);
+  }
+
   const startHotel = await hotelService.getOwnedHotel(userId, startHotelId);
   const endHotel =
     endHotelId === startHotelId ? startHotel : await hotelService.getOwnedHotel(userId, endHotelId);
@@ -46,7 +54,7 @@ async function createItinerary(userId, startHotelId, endHotelId, placeIds) {
     15000
   );
 
-  return itineraryRepository.create(userId, startHotelId, endHotelId, optimizedResult);
+  return itineraryRepository.create(userId, tripId, dayNumber, startHotelId, endHotelId, optimizedResult);
 }
 
 module.exports = { createItinerary };

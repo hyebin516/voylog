@@ -4,6 +4,8 @@ const { success } = require('../utils/response');
 function toItineraryResponse(itinerary) {
   return {
     itineraryId: itinerary.itinerary_id,
+    tripId: itinerary.trip_id,
+    dayNumber: itinerary.day_number,
     startHotelId: itinerary.start_hotel_id,
     endHotelId: itinerary.end_hotel_id,
     routeType: itinerary.route_type,
@@ -17,12 +19,19 @@ function toItineraryResponse(itinerary) {
 
 async function create(req, res, next) {
   try {
-    const { startHotelId, endHotelId, placeIds } = req.body;
-    const itinerary = await itineraryService.createItinerary(req.user.userId, startHotelId, endHotelId, placeIds);
+    const { tripId, dayNumber, startHotelId, endHotelId, placeIds } = req.body;
+    const itinerary = await itineraryService.createItinerary(
+      req.user.userId,
+      tripId,
+      dayNumber,
+      startHotelId,
+      endHotelId,
+      placeIds
+    );
     return success(res, toItineraryResponse(itinerary), 201);
   } catch (err) {
     return next(err);
   }
 }
 
-module.exports = { create };
+module.exports = { create, toItineraryResponse };

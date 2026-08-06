@@ -4,17 +4,17 @@
 
 ## 프로젝트 개요
 
-**여행 유튜브 요약 서비스** — 유튜브 여행·브이로그 영상을 분석하여 영상 속 등장 장소를 자동 추출하고, 사용자가 선택한 시작/종료 호텔을 기준으로 북마크한 장소들을 순회하는 최적 동선(왕복 또는 호텔 간 이동)을 AI가 계획해주는 여행 일정 플래너 서비스. Clean Architecture(계층 분리)를 따른다.
+**여행 유튜브 요약 서비스** — 유튜브 여행·브이로그 영상을 분석하여 영상 속 등장 장소를 자동 추출하고, 사용자가 만든 "여행(trip)" 아래 여러 날짜(1일차, 2일차...)로 나눠 각 날짜마다 시작/종료 호텔을 기준으로 북마크한 장소들을 순회하는 최적 동선(왕복 또는 호텔 간 이동)을 AI가 계획해주는 여행 일정 플래너 서비스. Clean Architecture(계층 분리)를 따른다.
 
 - **팀명**: 럭키비키 (팀장: 김혜빈 / 팀원: 최나경, 황현빈)
-- **문서 버전**: v2.1 (시작/종료 호텔 분리, 표준 응답 포맷, LLM 폴백 규칙 반영)
+- **문서 버전**: v2.2 (여행(trip)-일자(day) 구조 도입, 시작/종료 호텔 분리, 표준 응답 포맷, LLM 폴백 규칙 반영)
 
 ### 핵심 사용자 흐름
 1. 유튜브 URL 입력 또는 해시태그로 브이로그 탐색
 2. 자막 추출 → LLM 장소 파싱 → Kakao Maps 좌표 변환 → 장소 카드 목록 제공
 3. 타임스탬프 클릭(영상 이동), 지도 보기, 북마크
-4. Kakao Maps로 시작 호텔·종료 호텔 선택 (같은 호텔을 선택하면 왕복, 다른 호텔이면 호텔 간 이동)
-5. 북마크된 장소(2~10개) 기반 AI 동선 최적화 (시작 호텔 → 장소들 → 종료 호텔)
+4. 여행(trip) 생성 후, 날짜(1일차, 2일차...)마다 Kakao Maps로 시작 호텔·종료 호텔 선택 (같은 호텔을 선택하면 왕복, 다른 호텔이면 호텔 간 이동 — 날짜마다 다르게 선택 가능, 예: 1일차 A호텔→B호텔, 2일차 B호텔→B호텔)
+5. 북마크된 장소(2~10개) 기반 AI 동선 최적화 (해당 날짜의 시작 호텔 → 장소들 → 종료 호텔), 날짜별로 반복하여 하나의 여행에 누적 저장
 
 ## 기술 스택
 
@@ -93,7 +93,9 @@ GradudtionProject/
 | POST | `/api/v1/bookmarks` | 필수 (JWT) | 북마크 저장. body: `{ placeId }` |
 | GET/DELETE | `/api/v1/bookmarks`, `/api/v1/bookmarks/:id` | 필수 (JWT) | 북마크 조회/삭제 |
 | POST/GET/PUT/DELETE | `/api/v1/hotels`, `/api/v1/hotels/:id` | 필수 (JWT) | 호텔 CRUD |
-| POST | `/api/v1/itineraries` | 필수 (JWT) | 동선 생성. body: `{ startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
+| POST/GET | `/api/v1/trips` | 필수 (JWT) | 여행 생성 body: `{ name }` / 내 여행 목록 조회 (각 여행에 `dayCount` 포함) |
+| GET/DELETE | `/api/v1/trips/:id` | 필수 (JWT) | 여행 상세(날짜별 동선 목록 `days[]`) 조회 / 여행 삭제(소속 날짜 동선도 함께 소프트 삭제) |
+| POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
 | GET | `/api/v1/auth/profile` | 필수 (JWT) | 내 정보 조회 |
 | DELETE | `/api/v1/auth/profile` | 필수 (JWT) | 회원 탈퇴 (users 소프트 삭제) |
@@ -102,7 +104,8 @@ GradudtionProject/
 - `400` INVALID_URL / 유효하지 않은 요청 / 장소 2개 미만
 - `401` JWT_INVALID / 미인증
 - `403` JWT_EXPIRED
-- `409` BOOKMARK_EXISTS
+- `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행)
+- `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜)
 - `422` TRANSCRIPT_NOT_FOUND (자막 없는 영상)
 - `500` 내부 오류
 - `503` AI_TIMEOUT / AI_PROVIDER_ERROR / GEOCODING_FAILED / YOUTUBE_SEARCH_FAILED (외부 API 실패)
@@ -116,9 +119,10 @@ GradudtionProject/
 - **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `created_at`, `updated_at`
 - **hotels**: `hotel_id(PK)`, `user_id(FK)`, `name`, `address`, `latitude`, `longitude`(NOT NULL — Kakao Maps 검색으로만 저장), `created_at`, `updated_at`
 - **bookmarks**: `bookmark_id(PK)`, `user_id(FK)`, `place_id(FK)`, `created_at`, UNIQUE(`user_id`, `place_id`)
-- **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
+- **trips**: `trip_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at` — 여러 날짜(itineraries)를 묶는 상위 "여행" 단위
+- **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `trip_id(FK → trips.trip_id, NOT NULL)`, `day_number(INTEGER, NOT NULL, > 0)` — 여행 내 몇 일차인지, `(trip_id, day_number)` UNIQUE(소프트 삭제 제외), `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
 
-인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`.
+인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`.
 
 ## 핵심 처리 로직
 
@@ -131,13 +135,19 @@ GradudtionProject/
 6. `videos`, `places` 저장 및 `is_analyzed = true`
 7. 결과 반환
 
-### 동선 최적화 (시작/종료 호텔 기반)
-1. `startHotelId`, `endHotelId` + `placeIds` 최소 2개, 최대 10개 검증. 둘 다 요청 사용자 소유 호텔이어야 함
-2. `route_type`을 서버에서 자동 판별: `startHotelId == endHotelId` → `roundTrip`, 다르면 → `hotelToHotel` (클라이언트가 보낸 routeType은 신뢰하지 않음)
-3. 시작 호텔·종료 호텔·각 장소 좌표 조회 (좌표 없는 장소는 제외)
-4. Kakao Mobility(길찾기) API로 이동 시간 계산, 실패 시 Haversine 직선거리로 대체
-5. 시작 호텔과 종료 호텔을 고정 양 끝점으로 유지한 채 장소들의 방문 순서만 TSP 스타일로 최적화: 시작 호텔(출발) → 장소들 → 종료 호텔(도착), 10개 초과는 최적화 대상에서 제외
-6. `itineraries`(route_data는 JSONB) 저장 후 반환
+### 여행(trip)·날짜(day) 구조
+- 동선은 항상 "여행" 하나에 소속된 "며칠째(day_number)" 단위로 생성된다. 먼저 `POST /trips`로 여행을 만들고, 그 아래에 `POST /itineraries`로 날짜별 동선을 하나씩 추가한다.
+- 같은 여행 안에서도 날짜마다 시작/종료 호텔이 다를 수 있다 (예: 1일차 A호텔 → B호텔, 2일차 B호텔 → B호텔 왕복). 각 날짜의 호텔 기반 동선 최적화 로직 자체는 서로 독립적이며 아래 로직을 날짜마다 그대로 반복한다.
+- 같은 `tripId`+`dayNumber` 조합으로 다시 생성을 시도하면 409 DAY_EXISTS.
+
+### 동선 최적화 (여행의 특정 날짜, 시작/종료 호텔 기반)
+1. `tripId`가 요청 사용자 소유 여행인지 확인 (아니면 404 TRIP_NOT_FOUND), 해당 `tripId`+`dayNumber` 조합이 이미 존재하는지 확인 (있으면 409 DAY_EXISTS)
+2. `startHotelId`, `endHotelId` + `placeIds` 최소 2개, 최대 10개 검증. 둘 다 요청 사용자 소유 호텔이어야 함
+3. `route_type`을 서버에서 자동 판별: `startHotelId == endHotelId` → `roundTrip`, 다르면 → `hotelToHotel` (클라이언트가 보낸 routeType은 신뢰하지 않음)
+4. 시작 호텔·종료 호텔·각 장소 좌표 조회 (좌표 없는 장소는 제외)
+5. Kakao Mobility(길찾기) API로 이동 시간 계산, 실패 시 Haversine 직선거리로 대체
+6. 시작 호텔과 종료 호텔을 고정 양 끝점으로 유지한 채 장소들의 방문 순서만 TSP 스타일로 최적화: 시작 호텔(출발) → 장소들 → 종료 호텔(도착), 10개 초과는 최적화 대상에서 제외
+7. `itineraries`(`trip_id`, `day_number` 포함, `route_data`는 JSONB) 저장 후 반환
 
 ## LLM 규칙
 

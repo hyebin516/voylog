@@ -8,12 +8,16 @@ class ItineraryRepository {
   final Dio _dio = DioClient().dio;
 
   Future<ItineraryModel> createItinerary({
+    required String tripId,
+    required int dayNumber,
     required String startHotelId,
     required String endHotelId,
     required List<String> placeIds,
   }) async {
     try {
       final response = await _dio.post('/itineraries', data: {
+        'tripId': tripId,
+        'dayNumber': dayNumber,
         'startHotelId': startHotelId,
         'endHotelId': endHotelId,
         'placeIds': placeIds,

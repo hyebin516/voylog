@@ -2,7 +2,7 @@ const AppError = require('../utils/AppError');
 const isUuid = require('../utils/isUuid');
 
 function validateCreateItinerary(req, res, next) {
-  const { hotelId, placeIds } = req.body;
+  const { hotelId, placeIds, tripId, dayNumber } = req.body;
   let { startHotelId, endHotelId } = req.body;
 
   // Backward compatibility: old clients send a single hotelId for a round trip.
@@ -11,6 +11,14 @@ function validateCreateItinerary(req, res, next) {
     endHotelId = hotelId;
     req.body.startHotelId = startHotelId;
     req.body.endHotelId = endHotelId;
+  }
+
+  if (!isUuid(tripId)) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A valid tripId is required'));
+  }
+
+  if (!Number.isInteger(dayNumber) || dayNumber < 1) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'dayNumber must be a positive integer'));
   }
 
   if (!isUuid(startHotelId) || !isUuid(endHotelId)) {

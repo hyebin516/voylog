@@ -38,7 +38,12 @@ class ItineraryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> optimize({required String startHotelId, required String endHotelId}) async {
+  Future<void> optimize({
+    required String tripId,
+    required int dayNumber,
+    required String startHotelId,
+    required String endHotelId,
+  }) async {
     if (!canOptimize) return;
 
     _state = ViewState.loading;
@@ -47,6 +52,8 @@ class ItineraryProvider extends ChangeNotifier {
 
     try {
       _result = await _repository.createItinerary(
+        tripId: tripId,
+        dayNumber: dayNumber,
         startHotelId: startHotelId,
         endHotelId: endHotelId,
         placeIds: _selectedPlaceIds.toList(),

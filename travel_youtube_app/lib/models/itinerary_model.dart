@@ -34,6 +34,8 @@ class RoutePointModel {
 
 class ItineraryModel {
   final String itineraryId;
+  final String tripId;
+  final int dayNumber;
   final String startHotelId;
   final String endHotelId;
   final String routeType; // 'roundTrip' | 'hotelToHotel'
@@ -44,6 +46,8 @@ class ItineraryModel {
 
   const ItineraryModel({
     required this.itineraryId,
+    required this.tripId,
+    required this.dayNumber,
     required this.startHotelId,
     required this.endHotelId,
     required this.routeType,
@@ -58,6 +62,8 @@ class ItineraryModel {
   factory ItineraryModel.fromJson(Map<String, dynamic> json) {
     return ItineraryModel(
       itineraryId: json['itineraryId'] as String,
+      tripId: json['tripId'] as String,
+      dayNumber: json['dayNumber'] as int,
       startHotelId: json['startHotelId'] as String,
       endHotelId: json['endHotelId'] as String,
       routeType: json['routeType'] as String,

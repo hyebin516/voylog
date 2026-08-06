@@ -31,6 +31,8 @@ void main() {
   group('ItineraryModel.fromJson', () {
     Map<String, dynamic> baseJson({required String startHotelId, required String endHotelId}) => {
           'itineraryId': 'it1',
+          'tripId': 'trip1',
+          'dayNumber': 1,
           'startHotelId': startHotelId,
           'endHotelId': endHotelId,
           'routeType': startHotelId == endHotelId ? 'roundTrip' : 'hotelToHotel',
@@ -50,6 +52,8 @@ void main() {
       expect(itinerary.isRoundTrip, isTrue);
       expect(itinerary.routeType, 'roundTrip');
       expect(itinerary.routeData, hasLength(3));
+      expect(itinerary.tripId, 'trip1');
+      expect(itinerary.dayNumber, 1);
     });
 
     test('isRoundTrip is false when startHotelId differs from endHotelId', () {

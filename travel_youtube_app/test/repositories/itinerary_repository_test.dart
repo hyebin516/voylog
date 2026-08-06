@@ -8,13 +8,15 @@ import '../helpers/mock_secure_storage_channel.dart';
 void main() {
   setUpAll(installMockSecureStorageChannel);
 
-  test('createItinerary sends startHotelId/endHotelId/placeIds and maps the optimized route back', () async {
+  test('createItinerary sends tripId/dayNumber/startHotelId/endHotelId/placeIds and maps the optimized route back', () async {
     final adapter = FakeDioAdapter(
       statusCode: 201,
       body: {
         'success': true,
         'data': {
           'itineraryId': 'it1',
+          'tripId': 'trip1',
+          'dayNumber': 1,
           'startHotelId': 'h1',
           'endHotelId': 'h1',
           'routeType': 'roundTrip',
@@ -30,14 +32,24 @@ void main() {
     DioClient().dio.httpClientAdapter = adapter;
 
     final itinerary = await ItineraryRepository().createItinerary(
+      tripId: 'trip1',
+      dayNumber: 1,
       startHotelId: 'h1',
       endHotelId: 'h1',
       placeIds: ['p1', 'p2'],
     );
 
     expect(itinerary.isRoundTrip, isTrue);
+    expect(itinerary.tripId, 'trip1');
+    expect(itinerary.dayNumber, 1);
     expect(itinerary.routeData, hasLength(1));
     expect(adapter.lastOptions?.path, '/itineraries');
-    expect(adapter.lastOptions?.data, {'startHotelId': 'h1', 'endHotelId': 'h1', 'placeIds': ['p1', 'p2']});
+    expect(adapter.lastOptions?.data, {
+      'tripId': 'trip1',
+      'dayNumber': 1,
+      'startHotelId': 'h1',
+      'endHotelId': 'h1',
+      'placeIds': ['p1', 'p2'],
+    });
   });
 }
