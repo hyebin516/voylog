@@ -19,17 +19,20 @@ class BookmarkFolderDetailScreen extends StatefulWidget {
 }
 
 class _BookmarkFolderDetailScreenState extends State<BookmarkFolderDetailScreen> {
+  late final BookmarkFolderProvider _folderProvider;
+
   @override
   void initState() {
     super.initState();
+    _folderProvider = context.read<BookmarkFolderProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BookmarkFolderProvider>().loadFolderBookmarks(widget.folderId);
+      _folderProvider.loadFolderBookmarks(widget.folderId);
     });
   }
 
   @override
   void dispose() {
-    context.read<BookmarkFolderProvider>().clearFolderDetail();
+    _folderProvider.clearFolderDetail();
     super.dispose();
   }
 
