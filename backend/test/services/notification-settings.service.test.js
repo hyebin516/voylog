@@ -1,0 +1,52 @@
+jest.mock('../../src/repositories/notification-settings.repository');
+
+const notificationSettingsRepository = require('../../src/repositories/notification-settings.repository');
+const notificationSettingsService = require('../../src/services/notification-settings.service');
+
+const USER_ID = 'user-1';
+
+afterEach(() => jest.clearAllMocks());
+
+describe('getSettings', () => {
+  it('returns the saved settings when they exist', async () => {
+    notificationSettingsRepository.find.mockResolvedValue({
+      user_id: USER_ID,
+      trip_alerts: false,
+      service_alerts: true,
+      marketing_alerts: true,
+    });
+
+    const settings = await notificationSettingsService.getSettings(USER_ID);
+
+    expect(settings).toEqual({
+      user_id: USER_ID,
+      trip_alerts: false,
+      service_alerts: true,
+      marketing_alerts: true,
+    });
+  });
+
+  it('returns default settings when the user has none saved yet', async () => {
+    notificationSettingsRepository.find.mockResolvedValue(null);
+
+    const settings = await notificationSettingsService.getSettings(USER_ID);
+
+    expect(settings).toEqual({
+      user_id: USER_ID,
+      trip_alerts: true,
+      service_alerts: true,
+      marketing_alerts: false,
+    });
+  });
+});
+
+describe('updateSettings', () => {
+  it('upserts the given settings for the user', async () => {
+    const input = { tripAlerts: false, serviceAlerts: false, marketingAlerts: true };
+    notificationSettingsRepository.upsert.mockResolvedValue({ user_id: USER_ID, ...input });
+
+    await notificationSettingsService.updateSettings(USER_ID, input);
+
+    expect(notificationSettingsRepository.upsert).toHaveBeenCalledWith(USER_ID, input);
+  });
+});

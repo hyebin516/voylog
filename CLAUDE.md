@@ -93,19 +93,27 @@ GradudtionProject/
 | POST | `/api/v1/videos/recommendations` | 불필요 | 지역/테마/기간 선택 기반 브이로그 추천 마법사. body: `{ regions[], themes[], duration }` (`duration`은 `당일치기 / 1박2일 / 2박3일 / 3박4일 / 4박5일이상` 중 하나). 서버가 지역+테마+기간을 하나의 검색어로 조합해 AI Worker의 YouTube Data API 키워드 검색(`/search-videos`)을 호출 — 해시태그 탐색과 동일한 검색 인프라 재사용, 응답 형식도 동일(`{ videos: [] }`), DB 저장 없음 |
 | POST | `/api/v1/bookmarks` | 필수 (JWT) | 북마크 저장. body: `{ placeId }` |
 | GET/DELETE | `/api/v1/bookmarks`, `/api/v1/bookmarks/:id` | 필수 (JWT) | 북마크 조회/삭제 |
+| POST/GET | `/api/v1/bookmark-folders` | 필수 (JWT) | 북마크 폴더 생성 body: `{ name }` / 내 폴더 목록 조회 (각 폴더에 `bookmarkCount` 포함) |
+| DELETE | `/api/v1/bookmark-folders/:id` | 필수 (JWT) | 폴더 삭제(소프트 삭제, 소속 북마크 자체는 삭제되지 않음) |
+| GET | `/api/v1/bookmark-folders/:id/bookmarks` | 필수 (JWT) | 폴더에 담긴 북마크(장소) 목록 조회 |
+| POST | `/api/v1/bookmark-folders/:id/bookmarks` | 필수 (JWT) | 폴더에 북마크 추가. body: `{ bookmarkId }`. 북마크 하나가 여러 폴더에 동시에 속할 수 있음(다대다 태그 방식) |
+| DELETE | `/api/v1/bookmark-folders/:id/bookmarks/:bookmarkId` | 필수 (JWT) | 폴더에서 북마크 제거(북마크 자체는 유지) |
 | POST/GET/PUT/DELETE | `/api/v1/hotels`, `/api/v1/hotels/:id` | 필수 (JWT) | 호텔 CRUD |
 | POST/GET | `/api/v1/trips` | 필수 (JWT) | 여행 생성 body: `{ name }` / 내 여행 목록 조회 (각 여행에 `dayCount` 포함) |
 | GET/DELETE | `/api/v1/trips/:id` | 필수 (JWT) | 여행 상세(날짜별 동선 목록 `days[]`) 조회 / 여행 삭제(소속 날짜 동선도 함께 소프트 삭제) |
 | POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
+| GET/PUT | `/api/v1/notification-settings` | 필수 (JWT) | 알림 설정 조회(저장된 값이 없으면 기본값 반환) / 수정. body(PUT): `{ tripAlerts, serviceAlerts, marketingAlerts }` (모두 boolean 필수). 실제 푸시 발송 인프라는 없음 — 설정값만 저장 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
 | GET | `/api/v1/auth/profile` | 필수 (JWT) | 내 정보 조회 |
 | DELETE | `/api/v1/auth/profile` | 필수 (JWT) | 회원 탈퇴 (users 소프트 삭제) |
+
+고객센터(FAQ + 문의처 안내) 화면은 정적 안내로만 제공되며 백엔드 API가 없다 — 프론트엔드에 하드코딩된 콘텐츠만 표시.
 
 ### 주요 오류 코드
 - `400` INVALID_URL / 유효하지 않은 요청 / 장소 2개 미만
 - `401` JWT_INVALID / 미인증
 - `403` JWT_EXPIRED
-- `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행)
+- `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행) / FOLDER_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 북마크 폴더)
 - `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜)
 - `422` TRANSCRIPT_NOT_FOUND (자막 없는 영상)
 - `500` 내부 오류
@@ -120,10 +128,13 @@ GradudtionProject/
 - **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `created_at`, `updated_at`
 - **hotels**: `hotel_id(PK)`, `user_id(FK)`, `name`, `address`, `latitude`, `longitude`(NOT NULL — Kakao Maps 검색으로만 저장), `created_at`, `updated_at`
 - **bookmarks**: `bookmark_id(PK)`, `user_id(FK)`, `place_id(FK)`, `created_at`, UNIQUE(`user_id`, `place_id`)
+- **bookmark_folders**: `folder_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at`, `deleted_at` — 사용자가 만드는 북마크 폴더
+- **bookmark_folder_items**: `folder_id(FK → bookmark_folders.folder_id)`, `bookmark_id(FK → bookmarks.bookmark_id)`, `created_at`, PK(`folder_id`, `bookmark_id`) — 폴더↔북마크 다대다 조인 테이블(북마크 하나가 여러 폴더에 동시에 속할 수 있음, 태그 방식)
 - **trips**: `trip_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at` — 여러 날짜(itineraries)를 묶는 상위 "여행" 단위
 - **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `trip_id(FK → trips.trip_id, NOT NULL)`, `day_number(INTEGER, NOT NULL, > 0)` — 여행 내 몇 일차인지, `(trip_id, day_number)` UNIQUE(소프트 삭제 제외), `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
+- **notification_settings**: `user_id(PK, FK → users.user_id)`, `trip_alerts`(boolean, 기본 true), `service_alerts`(boolean, 기본 true), `marketing_alerts`(boolean, 기본 false), `created_at`, `updated_at` — 사용자당 1행, 저장된 행이 없으면 API가 기본값을 즉석에서 반환(레코드 미리 생성 안 함)
 
-인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`.
+인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `bookmark_folders.user_id`, `bookmark_folder_items.bookmark_id`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`.
 
 ## 핵심 처리 로직
 
@@ -177,6 +188,7 @@ GradudtionProject/
 
 - **FR-01** URL 분석 / **FR-02** 해시태그 탐색 / **FR-03** 장소 카드 / **FR-04** 타임스탬프 이동
 - **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
+- **FR-10** 지역/테마/기간 추천 마법사 / **FR-11** 북마크 폴더(다대다 태그) / **FR-12** 알림 설정(서버 저장, 발송 인프라 없음) / **FR-13** 고객센터(정적 FAQ + 연락처 안내)
 
 ## 자주 쓰는 명령어
 

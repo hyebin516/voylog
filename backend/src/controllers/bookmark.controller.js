@@ -52,4 +52,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, remove };
+module.exports = { create, list, remove, toBookmarkedPlaceResponse };

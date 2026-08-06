@@ -60,6 +60,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text('버전'),
             trailing: Text('1.0.0'),
           ),
+          ListTile(
+            leading: const Icon(Icons.notifications_outlined),
+            title: const Text('알림 설정'),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => Navigator.pushNamed(context, AppRoutes.notificationSettings),
+          ),
           const Divider(height: AppSpacing.xl),
           ListTile(
             leading: Icon(Icons.person_remove_outlined, color: Theme.of(context).colorScheme.error),

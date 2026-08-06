@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
 import '../models/place_model.dart';
+import '../screens/bookmark_folder_detail_screen.dart';
+import '../screens/bookmark_folder_list_screen.dart';
+import '../screens/bookmark_folder_picker_screen.dart';
 import '../screens/bookmark_screen.dart';
+import '../screens/customer_service_screen.dart';
 import '../screens/home_screen.dart';
 import '../screens/hotel_search_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_page_screen.dart';
+import '../screens/notification_settings_screen.dart';
 import '../screens/place_detail_screen.dart';
 import '../screens/recommendation_duration_screen.dart';
 import '../screens/recommendation_region_screen.dart';
@@ -37,6 +42,11 @@ class AppRoutes {
   static const String recommendationTheme = '/recommendation/theme';
   static const String recommendationDuration = '/recommendation/duration';
   static const String recommendationResults = '/recommendation/results';
+  static const String bookmarkFolders = '/bookmark-folders';
+  static const String bookmarkFolderDetail = '/bookmark-folder-detail';
+  static const String bookmarkFolderPicker = '/bookmark-folder-picker';
+  static const String notificationSettings = '/notification-settings';
+  static const String customerService = '/customer-service';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -75,6 +85,18 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const RecommendationDurationScreen(), settings: settings);
       case AppRoutes.recommendationResults:
         return MaterialPageRoute(builder: (_) => const RecommendationResultsScreen(), settings: settings);
+      case AppRoutes.bookmarkFolders:
+        return MaterialPageRoute(builder: (_) => const BookmarkFolderListScreen(), settings: settings);
+      case AppRoutes.bookmarkFolderDetail:
+        final folderId = settings.arguments as String;
+        return MaterialPageRoute(builder: (_) => BookmarkFolderDetailScreen(folderId: folderId), settings: settings);
+      case AppRoutes.bookmarkFolderPicker:
+        final folderId = settings.arguments as String;
+        return MaterialPageRoute(builder: (_) => BookmarkFolderPickerScreen(folderId: folderId), settings: settings);
+      case AppRoutes.notificationSettings:
+        return MaterialPageRoute(builder: (_) => const NotificationSettingsScreen(), settings: settings);
+      case AppRoutes.customerService:
+        return MaterialPageRoute(builder: (_) => const CustomerServiceScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),
