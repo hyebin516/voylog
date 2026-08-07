@@ -25,12 +25,33 @@ Return JSON only. No markdown. No explanation. No code block.
 Schema:
 {
   "places": [
-    { "name": "string", "timestampSec": 0, "source": "transcript", "confidence": 0.0 }
+    {
+      "name": "string",
+      "timestampSec": 0,
+      "source": "transcript",
+      "confidence": 0.0,
+      "category": "string or null",
+      "businessHours": {
+        "mon": {"open": "HH:MM", "close": "HH:MM"} or null,
+        "tue": ... , "wed": ..., "thu": ..., "fri": ..., "sat": ..., "sun": ...
+      } or null
+    }
   ]
 }
 
 Allowed source values: transcript, hashtags, description, title.
 Confidence must be between 0 and 1.
+
+category: one of [cafe, bakery, restaurant, dessert, bar, beach, museum,
+gallery, shopping, attraction, night_view, other] if the place's type is
+clearly identifiable from context. Otherwise null. Do not guess.
+
+businessHours: ONLY include a day if operating hours for that day are
+explicitly stated in the transcript or description (e.g. "매일 오전 9시부터
+오후 9시까지 영업", "화요일 휴무"). If no operating hours are mentioned
+anywhere for a place, set businessHours to null entirely. Never estimate or
+assume typical hours for the category -- an omitted or null day means
+"not mentioned", not "closed".
 """
 
 

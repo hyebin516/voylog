@@ -2,6 +2,8 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
+from app.schemas.response_schema import BusinessHours
+
 
 class TranscriptRequest(BaseModel):
     youtubeUrl: str
@@ -57,3 +59,21 @@ class RouteOptimizationRequest(BaseModel):
     places: List[PlaceInput]
     routeType: Literal["roundTrip", "hotelToHotel"] = "roundTrip"
     optimizationPriority: Literal["duration"] = "duration"
+
+
+class NearbyPlaceCandidate(BaseModel):
+    placeId: str
+    name: str
+    latitude: float
+    longitude: float
+    category: Optional[str] = None
+    businessHours: Optional[BusinessHours] = None
+
+
+class NearbyScoreRequest(BaseModel):
+    latitude: float
+    longitude: float
+    localTime: str
+    radiusMeters: int = 2000
+    limit: int = 20
+    candidates: List[NearbyPlaceCandidate] = []

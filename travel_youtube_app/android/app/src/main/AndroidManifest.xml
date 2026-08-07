@@ -1,6 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- Required by kakao_map_plugin / webview_flutter to load the Kakao Maps SDK -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required by geolocator for "내 주변 추천" (nearby recommendations) -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
     <application
         android:label="Voylog"

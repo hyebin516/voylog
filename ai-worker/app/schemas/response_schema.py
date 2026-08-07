@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -28,11 +28,23 @@ class HashtagSearchResponse(BaseModel):
     videos: List[VideoSearchResult]
 
 
+class BusinessHoursDay(BaseModel):
+    open: Optional[str] = None
+    close: Optional[str] = None
+
+
+# Keyed by lowercase 3-letter weekday (mon..sun). A missing or null day means
+# "not mentioned / unknown" -- never inferred, never treated as "closed".
+BusinessHours = Dict[str, Optional[BusinessHoursDay]]
+
+
 class PlaceCandidate(BaseModel):
     name: str
     timestampSec: Optional[int] = None
     source: Literal["transcript", "hashtags", "description", "title"]
     confidence: float
+    category: Optional[str] = None
+    businessHours: Optional[BusinessHours] = None
 
 
 class LlmPlaceExtractionResult(BaseModel):
@@ -47,10 +59,36 @@ class GeocodedPlace(BaseModel):
     address: Optional[str] = None
     source: str
     confidence: float
+    category: Optional[str] = None
+    businessHours: Optional[BusinessHours] = None
 
 
 class PlaceExtractionResponse(BaseModel):
     places: List[GeocodedPlace]
+
+
+class ScoreDetails(BaseModel):
+    distance: float
+    timeOfDay: float
+    businessHours: float
+
+
+class NearbyRecommendation(BaseModel):
+    placeId: str
+    name: str
+    latitude: float
+    longitude: float
+    distanceMeters: int
+    category: Optional[str] = None
+    isOpen: Optional[bool] = None
+    isOpenEstimated: bool
+    score: float
+    scoreDetails: ScoreDetails
+    reason: str
+
+
+class NearbyScoreResponse(BaseModel):
+    recommendations: List[NearbyRecommendation]
 
 
 class RoutePoint(BaseModel):

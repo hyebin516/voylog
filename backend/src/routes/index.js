@@ -6,6 +6,7 @@ const hotelRoutes = require('./hotel.routes');
 const itineraryRoutes = require('./itinerary.routes');
 const tripRoutes = require('./trip.routes');
 const notificationSettingsRoutes = require('./notification-settings.routes');
+const recommendationRoutes = require('./recommendation.routes');
 const authRoutes = require('./auth.routes');
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.use('/hotels', hotelRoutes);
 router.use('/itineraries', itineraryRoutes);
 router.use('/trips', tripRoutes);
 router.use('/notification-settings', notificationSettingsRoutes);
+router.use('/recommendations', recommendationRoutes);
 router.use('/auth', authRoutes);
 
 module.exports = router;

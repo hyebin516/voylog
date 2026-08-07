@@ -30,6 +30,8 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
                 address=geo["address"] if geo else None,
                 source=candidate.source,
                 confidence=candidate.confidence,
+                category=candidate.category,
+                businessHours=candidate.businessHours,
             )
         )
 

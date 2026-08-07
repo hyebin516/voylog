@@ -10,6 +10,7 @@ import '../screens/home_screen.dart';
 import '../screens/hotel_search_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_page_screen.dart';
+import '../screens/nearby_recommendations_screen.dart';
 import '../screens/notification_settings_screen.dart';
 import '../screens/place_detail_screen.dart';
 import '../screens/recommendation_duration_screen.dart';
@@ -53,6 +54,7 @@ class AppRoutes {
   static const String signupEmail = '/signup/email';
   static const String signupOtp = '/signup/otp';
   static const String signupDetails = '/signup/details';
+  static const String nearbyRecommendations = '/recommendations/nearby';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -111,6 +113,8 @@ class AppRoutes {
       case AppRoutes.signupDetails:
         final email = settings.arguments as String;
         return MaterialPageRoute(builder: (_) => SignupDetailsScreen(email: email), settings: settings);
+      case AppRoutes.nearbyRecommendations:
+        return MaterialPageRoute(builder: (_) => const NearbyRecommendationsScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

@@ -76,6 +76,16 @@ describe('POST /api/v1/auth/kakao', () => {
   });
 });
 
+describe('POST /api/v1/recommendations/nearby', () => {
+  it('rejects a missing latitude before reaching the controller (no auth required)', async () => {
+    const res = await request(app)
+      .post('/api/v1/recommendations/nearby')
+      .send({ longitude: 127.0, localTime: '2026-08-10T12:00:00+09:00' });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('INVALID_REQUEST');
+  });
+});
+
 describe('POST /api/v1/auth/signup/request-otp', () => {
   it('rejects an invalid email before reaching the controller', async () => {
     const res = await request(app).post('/api/v1/auth/signup/request-otp').send({ email: 'not-an-email' });

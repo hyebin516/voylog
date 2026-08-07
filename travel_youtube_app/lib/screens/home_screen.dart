@@ -78,6 +78,11 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('여행 유튜브 요약'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.near_me_outlined),
+            tooltip: '내 주변 추천',
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.nearbyRecommendations),
+          ),
+          IconButton(
             icon: const Icon(Icons.bookmark_outline_rounded),
             tooltip: '북마크',
             onPressed: () => Navigator.pushNamed(context, AppRoutes.bookmarks),
