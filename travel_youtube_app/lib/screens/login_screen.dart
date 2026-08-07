@@ -67,7 +67,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.lg),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -131,3 +131,4 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
+
