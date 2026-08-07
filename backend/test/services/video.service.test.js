@@ -1,13 +1,20 @@
 jest.mock('../../src/config/db');
 jest.mock('../../src/config/redis');
 jest.mock('../../src/repositories/video.repository');
+jest.mock('../../src/repositories/place-embedding.repository');
 jest.mock('../../src/services/aiWorkerClient');
 
 const pool = require('../../src/config/db');
 const redis = require('../../src/config/redis');
 const videoRepository = require('../../src/repositories/video.repository');
+const placeEmbeddingRepository = require('../../src/repositories/place-embedding.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { analyzeVideo, searchByHashtag, getRecommendations } = require('../../src/services/video.service');
+const {
+  analyzeVideo,
+  searchByHashtag,
+  getRecommendations,
+  generateAndStorePlaceEmbeddings,
+} = require('../../src/services/video.service');
 
 const YOUTUBE_URL = 'https://www.youtube.com/watch?v=dQw4w9WgXcQ';
 
@@ -81,6 +88,39 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
     expect(client.query).toHaveBeenCalledWith('ROLLBACK');
     expect(client.release).toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
+  });
+});
+
+describe('generateAndStorePlaceEmbeddings', () => {
+  it('embeds and stores each place that has coordinates', async () => {
+    callAiWorker.mockResolvedValue({ embedding: [0.1, 0.2], model: 'text-embedding-3-small', dimensions: 2 });
+
+    await generateAndStorePlaceEmbeddings([
+      { place_id: 'p1', name: 'Place 1', category: 'cafe', address: 'addr', latitude: 37.5, longitude: 127.0 },
+    ]);
+
+    expect(callAiWorker).toHaveBeenCalledWith('/embeddings/generate', { text: 'Place 1 | cafe | addr' }, 15000);
+    expect(placeEmbeddingRepository.upsert).toHaveBeenCalledWith(
+      'p1',
+      expect.objectContaining({ embedding: [0.1, 0.2], model: 'text-embedding-3-small', dimensions: 2 })
+    );
+  });
+
+  it('skips places without coordinates', async () => {
+    await generateAndStorePlaceEmbeddings([{ place_id: 'p1', name: 'No coords', latitude: null, longitude: null }]);
+
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(placeEmbeddingRepository.upsert).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when embedding generation fails for a place', async () => {
+    callAiWorker.mockRejectedValue(new Error('AI worker down'));
+
+    await expect(
+      generateAndStorePlaceEmbeddings([{ place_id: 'p1', name: 'Place 1', latitude: 37.5, longitude: 127.0 }])
+    ).resolves.toBeUndefined();
+
+    expect(placeEmbeddingRepository.upsert).not.toHaveBeenCalled();
   });
 });
 

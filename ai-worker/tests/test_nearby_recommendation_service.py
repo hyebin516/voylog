@@ -90,3 +90,46 @@ def test_reason_mentions_distance_and_open_state():
 
     assert "m 떨어져" in result.recommendations[0].reason
     assert "영업 중" in result.recommendations[0].reason
+
+
+def test_no_embedding_similarity_when_the_user_has_no_preference_embedding():
+    candidate = NearbyPlaceCandidate(placeId="p1", name="Place", latitude=37.5005, longitude=127.0, embedding=[1.0, 0.0])
+
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate], userEmbedding=None))
+
+    rec = result.recommendations[0]
+    assert rec.scoreDetails.embeddingSimilarity is None
+
+
+def test_no_embedding_similarity_when_the_candidate_has_no_embedding():
+    candidate = NearbyPlaceCandidate(placeId="p1", name="Place", latitude=37.5005, longitude=127.0)
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userEmbedding=[1.0, 0.0])
+    )
+
+    assert result.recommendations[0].scoreDetails.embeddingSimilarity is None
+
+
+def test_a_closer_taste_match_outscores_a_worse_match_at_the_same_distance():
+    matching = NearbyPlaceCandidate(placeId="match", name="Match", latitude=37.5005, longitude=127.0, embedding=[1.0, 0.0])
+    opposite = NearbyPlaceCandidate(placeId="opposite", name="Opposite", latitude=37.5005, longitude=127.001, embedding=[-1.0, 0.0])
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[matching, opposite], userEmbedding=[1.0, 0.0])
+    )
+
+    by_id = {r.placeId: r for r in result.recommendations}
+    assert by_id["match"].scoreDetails.embeddingSimilarity == 1.0
+    assert by_id["opposite"].scoreDetails.embeddingSimilarity == 0.0
+    assert by_id["match"].score > by_id["opposite"].score
+
+
+def test_reason_mentions_taste_match_when_an_embedding_pair_is_present():
+    candidate = NearbyPlaceCandidate(placeId="p1", name="Place", latitude=37.5005, longitude=127.0, embedding=[1.0, 0.0])
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userEmbedding=[1.0, 0.0])
+    )
+
+    assert "취향" in result.recommendations[0].reason

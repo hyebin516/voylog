@@ -71,6 +71,7 @@ class ScoreDetails(BaseModel):
     distance: float
     timeOfDay: float
     businessHours: float
+    embeddingSimilarity: Optional[float] = None
 
 
 class NearbyRecommendation(BaseModel):
@@ -89,6 +90,12 @@ class NearbyRecommendation(BaseModel):
 
 class NearbyScoreResponse(BaseModel):
     recommendations: List[NearbyRecommendation]
+
+
+class EmbeddingResponse(BaseModel):
+    embedding: List[float]
+    model: str
+    dimensions: int
 
 
 class RoutePoint(BaseModel):

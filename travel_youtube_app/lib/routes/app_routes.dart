@@ -23,6 +23,7 @@ import '../screens/signup_details_screen.dart';
 import '../screens/signup_email_screen.dart';
 import '../screens/signup_otp_screen.dart';
 import '../screens/splash_screen.dart';
+import '../screens/taste_preference_screen.dart';
 import '../screens/trip_detail_screen.dart';
 import '../screens/trip_list_screen.dart';
 import '../screens/video_analysis_screen.dart';
@@ -55,6 +56,7 @@ class AppRoutes {
   static const String signupOtp = '/signup/otp';
   static const String signupDetails = '/signup/details';
   static const String nearbyRecommendations = '/recommendations/nearby';
+  static const String tastePreferences = '/taste-preferences';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -115,6 +117,8 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => SignupDetailsScreen(email: email), settings: settings);
       case AppRoutes.nearbyRecommendations:
         return MaterialPageRoute(builder: (_) => const NearbyRecommendationsScreen(), settings: settings);
+      case AppRoutes.tastePreferences:
+        return MaterialPageRoute(builder: (_) => const TastePreferenceScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

@@ -1,7 +1,9 @@
 jest.mock('../../src/repositories/recommendation.repository');
+jest.mock('../../src/repositories/taste-preference.repository');
 jest.mock('../../src/services/aiWorkerClient');
 
 const recommendationRepository = require('../../src/repositories/recommendation.repository');
+const tastePreferenceRepository = require('../../src/repositories/taste-preference.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
 const { getNearbyRecommendations } = require('../../src/services/recommendation.service');
 
@@ -77,5 +79,63 @@ describe('getNearbyRecommendations', () => {
     await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
 
     expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100);
+  });
+
+  it('passes candidate embeddings through to the AI worker', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([
+      { place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0', embedding: [0.1, 0.2] },
+    ]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ candidates: [expect.objectContaining({ embedding: [0.1, 0.2] })] }),
+      10000
+    );
+  });
+
+  it('leaves userEmbedding null for a guest request (no userId)', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(tastePreferenceRepository.find).not.toHaveBeenCalled();
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ userEmbedding: null }),
+      10000
+    );
+  });
+
+  it('fetches and forwards the user preference embedding when the user has one', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [0.9, 0.1] });
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ userId: 'u1', latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(tastePreferenceRepository.find).toHaveBeenCalledWith('u1');
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ userEmbedding: [0.9, 0.1] }),
+      10000
+    );
+  });
+
+  it('leaves userEmbedding null when the logged-in user has not set preferences yet', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    tastePreferenceRepository.find.mockResolvedValue(null);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ userId: 'u1', latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ userEmbedding: null }),
+      10000
+    );
   });
 });

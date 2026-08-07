@@ -5,6 +5,7 @@ async function nearby(req, res, next) {
   try {
     const { latitude, longitude, localTime, radiusMeters, limit } = req.body;
     const result = await recommendationService.getNearbyRecommendations({
+      userId: req.user ? req.user.userId : null,
       latitude,
       longitude,
       localTime,

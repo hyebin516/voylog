@@ -1,4 +1,5 @@
 const recommendationRepository = require('../repositories/recommendation.repository');
+const tastePreferenceRepository = require('../repositories/taste-preference.repository');
 const { callAiWorker } = require('./aiWorkerClient');
 
 const DEFAULT_RADIUS_M = 2000;
@@ -15,16 +16,23 @@ function toCandidate(place) {
     longitude: Number(place.longitude),
     category: place.category,
     businessHours: place.business_hours,
+    embedding: place.embedding,
   };
 }
 
-async function getNearbyRecommendations({ latitude, longitude, localTime, radiusMeters, limit }) {
+async function getNearbyRecommendations({ userId, latitude, longitude, localTime, radiusMeters, limit }) {
   const radius = Math.min(radiusMeters || DEFAULT_RADIUS_M, MAX_RADIUS_M);
   const resultLimit = Math.min(limit || DEFAULT_LIMIT, MAX_LIMIT);
 
   const candidatePlaces = await recommendationRepository.findNearby(latitude, longitude, radius, MAX_CANDIDATES);
   if (candidatePlaces.length === 0) {
     return { recommendations: [] };
+  }
+
+  let userEmbedding = null;
+  if (userId) {
+    const preference = await tastePreferenceRepository.find(userId);
+    userEmbedding = preference ? preference.embedding : null;
   }
 
   return callAiWorker(
@@ -36,6 +44,7 @@ async function getNearbyRecommendations({ latitude, longitude, localTime, radius
       radiusMeters: radius,
       limit: resultLimit,
       candidates: candidatePlaces.map(toCandidate),
+      userEmbedding,
     },
     10000
   );

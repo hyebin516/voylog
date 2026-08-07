@@ -1,10 +1,43 @@
+const crypto = require('crypto');
 const pool = require('../config/db');
 const redis = require('../config/redis');
 const videoRepository = require('../repositories/video.repository');
+const placeEmbeddingRepository = require('../repositories/place-embedding.repository');
 const { callAiWorker } = require('./aiWorkerClient');
 const { extractYoutubeVideoId } = require('../utils/youtube');
 
 const CACHE_TTL_SECONDS = 60 * 60 * 24 * 7;
+
+function buildEmbeddingText(place) {
+  return [place.name, place.category, place.address].filter(Boolean).join(' | ');
+}
+
+/**
+ * Best-effort: a place that fails to embed just falls back to
+ * non-personalized scoring later, so no failure here should ever surface
+ * to the caller of analyzeVideo.
+ */
+async function generateAndStorePlaceEmbeddings(places) {
+  await Promise.all(
+    places
+      .filter((place) => place.latitude != null && place.longitude != null)
+      .map(async (place) => {
+        try {
+          const text = buildEmbeddingText(place);
+          const result = await callAiWorker('/embeddings/generate', { text }, 15000);
+          const sourceTextHash = crypto.createHash('sha256').update(text).digest('hex');
+          await placeEmbeddingRepository.upsert(place.place_id, {
+            embedding: result.embedding,
+            model: result.model,
+            dimensions: result.dimensions,
+            sourceTextHash,
+          });
+        } catch (err) {
+          // no-op: embedding is an enhancement, not a requirement
+        }
+      })
+  );
+}
 
 function toResponse(video, places, isCached) {
   return {
@@ -84,6 +117,8 @@ async function analyzeVideo(youtubeUrl) {
     client.release();
   }
 
+  await generateAndStorePlaceEmbeddings(savedPlaces);
+
   const response = toResponse(savedVideo, savedPlaces, false);
   await redis.set(cacheKey, JSON.stringify(response), 'EX', CACHE_TTL_SECONDS);
   return response;
@@ -104,4 +139,4 @@ async function getRecommendations(regions, themes, duration) {
   return { videos: result.videos };
 }
 
-module.exports = { analyzeVideo, searchByHashtag, getRecommendations };
+module.exports = { analyzeVideo, searchByHashtag, getRecommendations, generateAndStorePlaceEmbeddings };

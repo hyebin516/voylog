@@ -24,3 +24,23 @@ def test_business_hours_score_by_open_state():
     assert policy.business_hours_score(True) == policy.BUSINESS_HOURS_OPEN_SCORE
     assert policy.business_hours_score(False) == policy.BUSINESS_HOURS_CLOSED_SCORE
     assert policy.business_hours_score(None) == policy.BUSINESS_HOURS_UNKNOWN_SCORE
+
+
+def test_embedding_similarity_score_rescales_cosine_range_to_zero_one():
+    assert policy.embedding_similarity_score(1.0) == 1.0
+    assert policy.embedding_similarity_score(-1.0) == 0.0
+    assert policy.embedding_similarity_score(0.0) == 0.5
+
+
+def test_embedding_similarity_score_is_zero_when_unavailable():
+    assert policy.embedding_similarity_score(None) == 0.0
+
+
+def test_weights_for_switches_sets_based_on_embedding_availability():
+    without = policy.weights_for(False)
+    with_embedding = policy.weights_for(True)
+
+    assert "embeddingSimilarity" not in without
+    assert "embeddingSimilarity" in with_embedding
+    assert round(sum(without.values()), 6) == 1.0
+    assert round(sum(with_embedding.values()), 6) == 1.0

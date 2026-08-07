@@ -8,7 +8,7 @@ const pool = require('../config/db');
 async function findNearby(latitude, longitude, radiusMeters, limit) {
   const { rows } = await pool.query(
     `SELECT * FROM (
-       SELECT p.*,
+       SELECT p.*, pe.embedding AS embedding,
          6371000 * acos(
            LEAST(1, GREATEST(-1,
              cos(radians($1)) * cos(radians(p.latitude)) * cos(radians(p.longitude) - radians($2))
@@ -16,6 +16,7 @@ async function findNearby(latitude, longitude, radiusMeters, limit) {
            ))
          ) AS distance_m
        FROM places p
+       LEFT JOIN place_embeddings pe ON pe.place_id = p.place_id
        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL AND p.deleted_at IS NULL
      ) sub
      WHERE distance_m <= $3

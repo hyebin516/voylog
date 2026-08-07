@@ -56,6 +56,9 @@ describe('protected routes require a Bearer token', () => {
     ['DELETE', '/api/v1/bookmark-folders/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
     ['GET', '/api/v1/notification-settings'],
     ['PUT', '/api/v1/notification-settings'],
+    ['GET', '/api/v1/taste-preferences'],
+    ['PUT', '/api/v1/taste-preferences'],
+    ['DELETE', '/api/v1/taste-preferences'],
     ['GET', '/api/v1/auth/profile'],
     ['DELETE', '/api/v1/auth/profile'],
   ])('%s %s returns 401 JWT_INVALID without an Authorization header', async (method, path) => {

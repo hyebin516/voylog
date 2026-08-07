@@ -68,6 +68,7 @@ class NearbyPlaceCandidate(BaseModel):
     longitude: float
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
+    embedding: Optional[List[float]] = None
 
 
 class NearbyScoreRequest(BaseModel):
@@ -77,3 +78,8 @@ class NearbyScoreRequest(BaseModel):
     radiusMeters: int = 2000
     limit: int = 20
     candidates: List[NearbyPlaceCandidate] = []
+    userEmbedding: Optional[List[float]] = None
+
+
+class EmbeddingRequest(BaseModel):
+    text: str
