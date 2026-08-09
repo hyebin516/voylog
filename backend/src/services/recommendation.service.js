@@ -1,5 +1,6 @@
 const recommendationRepository = require('../repositories/recommendation.repository');
 const tastePreferenceRepository = require('../repositories/taste-preference.repository');
+const behaviorRepository = require('../repositories/behavior.repository');
 const { callAiWorker } = require('./aiWorkerClient');
 
 const DEFAULT_RADIUS_M = 2000;
@@ -25,17 +26,31 @@ async function getNearbyRecommendations({ userId, latitude, longitude, localTime
   const radius = Math.min(radiusMeters || DEFAULT_RADIUS_M, MAX_RADIUS_M);
   const resultLimit = Math.min(limit || DEFAULT_LIMIT, MAX_LIMIT);
 
-  const candidatePlaces = await recommendationRepository.findNearby(latitude, longitude, radius, MAX_CANDIDATES);
+  const excludePlaceIds = userId ? await behaviorRepository.findHiddenPlaceIds(userId) : [];
+  const candidatePlaces = await recommendationRepository.findNearby(
+    latitude,
+    longitude,
+    radius,
+    MAX_CANDIDATES,
+    excludePlaceIds
+  );
   if (candidatePlaces.length === 0) {
     return { recommendations: [] };
   }
 
   let userEmbedding = null;
-  let userTagCodes = [];
+  let userTagScores = {};
   if (userId) {
     const preference = await tastePreferenceRepository.find(userId);
-    userEmbedding = preference ? preference.embedding : null;
-    userTagCodes = preference ? preference.source_tags : [];
+    if (preference) {
+      userEmbedding = preference.embedding;
+      // tag_scores is the learned, behavior-nudged strength per tag. Rows
+      // from before behavior tracking existed (or that haven't had a
+      // learnable behavior yet) fall back to a flat 1.0 per surveyed tag --
+      // this reproduces phase 4's plain presence-match exactly.
+      userTagScores =
+        preference.tag_scores || Object.fromEntries((preference.source_tags || []).map((tag) => [tag, 1.0]));
+    }
   }
 
   return callAiWorker(
@@ -48,7 +63,7 @@ async function getNearbyRecommendations({ userId, latitude, longitude, localTime
       limit: resultLimit,
       candidates: candidatePlaces.map(toCandidate),
       userEmbedding,
-      userTagCodes,
+      userTagScores,
     },
     10000
   );

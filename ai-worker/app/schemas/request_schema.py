@@ -1,4 +1,4 @@
-from typing import List, Literal, Optional
+from typing import Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -85,8 +85,14 @@ class NearbyScoreRequest(BaseModel):
     limit: int = 20
     candidates: List[NearbyPlaceCandidate] = []
     userEmbedding: Optional[List[float]] = None
-    userTagCodes: List[str] = []
+    userTagScores: Dict[str, float] = {}
 
 
 class EmbeddingRequest(BaseModel):
     text: str
+
+
+class PreferenceUpdateRequest(BaseModel):
+    currentEmbedding: Optional[List[float]] = None
+    placeEmbedding: List[float]
+    weight: float

@@ -15,3 +15,15 @@ def cosine_similarity(a: List[float], b: List[float]) -> Optional[float]:
         return None
 
     return dot / (norm_a * norm_b)
+
+
+def add_scaled(base: List[float], scale: float, other: List[float]) -> List[float]:
+    """base + scale * other, elementwise. Assumes equal-length vectors."""
+    return [b + scale * o for b, o in zip(base, other)]
+
+
+def normalize(vector: List[float]) -> List[float]:
+    norm = math.sqrt(sum(x * x for x in vector))
+    if norm == 0:
+        return vector
+    return [x / norm for x in vector]

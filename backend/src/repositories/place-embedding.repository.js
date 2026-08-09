@@ -17,7 +17,7 @@ async function upsert(placeId, { embedding, model, dimensions, sourceTextHash })
 async function findByPlaceIds(placeIds) {
   if (placeIds.length === 0) return [];
   const { rows } = await pool.query(
-    'SELECT place_id, embedding FROM place_embeddings WHERE place_id = ANY($1::uuid[])',
+    'SELECT place_id, embedding, model, dimensions FROM place_embeddings WHERE place_id = ANY($1::uuid[])',
     [placeIds]
   );
   return rows;

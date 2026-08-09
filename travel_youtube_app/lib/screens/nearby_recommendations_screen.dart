@@ -3,11 +3,27 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/nearby_recommendation_model.dart';
+import '../models/place_model.dart';
 import '../providers/location_provider.dart';
 import '../providers/recommendation_provider.dart';
+import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
+import '../widgets/bookmark_button.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
+
+PlaceModel _toPlaceModel(NearbyRecommendationModel rec) {
+  return PlaceModel(
+    placeId: rec.placeId,
+    name: rec.name,
+    timestampSec: null,
+    latitude: rec.latitude,
+    longitude: rec.longitude,
+    address: null,
+    source: 'nearby',
+    confidence: 1.0,
+  );
+}
 
 class NearbyRecommendationsScreen extends StatefulWidget {
   const NearbyRecommendationsScreen({super.key});
@@ -84,51 +100,67 @@ class _NearbyRecommendationsScreenState extends State<NearbyRecommendationsScree
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(rec.name, style: Theme.of(context).textTheme.titleMedium),
-                            ),
-                            if (rec.isOpen != null)
-                              Chip(
-                                label: Text(rec.isOpen! ? '영업중' : '영업종료', style: const TextStyle(fontSize: 12)),
-                                visualDensity: VisualDensity.compact,
-                                backgroundColor: rec.isOpen!
-                                    ? Theme.of(context).colorScheme.primaryContainer
-                                    : Theme.of(context).colorScheme.surfaceContainerHighest,
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: AppSpacing.xs),
-                        Text(rec.reason, style: Theme.of(context).textTheme.bodySmall),
-                        if (rec.matchedTags.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.xs),
-                          Wrap(
-                            spacing: AppSpacing.xs,
-                            runSpacing: AppSpacing.xs,
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () {
+                      recommendationProvider.recordViewDetail(rec);
+                      Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: _toPlaceModel(rec));
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              for (final tag in rec.matchedTags)
+                              Expanded(
+                                child: Text(rec.name, style: Theme.of(context).textTheme.titleMedium),
+                              ),
+                              if (rec.isOpen != null)
                                 Chip(
-                                  label: Text(tag, style: const TextStyle(fontSize: 11)),
+                                  label: Text(rec.isOpen! ? '영업중' : '영업종료', style: const TextStyle(fontSize: 12)),
                                   visualDensity: VisualDensity.compact,
-                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  backgroundColor: rec.isOpen!
+                                      ? Theme.of(context).colorScheme.primaryContainer
+                                      : Theme.of(context).colorScheme.surfaceContainerHighest,
                                 ),
+                              BookmarkButton(
+                                placeId: rec.placeId,
+                                onBookmarked: () => recommendationProvider.recordBookmark(rec),
+                              ),
+                              IconButton(
+                                onPressed: () => recommendationProvider.markNotInterested(rec),
+                                icon: const Icon(Icons.visibility_off_outlined),
+                                tooltip: '관심 없음',
+                              ),
                             ],
                           ),
-                        ],
-                        if (rec.isOpen != null && rec.isOpenEstimated) ...[
                           const SizedBox(height: AppSpacing.xs),
-                          Text(
-                            '* 영업시간은 영상 정보 기반 추정치예요.',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
-                          ),
+                          Text(rec.reason, style: Theme.of(context).textTheme.bodySmall),
+                          if (rec.matchedTags.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              runSpacing: AppSpacing.xs,
+                              children: [
+                                for (final tag in rec.matchedTags)
+                                  Chip(
+                                    label: Text(tag, style: const TextStyle(fontSize: 11)),
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                              ],
+                            ),
+                          ],
+                          if (rec.isOpen != null && rec.isOpenEstimated) ...[
+                            const SizedBox(height: AppSpacing.xs),
+                            Text(
+                              '* 영업시간은 영상 정보 기반 추정치예요.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(fontStyle: FontStyle.italic),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
                   ),
                 ),

@@ -7,7 +7,7 @@
 **여행 유튜브 요약 서비스** — 유튜브 여행·브이로그 영상을 분석하여 영상 속 등장 장소를 자동 추출하고, 사용자가 만든 "여행(trip)" 아래 여러 날짜(1일차, 2일차...)로 나눠 각 날짜마다 시작/종료 호텔을 기준으로 북마크한 장소들을 순회하는 최적 동선(왕복 또는 호텔 간 이동)을 AI가 계획해주는 여행 일정 플래너 서비스. Clean Architecture(계층 분리)를 따른다.
 
 - **팀명**: 럭키비키 (팀장: 김혜빈 / 팀원: 최나경)
-- **문서 버전**: v2.5 (위치·시간 기반 개인화 추천 1~3단계 — 거리/시간대/영업여부 + 사전학습 임베딩 유사도 + 세부 태그 일치도 반영)
+- **문서 버전**: v2.6 (위치·시간 기반 개인화 추천 1~5단계 — 거리/시간대/영업여부 + 사전학습 임베딩 유사도 + 세부 태그 일치도 + 행동 기반 자동 학습 반영)
 
 ### 핵심 사용자 흐름
 1. 유튜브 URL 입력 또는 해시태그로 브이로그 탐색
@@ -105,7 +105,8 @@ GradudtionProject/
 | GET/DELETE | `/api/v1/trips/:id` | 필수 (JWT) | 여행 상세(날짜별 동선 목록 `days[]`) 조회 / 여행 삭제(소속 날짜 동선도 함께 소프트 삭제) |
 | POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | GET/PUT | `/api/v1/notification-settings` | 필수 (JWT) | 알림 설정 조회(저장된 값이 없으면 기본값 반환) / 수정. body(PUT): `{ tripAlerts, serviceAlerts, marketingAlerts }` (모두 boolean 필수). 실제 푸시 발송 인프라는 없음 — 설정값만 저장 |
-| POST | `/api/v1/recommendations/nearby` | 선택 (JWT, 미인증도 허용) | 위치·시간 기반 주변 장소 추천. body: `{ latitude, longitude, localTime, radiusMeters?, limit? }` (`localTime`은 ISO 8601, 기기의 로컬 시각 그대로 — 시간대 변환 없이 요일/시각 판단에 사용). 서버가 `places`에서 반경 내 후보(임베딩·태그 포함)를 조회하고, 로그인 사용자면 `user_preference_embeddings`(임베딩+`source_tags`)도 함께 조회해 AI Worker(`/recommendations/nearby-score`)로 전달 — 거리/시간대/영업여부(LLM 추정) + (양쪽에 임베딩이 있을 때만) 코사인 유사도 + (양쪽에 태그가 있을 때만) 세부 태그 일치도를 결합해 점수·정렬·매칭된 태그 목록·추천 이유(템플릿 문장) 계산. 각 신호는 있을 때만 가중치에 포함되고 없는 신호의 비중은 나머지 신호로 자동 재분배 — 사용자 행동 기반 자동 학습은 아직 없음(후속 단계) |
+| POST | `/api/v1/recommendations/nearby` | 선택 (JWT, 미인증도 허용) | 위치·시간 기반 주변 장소 추천. body: `{ latitude, longitude, localTime, radiusMeters?, limit? }` (`localTime`은 ISO 8601, 기기의 로컬 시각 그대로 — 시간대 변환 없이 요일/시각 판단에 사용). 서버가 로그인 사용자면 먼저 `recommendation_behaviors`에서 hide/not_interested 처리한 장소 id를 조회해 후보에서 제외하고, `places`에서 반경 내 나머지 후보(임베딩·태그 포함)를 조회, `user_preference_embeddings`(임베딩+`tag_scores` — 학습된 값이 없으면 `source_tags`를 1.0으로 대체)도 함께 조회해 AI Worker(`/recommendations/nearby-score`)로 전달 — 거리/시간대/영업여부(LLM 추정) + (양쪽에 임베딩이 있을 때만) 코사인 유사도 + (양쪽에 태그가 있을 때만) 학습된 선호도 가중 태그 일치도를 결합해 점수·정렬·매칭된 태그 목록·추천 이유(템플릿 문장) 계산. 각 신호는 있을 때만 가중치에 포함되고 없는 신호의 비중은 나머지 신호로 자동 재분배 |
+| POST | `/api/v1/recommendations/behaviors` | 필수 (JWT) | 추천 장소에 대한 사용자 행동 기록(FR-15 행동 기반 자동 학습). body: `{ placeId, action, screen?, distanceMeters? }` — `action`은 `view_detail`(+1)/`map_view`(+2)/`share`(+3)/`bookmark`(+4)/`add_to_itinerary`(+5)/`like`(+5)/`hide`(-4)/`not_interested`(-5) 중 하나(가중치는 `backend/src/services/behavior-scoring-policy.js`에 고정). `recommendation_behaviors`에 원본 이벤트를 남긴 뒤, 장소 임베딩·태그를 가중치(같은 사용자·장소·행동 반복 시 `1/sqrt(과거횟수+1)`로 감쇠) 적용해 AI Worker(`/embeddings/update-preference`)로 사용자 선호 임베딩을 갱신하고 `tag_scores`(태그별 학습된 선호 강도, [-2, 2] 클램프)도 함께 갱신. hide/not_interested는 이후 `/recommendations/nearby`에서 해당 장소를 아예 후보에서 제외(스코어 감점이 아닌 필수 필터). 위도/경도·이동 경로는 저장하지 않음(반경 버킷만) |
 | GET | `/api/v1/taste-preferences` | 필수 (JWT) | 내 취향 태그 조회. 저장된 값이 없으면 `{ tags: [] }` 반환(설문을 건너뛴 상태) |
 | PUT | `/api/v1/taste-preferences` | 필수 (JWT) | 취향 태그 설정/수정. body: `{ tags: string[] }` (1개 이상). 서버가 태그를 하나의 문장으로 합쳐 AI Worker(`/embeddings/generate`)로 임베딩을 생성해 `user_preference_embeddings`에 저장 |
 | DELETE | `/api/v1/taste-preferences` | 필수 (JWT) | 취향 설정 초기화(행 삭제) — 이후 추천은 다시 비개인화 상태로 동작 |
@@ -147,9 +148,10 @@ GradudtionProject/
 - **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `trip_id(FK → trips.trip_id, NOT NULL)`, `day_number(INTEGER, NOT NULL, > 0)` — 여행 내 몇 일차인지, `(trip_id, day_number)` UNIQUE(소프트 삭제 제외), `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
 - **notification_settings**: `user_id(PK, FK → users.user_id)`, `trip_alerts`(boolean, 기본 true), `service_alerts`(boolean, 기본 true), `marketing_alerts`(boolean, 기본 false), `created_at`, `updated_at` — 사용자당 1행, 저장된 행이 없으면 API가 기본값을 즉석에서 반환(레코드 미리 생성 안 함)
 - **place_embeddings**: `place_id(PK, FK → places.place_id)`, `embedding`(JSONB — float 배열, pgvector 미사용), `model`, `dimensions`, `source_text_hash`(재생성 필요 여부 판단용), `created_at`, `updated_at` — 장소 분석(영상 분석) 시점에 이름+카테고리+주소를 합친 텍스트로 자동 생성·캐싱, 임베딩 실패는 best-effort(전체 영상 분석을 막지 않음)
-- **user_preference_embeddings**: `user_id(PK, FK → users.user_id)`, `embedding`(JSONB), `source_tags`(JSONB — 선택한 태그 원본), `source_text`, `model`, `dimensions`, `created_at`, `updated_at` — 사용자당 1행, 취향 설정(`PUT /taste-preferences`)에서만 생성. 행이 없으면 "취향 미설정"으로 간주해 추천이 임베딩 없이 상황 기반으로만 동작
+- **user_preference_embeddings**: `user_id(PK, FK → users.user_id)`, `embedding`(JSONB), `source_tags`(JSONB — 취향 설문에서 선택한 태그 원본), `source_text`, `model`, `dimensions`, `tag_scores`(JSONB, nullable — `{code: score}` 형태, 설문 선택 시 1.0으로 초기화되고 이후 행동 기록마다 가중치만큼 오르내림, [-2, 2] 클램프), `created_at`, `updated_at` — 사용자당 1행. 설문(`PUT /taste-preferences`) 또는 행동 기록(`POST /recommendations/behaviors`) 어느 쪽이든 최초 1회 생성될 수 있음(설문을 건너뛰어도 행동만으로 임베딩이 생성될 수 있음). 행이 없으면 "취향 미설정"으로 간주해 추천이 임베딩 없이 상황 기반으로만 동작
+- **recommendation_behaviors**: `behavior_id(PK)`, `user_id(FK)`, `place_id(FK)`, `action`(view_detail | map_view | share | bookmark | add_to_itinerary | like | hide | not_interested), `screen`(nullable — 행동이 발생한 화면), `distance_bucket`(nullable — 원본 위/경도 대신 버킷 문자열만 저장, 예: `0-200m`), `model_version`(nullable), `created_at` — FR-15 행동 기반 자동 학습(phase 5)의 원본 로그. 위/경도·이동 경로는 저장하지 않음(개인정보 최소 수집 원칙)
 
-인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `bookmark_folders.user_id`, `bookmark_folder_items.bookmark_id`, `places.category`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`.
+인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `bookmark_folders.user_id`, `bookmark_folder_items.bookmark_id`, `places.category`, `created_at` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`, `(recommendation_behaviors.user_id, place_id, action)`.
 
 ## 핵심 처리 로직
 
@@ -205,7 +207,7 @@ GradudtionProject/
 - **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
 - **FR-10** 지역/테마/기간 추천 마법사 / **FR-11** 북마크 폴더(다대다 태그) / **FR-12** 알림 설정(서버 저장, 발송 인프라 없음) / **FR-13** 고객센터(정적 FAQ + 연락처 안내)
 - **FR-14** 네이티브 회원가입/로그인(이메일+비밀번호, OTP 이메일 인증) — 카카오 소셜 로그인(FR-08)과 별개의 로그인 수단, 두 provider 모두 동일한 JWT 발급 흐름을 공유
-- **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 시) 임베딩 유사도·세부 태그 일치도 하이브리드 정렬. 사용자 행동 기반 자동 학습, 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고
+- **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 또는 행동 이력 존재 시) 임베딩 유사도·학습된 태그 선호도 하이브리드 정렬 + 행동 기반 자동 학습(조회/북마크/일정추가/공유/좋아요는 선호 강화, 숨김/관심없음은 약화 및 향후 추천에서 완전 제외). 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고
 - **FR-16** 취향 설정(선택형 임베딩 + 태그) — 고정 태그 목록에서 선택하면 사전학습 임베딩 모델로 취향 벡터를 생성하고, 선택한 태그 자체도 `source_tags`로 저장해 FR-15의 세부 태그 일치도 계산에 함께 사용. 건너뛰기/초기화 가능, 미설정 시 FR-15는 상황 기반으로만 동작
 
 ## 자주 쓰는 명령어

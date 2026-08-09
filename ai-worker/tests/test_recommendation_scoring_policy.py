@@ -37,17 +37,29 @@ def test_embedding_similarity_score_is_zero_when_unavailable():
 
 
 def test_tag_match_score_returns_none_when_either_side_has_no_tags():
-    assert policy.tag_match_score({}, {"소금빵"}) is None
-    assert policy.tag_match_score({"소금빵": 0.9}, set()) is None
+    assert policy.tag_match_score({}, {"소금빵": 1.0}) is None
+    assert policy.tag_match_score({"소금빵": 0.9}, {}) is None
 
 
 def test_tag_match_score_is_zero_when_both_sides_have_tags_but_none_overlap():
-    assert policy.tag_match_score({"오션뷰": 0.9}, {"소금빵"}) == 0.0
+    assert policy.tag_match_score({"오션뷰": 0.9}, {"소금빵": 1.0}) == 0.0
 
 
-def test_tag_match_score_averages_matched_confidences_over_user_tag_count():
-    score = policy.tag_match_score({"소금빵": 0.8, "오션뷰": 0.6}, {"소금빵", "오션뷰", "야경"})
-    assert round(score, 4) == round((0.8 + 0.6) / 3, 4)
+def test_tag_match_score_weights_by_both_confidence_and_learned_preference_strength():
+    score = policy.tag_match_score({"소금빵": 0.8, "오션뷰": 0.6}, {"소금빵": 1.0, "오션뷰": 1.0, "야경": 1.0})
+    assert round(score, 4) == round((0.8 * 1.0 + 0.6 * 1.0) / 3.0, 4)
+
+
+def test_tag_match_score_is_floored_at_zero_when_the_user_dislikes_the_matched_tag():
+    score = policy.tag_match_score({"소금빵": 0.9}, {"소금빵": -1.0})
+    assert score == 0.0
+
+
+def test_tag_match_score_rewards_a_stronger_relative_preference_more():
+    candidate_tags = {"소금빵": 0.9}
+    weak_pref = policy.tag_match_score(candidate_tags, {"소금빵": 0.5, "오션뷰": 1.0})
+    strong_pref = policy.tag_match_score(candidate_tags, {"소금빵": 2.0, "오션뷰": 1.0})
+    assert strong_pref > weak_pref
 
 
 def test_weights_for_only_available_base_signals_matches_phase_two_ratios():

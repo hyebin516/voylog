@@ -6,7 +6,12 @@ import '../providers/bookmark_provider.dart';
 class BookmarkButton extends StatelessWidget {
   final String placeId;
 
-  const BookmarkButton({super.key, required this.placeId});
+  /// Fired only when the place transitions from not-bookmarked to
+  /// bookmarked (not on un-bookmarking) -- used by screens that also want
+  /// to record a "bookmark" behavior signal (phase 5 personalization).
+  final VoidCallback? onBookmarked;
+
+  const BookmarkButton({super.key, required this.placeId, this.onBookmarked});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +21,11 @@ class BookmarkButton extends StatelessWidget {
         final colorScheme = Theme.of(context).colorScheme;
 
         return IconButton(
-          onPressed: () => bookmarkProvider.toggleBookmark(placeId),
+          onPressed: () {
+            final wasBookmarked = bookmarked;
+            bookmarkProvider.toggleBookmark(placeId);
+            if (!wasBookmarked) onBookmarked?.call();
+          },
           icon: Icon(
             bookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             color: bookmarked ? colorScheme.primary : colorScheme.onSurfaceVariant,

@@ -77,16 +77,28 @@ def embedding_similarity_score(cosine_similarity: float | None) -> float:
     return max(0.0, min(1.0, (cosine_similarity + 1) / 2))
 
 
-def tag_match_score(candidate_tag_confidences: dict[str, float], user_tag_codes: set[str]) -> float | None:
-    """None means "can't compare" (one side has no tags at all) -- distinct
-    from a real 0.0, which means both sides have tags but none overlap."""
-    if not candidate_tag_confidences or not user_tag_codes:
+def tag_match_score(candidate_tag_confidences: dict[str, float], user_tag_scores: dict[str, float]) -> float | None:
+    """user_tag_scores is a *learned* preference strength per tag (seeded at
+    1.0 from the taste survey, then nudged by behavior -- see phase 5's
+    updateUserPreferenceFromBehavior), not just a flat set of chosen codes.
+
+    None means "can't compare" (one side has no tags at all) -- distinct
+    from a real 0.0, which means both sides have tags but the overlap is
+    net non-positive (no overlap, or the user has behaviorally soured on
+    the tags this place has)."""
+    if not candidate_tag_confidences or not user_tag_scores:
         return None
 
-    matched = [candidate_tag_confidences[code] for code in user_tag_codes if code in candidate_tag_confidences]
-    if not matched:
+    overlap = set(candidate_tag_confidences) & set(user_tag_scores)
+    if not overlap:
         return 0.0
-    return min(1.0, sum(matched) / len(user_tag_codes))
+
+    matched_weight = sum(candidate_tag_confidences[code] * user_tag_scores[code] for code in overlap)
+    total_possible = sum(abs(score) for score in user_tag_scores.values())
+    if total_possible == 0:
+        return 0.0
+
+    return max(0.0, min(1.0, matched_weight / total_possible))
 
 
 def weights_for(available: set[str]) -> dict[str, float]:

@@ -107,6 +107,10 @@ class EmbeddingResponse(BaseModel):
     dimensions: int
 
 
+class PreferenceUpdateResponse(BaseModel):
+    embedding: List[float]
+
+
 class RoutePoint(BaseModel):
     order: int
     type: Literal["hotel", "place"]

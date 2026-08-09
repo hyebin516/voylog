@@ -39,7 +39,7 @@ def _build_reason(
 
 def score_nearby(request: NearbyScoreRequest) -> NearbyScoreResponse:
     local_dt = datetime.fromisoformat(request.localTime)
-    user_tag_codes = set(request.userTagCodes)
+    user_tag_scores = request.userTagScores
 
     scored = []
     for candidate in request.candidates:
@@ -57,9 +57,13 @@ def score_nearby(request: NearbyScoreRequest) -> NearbyScoreResponse:
         has_embedding_pair = similarity is not None
 
         candidate_tag_confidences = {tag.code: tag.confidence for tag in candidate.tags}
-        tag_score = policy.tag_match_score(candidate_tag_confidences, user_tag_codes)
+        tag_score = policy.tag_match_score(candidate_tag_confidences, user_tag_scores)
         has_tag_pair = tag_score is not None
-        matched_tags = sorted(user_tag_codes & candidate_tag_confidences.keys()) if has_tag_pair else []
+        matched_tags = (
+            sorted(code for code in (set(user_tag_scores) & candidate_tag_confidences.keys()) if user_tag_scores[code] > 0)
+            if has_tag_pair
+            else []
+        )
 
         available = {"distance", "timeOfDay", "businessHours"}
         if has_embedding_pair:

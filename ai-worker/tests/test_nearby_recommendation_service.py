@@ -140,7 +140,7 @@ def test_no_tag_match_when_the_user_has_no_tag_preferences():
         placeId="p1", name="Place", latitude=37.5005, longitude=127.0, tags=[{"code": "소금빵", "confidence": 0.9}]
     )
 
-    result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate], userTagCodes=[]))
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate], userTagScores={}))
 
     assert result.recommendations[0].scoreDetails.tagMatch is None
     assert result.recommendations[0].matchedTags == []
@@ -150,7 +150,7 @@ def test_no_tag_match_when_the_candidate_has_no_tags():
     candidate = NearbyPlaceCandidate(placeId="p1", name="Place", latitude=37.5005, longitude=127.0)
 
     result = nearby_recommendation_service.score_nearby(
-        make_request(candidates=[candidate], userTagCodes=["소금빵"])
+        make_request(candidates=[candidate], userTagScores={"소금빵": 1.0})
     )
 
     assert result.recommendations[0].scoreDetails.tagMatch is None
@@ -166,7 +166,7 @@ def test_matched_tags_lists_the_overlapping_codes():
     )
 
     result = nearby_recommendation_service.score_nearby(
-        make_request(candidates=[candidate], userTagCodes=["소금빵", "오션뷰"])
+        make_request(candidates=[candidate], userTagScores={"소금빵": 1.0, "오션뷰": 1.0})
     )
 
     rec = result.recommendations[0]
@@ -191,7 +191,7 @@ def test_a_tag_match_outscores_no_match_at_the_same_distance():
     )
 
     result = nearby_recommendation_service.score_nearby(
-        make_request(candidates=[matching, no_match], userTagCodes=["소금빵"])
+        make_request(candidates=[matching, no_match], userTagScores={"소금빵": 1.0})
     )
 
     by_id = {r.placeId: r for r in result.recommendations}
@@ -206,7 +206,7 @@ def test_reason_names_the_matched_tags():
     )
 
     result = nearby_recommendation_service.score_nearby(
-        make_request(candidates=[candidate], userTagCodes=["소금빵"])
+        make_request(candidates=[candidate], userTagScores={"소금빵": 1.0})
     )
 
     assert "소금빵" in result.recommendations[0].reason
@@ -223,7 +223,7 @@ def test_embedding_and_tag_signals_combine_without_error():
     )
 
     result = nearby_recommendation_service.score_nearby(
-        make_request(candidates=[candidate], userEmbedding=[1.0, 0.0], userTagCodes=["소금빵"])
+        make_request(candidates=[candidate], userEmbedding=[1.0, 0.0], userTagScores={"소금빵": 1.0})
     )
 
     rec = result.recommendations[0]
