@@ -13,6 +13,7 @@ void main() {
       'isOpen': true,
       'isOpenEstimated': true,
       'score': 0.87,
+      'matchedTags': ['소금빵', '오션뷰'],
       'reason': '현재 위치에서 420m 떨어져 있어요. 지금 영업 중이에요.',
     });
 
@@ -21,9 +22,10 @@ void main() {
     expect(rec.isOpen, isTrue);
     expect(rec.isOpenEstimated, isTrue);
     expect(rec.score, 0.87);
+    expect(rec.matchedTags, ['소금빵', '오션뷰']);
   });
 
-  test('category and isOpen may be null (unknown)', () {
+  test('category and isOpen may be null (unknown), matchedTags defaults to empty', () {
     final rec = NearbyRecommendationModel.fromJson({
       'placeId': 'p1',
       'name': 'Place',
@@ -39,5 +41,6 @@ void main() {
 
     expect(rec.category, isNull);
     expect(rec.isOpen, isNull);
+    expect(rec.matchedTags, isEmpty);
   });
 }

@@ -51,6 +51,7 @@ describe('getNearbyRecommendations', () => {
             longitude: 127.0,
             category: 'cafe',
             businessHours: { mon: { open: '09:00', close: '21:00' } },
+            tags: [],
           },
         ],
       }),
@@ -135,6 +136,50 @@ describe('getNearbyRecommendations', () => {
     expect(callAiWorker).toHaveBeenCalledWith(
       '/recommendations/nearby-score',
       expect.objectContaining({ userEmbedding: null }),
+      10000
+    );
+  });
+
+  it('passes candidate tags through to the AI worker', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([
+      { place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0', tags: [{ code: '소금빵', confidence: 0.9 }] },
+    ]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({
+        candidates: [expect.objectContaining({ tags: [{ code: '소금빵', confidence: 0.9 }] })],
+      }),
+      10000
+    );
+  });
+
+  it('leaves userTagCodes empty for a guest request', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ userTagCodes: [] }),
+      10000
+    );
+  });
+
+  it('fetches and forwards the user preference tag codes when the user has preferences', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [0.9, 0.1], source_tags: ['소금빵', '오션뷰'] });
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ userId: 'u1', latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ userTagCodes: ['소금빵', '오션뷰'] }),
       10000
     );
   });

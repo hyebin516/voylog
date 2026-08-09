@@ -1,10 +1,20 @@
 import asyncio
 
+from app.constants.tag_catalog import ALL_TAG_CODES
 from app.prompts.place_extraction_prompt import build_user_prompt
 from app.schemas.request_schema import PlaceExtractionRequest
-from app.schemas.response_schema import GeocodedPlace, PlaceExtractionResponse
+from app.schemas.response_schema import GeocodedPlace, PlaceExtractionResponse, PlaceTag
 from app.services import llm_service
 from app.services.geocoding_service import geocode_place
+
+_ALLOWED_TAG_CODES = set(ALL_TAG_CODES)
+
+
+def _valid_tags(tags: list[PlaceTag]) -> list[PlaceTag]:
+    """Drops any tag the LLM hallucinated outside the fixed catalog, since a
+    tag code is only useful for matching if both sides agree on the
+    vocabulary."""
+    return [tag for tag in tags if tag.code in _ALLOWED_TAG_CODES]
 
 
 async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResponse:
@@ -32,6 +42,7 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
                 confidence=candidate.confidence,
                 category=candidate.category,
                 businessHours=candidate.businessHours,
+                tags=_valid_tags(candidate.tags),
             )
         )
 

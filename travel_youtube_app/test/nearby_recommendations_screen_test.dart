@@ -69,6 +69,7 @@ void main() {
           isOpen: true,
           isOpenEstimated: true,
           score: 0.87,
+          matchedTags: ['소금빵', '오션뷰'],
           reason: '현재 위치에서 420m 떨어져 있어요. 지금 영업 중이에요.',
         ),
       ];
@@ -81,6 +82,8 @@ void main() {
 
     expect(find.text('예시 베이커리 카페'), findsOneWidget);
     expect(find.text('영업중'), findsOneWidget);
+    expect(find.text('소금빵'), findsOneWidget);
+    expect(find.text('오션뷰'), findsOneWidget);
   });
 
   testWidgets('shows an empty state when there are no nearby recommendations', (tester) async {

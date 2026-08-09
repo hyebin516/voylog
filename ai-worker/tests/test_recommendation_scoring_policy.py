@@ -36,11 +36,38 @@ def test_embedding_similarity_score_is_zero_when_unavailable():
     assert policy.embedding_similarity_score(None) == 0.0
 
 
-def test_weights_for_switches_sets_based_on_embedding_availability():
-    without = policy.weights_for(False)
-    with_embedding = policy.weights_for(True)
+def test_tag_match_score_returns_none_when_either_side_has_no_tags():
+    assert policy.tag_match_score({}, {"소금빵"}) is None
+    assert policy.tag_match_score({"소금빵": 0.9}, set()) is None
 
-    assert "embeddingSimilarity" not in without
-    assert "embeddingSimilarity" in with_embedding
-    assert round(sum(without.values()), 6) == 1.0
-    assert round(sum(with_embedding.values()), 6) == 1.0
+
+def test_tag_match_score_is_zero_when_both_sides_have_tags_but_none_overlap():
+    assert policy.tag_match_score({"오션뷰": 0.9}, {"소금빵"}) == 0.0
+
+
+def test_tag_match_score_averages_matched_confidences_over_user_tag_count():
+    score = policy.tag_match_score({"소금빵": 0.8, "오션뷰": 0.6}, {"소금빵", "오션뷰", "야경"})
+    assert round(score, 4) == round((0.8 + 0.6) / 3, 4)
+
+
+def test_weights_for_only_available_base_signals_matches_phase_two_ratios():
+    weights = policy.weights_for({"distance", "timeOfDay", "businessHours"})
+
+    assert round(weights["distance"], 3) == 0.45
+    assert round(weights["timeOfDay"], 3) == 0.25
+    assert round(weights["businessHours"], 3) == 0.30
+    assert round(sum(weights.values()), 6) == 1.0
+
+
+def test_weights_for_includes_only_the_requested_signals():
+    weights = policy.weights_for({"distance", "timeOfDay", "businessHours", "embeddingSimilarity"})
+
+    assert "embeddingSimilarity" in weights
+    assert "tagMatch" not in weights
+    assert round(sum(weights.values()), 6) == 1.0
+
+
+def test_weights_for_all_five_signals_matches_base_weights_exactly():
+    weights = policy.weights_for(set(policy.BASE_WEIGHTS.keys()))
+
+    assert weights == policy.BASE_WEIGHTS

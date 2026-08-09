@@ -15,6 +15,7 @@ const NearbyRecommendationModel _rec = NearbyRecommendationModel(
   isOpen: true,
   isOpenEstimated: true,
   score: 0.8,
+  matchedTags: [],
   reason: 'reason',
 );
 

@@ -34,8 +34,8 @@ async function createPlaces(client, videoId, places) {
   const inserted = [];
   for (const place of places) {
     const { rows } = await client.query(
-      `INSERT INTO places (video_id, name, address, latitude, longitude, timestamp_sec, source, confidence, category, business_hours, business_hours_is_estimated)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO places (video_id, name, address, latitude, longitude, timestamp_sec, source, confidence, category, business_hours, business_hours_is_estimated, tags)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         videoId,
@@ -49,6 +49,7 @@ async function createPlaces(client, videoId, places) {
         place.category || null,
         place.businessHours ? JSON.stringify(place.businessHours) : null,
         Boolean(place.businessHours),
+        place.tags && place.tags.length > 0 ? JSON.stringify(place.tags) : null,
       ]
     );
     inserted.push(rows[0]);

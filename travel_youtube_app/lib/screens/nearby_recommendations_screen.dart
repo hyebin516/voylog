@@ -106,6 +106,21 @@ class _NearbyRecommendationsScreenState extends State<NearbyRecommendationsScree
                         ),
                         const SizedBox(height: AppSpacing.xs),
                         Text(rec.reason, style: Theme.of(context).textTheme.bodySmall),
+                        if (rec.matchedTags.isNotEmpty) ...[
+                          const SizedBox(height: AppSpacing.xs),
+                          Wrap(
+                            spacing: AppSpacing.xs,
+                            runSpacing: AppSpacing.xs,
+                            children: [
+                              for (final tag in rec.matchedTags)
+                                Chip(
+                                  label: Text(tag, style: const TextStyle(fontSize: 11)),
+                                  visualDensity: VisualDensity.compact,
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                            ],
+                          ),
+                        ],
                         if (rec.isOpen != null && rec.isOpenEstimated) ...[
                           const SizedBox(height: AppSpacing.xs),
                           Text(

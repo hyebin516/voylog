@@ -133,3 +133,100 @@ def test_reason_mentions_taste_match_when_an_embedding_pair_is_present():
     )
 
     assert "취향" in result.recommendations[0].reason
+
+
+def test_no_tag_match_when_the_user_has_no_tag_preferences():
+    candidate = NearbyPlaceCandidate(
+        placeId="p1", name="Place", latitude=37.5005, longitude=127.0, tags=[{"code": "소금빵", "confidence": 0.9}]
+    )
+
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate], userTagCodes=[]))
+
+    assert result.recommendations[0].scoreDetails.tagMatch is None
+    assert result.recommendations[0].matchedTags == []
+
+
+def test_no_tag_match_when_the_candidate_has_no_tags():
+    candidate = NearbyPlaceCandidate(placeId="p1", name="Place", latitude=37.5005, longitude=127.0)
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userTagCodes=["소금빵"])
+    )
+
+    assert result.recommendations[0].scoreDetails.tagMatch is None
+
+
+def test_matched_tags_lists_the_overlapping_codes():
+    candidate = NearbyPlaceCandidate(
+        placeId="p1",
+        name="Place",
+        latitude=37.5005,
+        longitude=127.0,
+        tags=[{"code": "소금빵", "confidence": 0.9}, {"code": "야경", "confidence": 0.8}],
+    )
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userTagCodes=["소금빵", "오션뷰"])
+    )
+
+    rec = result.recommendations[0]
+    assert rec.matchedTags == ["소금빵"]
+    assert rec.scoreDetails.tagMatch is not None
+
+
+def test_a_tag_match_outscores_no_match_at_the_same_distance():
+    matching = NearbyPlaceCandidate(
+        placeId="match",
+        name="Match",
+        latitude=37.5005,
+        longitude=127.0,
+        tags=[{"code": "소금빵", "confidence": 1.0}],
+    )
+    no_match = NearbyPlaceCandidate(
+        placeId="no_match",
+        name="No match",
+        latitude=37.5005,
+        longitude=127.001,
+        tags=[{"code": "야경", "confidence": 1.0}],
+    )
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[matching, no_match], userTagCodes=["소금빵"])
+    )
+
+    by_id = {r.placeId: r for r in result.recommendations}
+    assert by_id["match"].scoreDetails.tagMatch == 1.0
+    assert by_id["no_match"].scoreDetails.tagMatch == 0.0
+    assert by_id["match"].score > by_id["no_match"].score
+
+
+def test_reason_names_the_matched_tags():
+    candidate = NearbyPlaceCandidate(
+        placeId="p1", name="Place", latitude=37.5005, longitude=127.0, tags=[{"code": "소금빵", "confidence": 0.9}]
+    )
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userTagCodes=["소금빵"])
+    )
+
+    assert "소금빵" in result.recommendations[0].reason
+
+
+def test_embedding_and_tag_signals_combine_without_error():
+    candidate = NearbyPlaceCandidate(
+        placeId="p1",
+        name="Place",
+        latitude=37.5005,
+        longitude=127.0,
+        embedding=[1.0, 0.0],
+        tags=[{"code": "소금빵", "confidence": 0.9}],
+    )
+
+    result = nearby_recommendation_service.score_nearby(
+        make_request(candidates=[candidate], userEmbedding=[1.0, 0.0], userTagCodes=["소금빵"])
+    )
+
+    rec = result.recommendations[0]
+    assert rec.scoreDetails.embeddingSimilarity is not None
+    assert rec.scoreDetails.tagMatch is not None
+    assert 0.0 <= rec.score <= 1.0

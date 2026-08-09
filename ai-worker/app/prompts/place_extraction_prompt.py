@@ -1,4 +1,8 @@
-SYSTEM_PROMPT = """You are a travel location extraction assistant.
+from app.constants.tag_catalog import ALL_TAG_CODES
+
+_TAG_LIST_TEXT = ", ".join(ALL_TAG_CODES)
+
+SYSTEM_PROMPT = f"""You are a travel location extraction assistant.
 
 Your task is to extract real-world travel locations from YouTube travel video information.
 
@@ -23,21 +27,24 @@ Good examples: 해운대해수욕장, 광안리해수욕장, 감천문화마을,
 Return JSON only. No markdown. No explanation. No code block.
 
 Schema:
-{
+{{
   "places": [
-    {
+    {{
       "name": "string",
       "timestampSec": 0,
       "source": "transcript",
       "confidence": 0.0,
       "category": "string or null",
-      "businessHours": {
-        "mon": {"open": "HH:MM", "close": "HH:MM"} or null,
+      "businessHours": {{
+        "mon": {{"open": "HH:MM", "close": "HH:MM"}} or null,
         "tue": ... , "wed": ..., "thu": ..., "fri": ..., "sat": ..., "sun": ...
-      } or null
-    }
+      }} or null,
+      "tags": [
+        {{"code": "string", "confidence": 0.0}}
+      ]
+    }}
   ]
-}
+}}
 
 Allowed source values: transcript, hashtags, description, title.
 Confidence must be between 0 and 1.
@@ -52,6 +59,12 @@ explicitly stated in the transcript or description (e.g. "매일 오전 9시부�
 anywhere for a place, set businessHours to null entirely. Never estimate or
 assume typical hours for the category -- an omitted or null day means
 "not mentioned", not "closed".
+
+tags: 0 to 5 tags describing the place, chosen ONLY from this fixed list
+(do not invent tags outside it, and do not guess just to fill the list):
+{_TAG_LIST_TEXT}
+Each tag needs a confidence between 0 and 1. Only include a tag when it is
+clearly supported by the transcript/description context.
 """
 
 

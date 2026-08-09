@@ -38,6 +38,11 @@ class BusinessHoursDay(BaseModel):
 BusinessHours = Dict[str, Optional[BusinessHoursDay]]
 
 
+class PlaceTag(BaseModel):
+    code: str
+    confidence: float
+
+
 class PlaceCandidate(BaseModel):
     name: str
     timestampSec: Optional[int] = None
@@ -45,6 +50,7 @@ class PlaceCandidate(BaseModel):
     confidence: float
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
+    tags: List[PlaceTag] = []
 
 
 class LlmPlaceExtractionResult(BaseModel):
@@ -61,6 +67,7 @@ class GeocodedPlace(BaseModel):
     confidence: float
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
+    tags: List[PlaceTag] = []
 
 
 class PlaceExtractionResponse(BaseModel):
@@ -72,6 +79,7 @@ class ScoreDetails(BaseModel):
     timeOfDay: float
     businessHours: float
     embeddingSimilarity: Optional[float] = None
+    tagMatch: Optional[float] = None
 
 
 class NearbyRecommendation(BaseModel):
@@ -85,6 +93,7 @@ class NearbyRecommendation(BaseModel):
     isOpenEstimated: bool
     score: float
     scoreDetails: ScoreDetails
+    matchedTags: List[str] = []
     reason: str
 
 

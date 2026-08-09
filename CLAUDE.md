@@ -7,16 +7,16 @@
 **여행 유튜브 요약 서비스** — 유튜브 여행·브이로그 영상을 분석하여 영상 속 등장 장소를 자동 추출하고, 사용자가 만든 "여행(trip)" 아래 여러 날짜(1일차, 2일차...)로 나눠 각 날짜마다 시작/종료 호텔을 기준으로 북마크한 장소들을 순회하는 최적 동선(왕복 또는 호텔 간 이동)을 AI가 계획해주는 여행 일정 플래너 서비스. Clean Architecture(계층 분리)를 따른다.
 
 - **팀명**: 럭키비키 (팀장: 김혜빈 / 팀원: 최나경)
-- **문서 버전**: v2.4 (위치·시간 기반 개인화 추천 1~2단계 — 거리/시간대/영업여부 + 사전학습 임베딩 유사도 반영)
+- **문서 버전**: v2.5 (위치·시간 기반 개인화 추천 1~3단계 — 거리/시간대/영업여부 + 사전학습 임베딩 유사도 + 세부 태그 일치도 반영)
 
 ### 핵심 사용자 흐름
 1. 유튜브 URL 입력 또는 해시태그로 브이로그 탐색
-2. 자막 추출 → LLM 장소 파싱(카테고리·영업시간 추정 포함) → Kakao Maps 좌표 변환 → 장소 임베딩 생성·캐싱 → 장소 카드 목록 제공
+2. 자막 추출 → LLM 장소 파싱(카테고리·영업시간·세부 태그 추정 포함) → Kakao Maps 좌표 변환 → 장소 임베딩 생성·캐싱 → 장소 카드 목록 제공
 3. 타임스탬프 클릭(영상 이동), 지도 보기, 북마크
 4. 여행(trip) 생성 후, 날짜(1일차, 2일차...)마다 Kakao Maps로 시작 호텔·종료 호텔 선택 (같은 호텔을 선택하면 왕복, 다른 호텔이면 호텔 간 이동 — 날짜마다 다르게 선택 가능, 예: 1일차 A호텔→B호텔, 2일차 B호텔→B호텔)
 5. 북마크된 장소(2~10개) 기반 AI 동선 최적화 (해당 날짜의 시작 호텔 → 장소들 → 종료 호텔), 날짜별로 반복하여 하나의 여행에 누적 저장
-6. (선택) 마이페이지에서 취향 태그를 선택하면 취향 임베딩 생성(건너뛰기/초기화 가능)
-7. (선택) "내 주변 추천" — 현재 위치·시각 기반으로 반경 내 기존 places를 거리/시간대/영업여부(추정) + (취향 설정 시) 임베딩 유사도로 정렬해 추천. 로그인 불필요 — 비회원·취향 미설정 사용자는 임베딩 없이 상황 기반으로만 정렬
+6. (선택) 마이페이지에서 고정 태그 목록 중 취향 태그를 선택하면 취향 임베딩 생성(건너뛰기/초기화 가능) — 같은 태그 목록이 장소 태그 추출과 취향 설문에 공통으로 쓰여 매칭이 가능
+7. (선택) "내 주변 추천" — 현재 위치·시각 기반으로 반경 내 기존 places를 거리/시간대/영업여부(추정) + (취향 설정 시) 임베딩 유사도·세부 태그 일치도로 정렬해 추천. 로그인 불필요 — 비회원·취향 미설정 사용자는 상황 기반으로만 정렬, 신호가 있을 때만 가중치에 반영(없는 신호의 비중은 나머지 신호로 재분배)
 
 ## 기술 스택
 
@@ -105,7 +105,7 @@ GradudtionProject/
 | GET/DELETE | `/api/v1/trips/:id` | 필수 (JWT) | 여행 상세(날짜별 동선 목록 `days[]`) 조회 / 여행 삭제(소속 날짜 동선도 함께 소프트 삭제) |
 | POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | GET/PUT | `/api/v1/notification-settings` | 필수 (JWT) | 알림 설정 조회(저장된 값이 없으면 기본값 반환) / 수정. body(PUT): `{ tripAlerts, serviceAlerts, marketingAlerts }` (모두 boolean 필수). 실제 푸시 발송 인프라는 없음 — 설정값만 저장 |
-| POST | `/api/v1/recommendations/nearby` | 선택 (JWT, 미인증도 허용) | 위치·시간 기반 주변 장소 추천. body: `{ latitude, longitude, localTime, radiusMeters?, limit? }` (`localTime`은 ISO 8601, 기기의 로컬 시각 그대로 — 시간대 변환 없이 요일/시각 판단에 사용). 서버가 `places`에서 반경 내 후보(임베딩 포함)를 조회하고, 로그인 사용자면 `user_preference_embeddings`도 함께 조회해 AI Worker(`/recommendations/nearby-score`)로 전달 — 거리/시간대/영업여부(LLM 추정) + (사용자·후보 임베딩이 모두 있을 때만) 임베딩 코사인 유사도를 결합해 점수·정렬·추천 이유(템플릿 문장) 계산. 임베딩이 없으면 자동으로 상황 기반 가중치로 재분배 — 태그 기반 개인화·행동 학습은 아직 없음(후속 단계) |
+| POST | `/api/v1/recommendations/nearby` | 선택 (JWT, 미인증도 허용) | 위치·시간 기반 주변 장소 추천. body: `{ latitude, longitude, localTime, radiusMeters?, limit? }` (`localTime`은 ISO 8601, 기기의 로컬 시각 그대로 — 시간대 변환 없이 요일/시각 판단에 사용). 서버가 `places`에서 반경 내 후보(임베딩·태그 포함)를 조회하고, 로그인 사용자면 `user_preference_embeddings`(임베딩+`source_tags`)도 함께 조회해 AI Worker(`/recommendations/nearby-score`)로 전달 — 거리/시간대/영업여부(LLM 추정) + (양쪽에 임베딩이 있을 때만) 코사인 유사도 + (양쪽에 태그가 있을 때만) 세부 태그 일치도를 결합해 점수·정렬·매칭된 태그 목록·추천 이유(템플릿 문장) 계산. 각 신호는 있을 때만 가중치에 포함되고 없는 신호의 비중은 나머지 신호로 자동 재분배 — 사용자 행동 기반 자동 학습은 아직 없음(후속 단계) |
 | GET | `/api/v1/taste-preferences` | 필수 (JWT) | 내 취향 태그 조회. 저장된 값이 없으면 `{ tags: [] }` 반환(설문을 건너뛴 상태) |
 | PUT | `/api/v1/taste-preferences` | 필수 (JWT) | 취향 태그 설정/수정. body: `{ tags: string[] }` (1개 이상). 서버가 태그를 하나의 문장으로 합쳐 AI Worker(`/embeddings/generate`)로 임베딩을 생성해 `user_preference_embeddings`에 저장 |
 | DELETE | `/api/v1/taste-preferences` | 필수 (JWT) | 취향 설정 초기화(행 삭제) — 이후 추천은 다시 비개인화 상태로 동작 |
@@ -138,7 +138,7 @@ GradudtionProject/
 - **users**: `user_id(PK)`, `provider`(kakao | email), `provider_id`(UNIQUE — kakao는 카카오 회원번호, email 계정은 `email`과 동일한 값), `email`(nullable — email 계정은 UNIQUE 부분 인덱스로 중복 가입 방지), `password_hash`(nullable — email 계정만 bcrypt 해시 보유, kakao 계정은 null), `nickname`, `profile_image`, `created_at`, `updated_at`
 - **email_otps**: `otp_id(PK)`, `email`, `code_hash`(6자리 코드의 SHA-256 해시, 평문 미저장), `expires_at`(발급 5분 후), `verified_at`(nullable), `attempts`(기본 0, 5회 초과 시 만료 취급), `created_at` — 네이티브 회원가입 이메일 인증용. `POST /auth/signup` 성공 시 해당 이메일의 행을 모두 삭제(소프트 삭제 대상 아님, 단기 토큰성 데이터)
 - **videos**: `video_id(PK)`, `youtube_url`(UNIQUE), `title`, `description`, `thumbnail_url`, `channel_name`, `published_at`, `duration_sec`, `language`, `is_analyzed`, `analysis_version`, `created_at`, `updated_at`
-- **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `category`(nullable — LLM이 장소 추출 시점에 함께 추정, cafe/bakery/restaurant 등 자유 텍스트), `business_hours`(JSONB, nullable — LLM이 자막/설명에 명시된 영업시간만 추출, 언급 없으면 null이며 절대 추측하지 않음), `business_hours_is_estimated`(boolean, 기본 false — Kakao Local API는 영업시간을 제공하지 않아 항상 LLM 추정치임을 표시), `created_at`, `updated_at`
+- **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `category`(nullable — LLM이 장소 추출 시점에 함께 추정, cafe/bakery/restaurant 등 자유 텍스트), `business_hours`(JSONB, nullable — LLM이 자막/설명에 명시된 영업시간만 추출, 언급 없으면 null이며 절대 추측하지 않음), `business_hours_is_estimated`(boolean, 기본 false — Kakao Local API는 영업시간을 제공하지 않아 항상 LLM 추정치임을 표시), `tags`(JSONB, nullable — `[{code, confidence}]` 배열, `code`는 `ai-worker/app/constants/tag_catalog.py`의 고정 목록 중 하나만 허용(새 태그마다 컬럼 추가하지 않기 위한 MVP 설계), 취향 설정 화면의 태그 목록과 동일한 어휘를 공유해야 매칭이 성립), `created_at`, `updated_at`
 - **hotels**: `hotel_id(PK)`, `user_id(FK)`, `name`, `address`, `latitude`, `longitude`(NOT NULL — Kakao Maps 검색으로만 저장), `created_at`, `updated_at`
 - **bookmarks**: `bookmark_id(PK)`, `user_id(FK)`, `place_id(FK)`, `created_at`, UNIQUE(`user_id`, `place_id`)
 - **bookmark_folders**: `folder_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at`, `deleted_at` — 사용자가 만드는 북마크 폴더
@@ -205,8 +205,8 @@ GradudtionProject/
 - **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
 - **FR-10** 지역/테마/기간 추천 마법사 / **FR-11** 북마크 폴더(다대다 태그) / **FR-12** 알림 설정(서버 저장, 발송 인프라 없음) / **FR-13** 고객센터(정적 FAQ + 연락처 안내)
 - **FR-14** 네이티브 회원가입/로그인(이메일+비밀번호, OTP 이메일 인증) — 카카오 소셜 로그인(FR-08)과 별개의 로그인 수단, 두 provider 모두 동일한 JWT 발급 흐름을 공유
-- **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 시) 임베딩 유사도 하이브리드 정렬. 세부 태그 매칭, 사용자 행동 기반 자동 학습, 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고
-- **FR-16** 취향 설정(선택형 임베딩) — 태그를 선택하면 사전학습 임베딩 모델로 취향 벡터를 생성해 FR-15 추천에 반영. 건너뛰기/초기화 가능, 미설정 시 FR-15는 상황 기반으로만 동작
+- **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 시) 임베딩 유사도·세부 태그 일치도 하이브리드 정렬. 사용자 행동 기반 자동 학습, 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고
+- **FR-16** 취향 설정(선택형 임베딩 + 태그) — 고정 태그 목록에서 선택하면 사전학습 임베딩 모델로 취향 벡터를 생성하고, 선택한 태그 자체도 `source_tags`로 저장해 FR-15의 세부 태그 일치도 계산에 함께 사용. 건너뛰기/초기화 가능, 미설정 시 FR-15는 상황 기반으로만 동작
 
 ## 자주 쓰는 명령어
 

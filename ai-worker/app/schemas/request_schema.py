@@ -61,6 +61,11 @@ class RouteOptimizationRequest(BaseModel):
     optimizationPriority: Literal["duration"] = "duration"
 
 
+class NearbyPlaceTagInput(BaseModel):
+    code: str
+    confidence: float
+
+
 class NearbyPlaceCandidate(BaseModel):
     placeId: str
     name: str
@@ -69,6 +74,7 @@ class NearbyPlaceCandidate(BaseModel):
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
     embedding: Optional[List[float]] = None
+    tags: List[NearbyPlaceTagInput] = []
 
 
 class NearbyScoreRequest(BaseModel):
@@ -79,6 +85,7 @@ class NearbyScoreRequest(BaseModel):
     limit: int = 20
     candidates: List[NearbyPlaceCandidate] = []
     userEmbedding: Optional[List[float]] = None
+    userTagCodes: List[str] = []
 
 
 class EmbeddingRequest(BaseModel):

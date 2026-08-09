@@ -17,6 +17,7 @@ function toCandidate(place) {
     category: place.category,
     businessHours: place.business_hours,
     embedding: place.embedding,
+    tags: place.tags || [],
   };
 }
 
@@ -30,9 +31,11 @@ async function getNearbyRecommendations({ userId, latitude, longitude, localTime
   }
 
   let userEmbedding = null;
+  let userTagCodes = [];
   if (userId) {
     const preference = await tastePreferenceRepository.find(userId);
     userEmbedding = preference ? preference.embedding : null;
+    userTagCodes = preference ? preference.source_tags : [];
   }
 
   return callAiWorker(
@@ -45,6 +48,7 @@ async function getNearbyRecommendations({ userId, latitude, longitude, localTime
       limit: resultLimit,
       candidates: candidatePlaces.map(toCandidate),
       userEmbedding,
+      userTagCodes,
     },
     10000
   );

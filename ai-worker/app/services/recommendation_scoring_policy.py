@@ -1,29 +1,22 @@
 """Weights and heuristics for nearby scoring. Kept in one place so tuning
 never means hunting through multiple files.
 
-Two weight sets exist because embedding similarity is only meaningful when
-*both* the user has a preference embedding (completed the taste survey) and
-the candidate place has one (embedded at extraction time). Whenever either
-is missing, scoring falls back to WITHOUT_EMBEDDING so a candidate/guest
-without personalization data is never penalized for lacking it -- this is
-the "재분배" behavior described in the design: personalization weight comes
-out of these categories, it doesn't get silently dropped.
-
-Tag-match scoring is not implemented yet (a later phase); when it lands its
-share should come out of these too, not be added on top.
+distance/timeOfDay/businessHours are always computable. embeddingSimilarity
+and tagMatch are only meaningful when *both* sides have the data (the user
+completed the taste survey / has behavior-derived preferences, and the
+candidate place has an embedding or tags from extraction). weights_for()
+renormalizes BASE_WEIGHTS over whichever signals are actually available, so
+a guest or a candidate lacking personalization data is never penalized for
+it -- its share is redistributed, never silently dropped, and never added
+on top of the always-available signals either.
 """
 
-SCORE_WEIGHTS_WITHOUT_EMBEDDING = {
-    "distance": 0.45,
-    "timeOfDay": 0.25,
-    "businessHours": 0.30,
-}
-
-SCORE_WEIGHTS_WITH_EMBEDDING = {
-    "distance": 0.25,
-    "timeOfDay": 0.10,
-    "businessHours": 0.20,
-    "embeddingSimilarity": 0.45,
+BASE_WEIGHTS = {
+    "distance": 0.225,
+    "timeOfDay": 0.125,
+    "businessHours": 0.15,
+    "embeddingSimilarity": 0.35,
+    "tagMatch": 0.15,
 }
 
 # A day is split into buckets; within each bucket, place categories in the
@@ -84,5 +77,20 @@ def embedding_similarity_score(cosine_similarity: float | None) -> float:
     return max(0.0, min(1.0, (cosine_similarity + 1) / 2))
 
 
-def weights_for(has_embedding_pair: bool) -> dict[str, float]:
-    return SCORE_WEIGHTS_WITH_EMBEDDING if has_embedding_pair else SCORE_WEIGHTS_WITHOUT_EMBEDDING
+def tag_match_score(candidate_tag_confidences: dict[str, float], user_tag_codes: set[str]) -> float | None:
+    """None means "can't compare" (one side has no tags at all) -- distinct
+    from a real 0.0, which means both sides have tags but none overlap."""
+    if not candidate_tag_confidences or not user_tag_codes:
+        return None
+
+    matched = [candidate_tag_confidences[code] for code in user_tag_codes if code in candidate_tag_confidences]
+    if not matched:
+        return 0.0
+    return min(1.0, sum(matched) / len(user_tag_codes))
+
+
+def weights_for(available: set[str]) -> dict[str, float]:
+    total = sum(BASE_WEIGHTS[key] for key in available)
+    if total == 0:
+        return {key: 0.0 for key in available}
+    return {key: BASE_WEIGHTS[key] / total for key in available}

@@ -8,6 +8,7 @@ class NearbyRecommendationModel {
   final bool? isOpen;
   final bool isOpenEstimated;
   final double score;
+  final List<String> matchedTags;
   final String reason;
 
   const NearbyRecommendationModel({
@@ -20,6 +21,7 @@ class NearbyRecommendationModel {
     required this.isOpen,
     required this.isOpenEstimated,
     required this.score,
+    required this.matchedTags,
     required this.reason,
   });
 
@@ -34,6 +36,7 @@ class NearbyRecommendationModel {
       isOpen: json['isOpen'] as bool?,
       isOpenEstimated: json['isOpenEstimated'] as bool,
       score: (json['score'] as num).toDouble(),
+      matchedTags: (json['matchedTags'] as List<dynamic>? ?? []).map((e) => e as String).toList(),
       reason: json['reason'] as String,
     );
   }

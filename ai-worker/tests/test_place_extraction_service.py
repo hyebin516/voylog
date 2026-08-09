@@ -1,7 +1,7 @@
 import asyncio
 
 from app.schemas.request_schema import PlaceExtractionRequest, TranscriptSegment, VideoMeta
-from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceCandidate
+from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceCandidate, PlaceTag
 from app.services import place_extraction_service
 
 
@@ -95,6 +95,34 @@ def test_extract_places_forwards_category_and_business_hours(monkeypatch):
 
     assert result.places[0].category == "beach"
     assert result.places[0].businessHours["mon"].open == "09:00"
+
+
+def test_extract_places_forwards_valid_tags_and_drops_hallucinated_ones(monkeypatch):
+    candidates = LlmPlaceExtractionResult(
+        places=[
+            PlaceCandidate(
+                name="해운대해수욕장",
+                timestampSec=12,
+                source="transcript",
+                confidence=0.9,
+                tags=[
+                    PlaceTag(code="소금빵", confidence=0.9),
+                    PlaceTag(code="made_up_tag_not_in_catalog", confidence=0.9),
+                ],
+            )
+        ]
+    )
+    monkeypatch.setattr(place_extraction_service.llm_service, "extract_places", lambda prompt, provider: candidates)
+
+    async def fake_geocode(name):
+        return {"latitude": 35.1, "longitude": 129.1, "address": f"addr for {name}"}
+
+    monkeypatch.setattr(place_extraction_service, "geocode_place", fake_geocode)
+
+    result = asyncio.run(place_extraction_service.extract_places(make_request()))
+
+    tag_codes = [tag.code for tag in result.places[0].tags]
+    assert tag_codes == ["소금빵"]
 
 
 def test_extract_places_forwards_the_requested_llm_provider(monkeypatch):
