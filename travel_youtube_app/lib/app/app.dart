@@ -14,6 +14,7 @@ import '../providers/recommendation_wizard_provider.dart';
 import '../providers/taste_preference_provider.dart';
 import '../providers/trip_provider.dart';
 import '../providers/video_provider.dart';
+import '../providers/walking_course_provider.dart';
 import '../routes/app_routes.dart';
 
 class TravelYoutubeApp extends StatelessWidget {
@@ -35,6 +36,7 @@ class TravelYoutubeApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => LocationProvider()),
         ChangeNotifierProvider(create: (_) => RecommendationProvider()),
         ChangeNotifierProvider(create: (_) => TastePreferenceProvider()),
+        ChangeNotifierProvider(create: (_) => WalkingCourseProvider()),
       ],
       child: MaterialApp(
         title: '여행 유튜브 요약',

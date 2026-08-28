@@ -7,7 +7,7 @@ const recommendationRepository = require('../../src/repositories/recommendation.
 const tastePreferenceRepository = require('../../src/repositories/taste-preference.repository');
 const behaviorRepository = require('../../src/repositories/behavior.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { getNearbyRecommendations } = require('../../src/services/recommendation.service');
+const { getNearbyRecommendations, getWalkingCourse } = require('../../src/services/recommendation.service');
 
 beforeEach(() => {
   behaviorRepository.findHiddenPlaceIds.mockResolvedValue([]);
@@ -223,5 +223,86 @@ describe('getNearbyRecommendations', () => {
 
     expect(behaviorRepository.findHiddenPlaceIds).toHaveBeenCalledWith('u1');
     expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, ['p2', 'p3']);
+  });
+});
+
+describe('getWalkingCourse', () => {
+  it('geocodes the region, queries bookmarked-only candidates around its center, and forwards them', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.4996, longitude: 126.5312, address: '제주특별자치도' });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([
+      { place_id: 'p1', name: '북마크장소', latitude: '33.5', longitude: '126.53', category: 'cafe' },
+    ]);
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith('/geocode', { query: '제주' }, 10000);
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(33.4996, 126.5312, 3000, 60, [], true);
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({
+        regionName: '제주',
+        centerLatitude: 33.4996,
+        centerLongitude: 126.5312,
+        localTime: '2026-08-10T12:00:00',
+        radiusMeters: 3000,
+        bookmarkCandidates: [
+          expect.objectContaining({ placeId: 'p1', name: '북마크장소', latitude: 33.5, longitude: 126.53, category: 'cafe' }),
+        ],
+      }),
+      15000
+    );
+  });
+
+  it('lets a GEOCODING_FAILED error from the AI worker propagate unchanged', async () => {
+    const AppError = require('../../src/utils/AppError');
+    callAiWorker.mockRejectedValue(new AppError(503, 'GEOCODING_FAILED', "Could not geocode '존재하지않는지역'"));
+
+    await expect(getWalkingCourse({ region: '존재하지않는지역', localTime: '2026-08-10T12:00:00' })).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'GEOCODING_FAILED',
+    });
+    expect(recommendationRepository.findNearby).not.toHaveBeenCalled();
+  });
+
+  it('forwards the learned taste preference for a logged-in user, and null for a guest', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+    tastePreferenceRepository.find.mockResolvedValue({
+      user_id: 'u1',
+      embedding: [0.1, 0.2],
+      source_tags: ['오션뷰'],
+      tag_scores: { 오션뷰: 1.5 },
+    });
+
+    await getWalkingCourse({ userId: 'u1', region: '제주', localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ userEmbedding: [0.1, 0.2], userTagScores: { 오션뷰: 1.5 } }),
+      15000
+    );
+
+    jest.clearAllMocks();
+    behaviorRepository.findHiddenPlaceIds.mockResolvedValue([]);
+    recommendationRepository.findNearby.mockResolvedValue([]);
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00' });
+
+    expect(tastePreferenceRepository.find).not.toHaveBeenCalled();
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ userEmbedding: null, userTagScores: {} }),
+      15000
+    );
   });
 });

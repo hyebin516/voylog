@@ -22,8 +22,18 @@ void main() {
     expect(find.text('북마크 폴더'), findsOneWidget);
     expect(find.text('내 여행'), findsOneWidget);
     expect(find.text('취향 설정'), findsOneWidget);
+    expect(find.text('뚜벅이 코스'), findsOneWidget);
     expect(find.text('고객센터'), findsOneWidget);
     expect(find.text('설정'), findsOneWidget);
+  });
+
+  testWidgets('tapping 뚜벅이 코스 navigates to the walking course region route', (tester) async {
+    await tester.pumpWidget(_wrap());
+
+    await tester.tap(find.text('뚜벅이 코스'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('route:/walking-course/region'), findsOneWidget);
   });
 
   testWidgets('tapping 취향 설정 navigates to the taste preferences route', (tester) async {

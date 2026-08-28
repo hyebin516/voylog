@@ -101,6 +101,12 @@ class NearbyScoreResponse(BaseModel):
     recommendations: List[NearbyRecommendation]
 
 
+class GeocodeResponse(BaseModel):
+    latitude: float
+    longitude: float
+    address: Optional[str] = None
+
+
 class EmbeddingResponse(BaseModel):
     embedding: List[float]
     model: str
@@ -130,3 +136,10 @@ class RouteOptimizationResponse(BaseModel):
     optimizedRoute: List[RoutePoint]
     totalDistanceM: int
     totalDurationSec: int
+
+
+class WalkingCourseResponse(BaseModel):
+    # None when fewer than 2 mutually-walkable places could be found nearby
+    # (e.g. a region with little bookmark/Kakao coverage) -- not an error.
+    course: Optional[RouteOptimizationResponse] = None
+    recommendations: List[NearbyRecommendation] = []

@@ -1,4 +1,4 @@
-const { validateNearbyRequest } = require('../../src/validators/recommendation.validator');
+const { validateNearbyRequest, validateWalkingCourseRequest } = require('../../src/validators/recommendation.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
@@ -51,5 +51,33 @@ describe('validateNearbyRequest', () => {
     const next = jest.fn();
     validateNearbyRequest(mockReq({ body: { ...VALID_BODY, radiusMeters: 1000, limit: 5 } }), mockRes(), next);
     expect(next).toHaveBeenCalledWith();
+  });
+});
+
+describe('validateWalkingCourseRequest', () => {
+  const VALID_COURSE_BODY = { region: '제주', localTime: '2026-08-10T12:00:00+09:00' };
+
+  it('passes for a valid region/localTime', () => {
+    const next = jest.fn();
+    validateWalkingCourseRequest(mockReq({ body: VALID_COURSE_BODY }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing region', () => {
+    const next = jest.fn();
+    validateWalkingCourseRequest(mockReq({ body: { localTime: VALID_COURSE_BODY.localTime } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects an empty/whitespace-only region', () => {
+    const next = jest.fn();
+    validateWalkingCourseRequest(mockReq({ body: { ...VALID_COURSE_BODY, region: '   ' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects an unparseable localTime', () => {
+    const next = jest.fn();
+    validateWalkingCourseRequest(mockReq({ body: { ...VALID_COURSE_BODY, localTime: 'not-a-date' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

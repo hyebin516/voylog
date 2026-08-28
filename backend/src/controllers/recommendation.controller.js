@@ -18,4 +18,18 @@ async function nearby(req, res, next) {
   }
 }
 
-module.exports = { nearby };
+async function walkingCourse(req, res, next) {
+  try {
+    const { region, localTime } = req.body;
+    const result = await recommendationService.getWalkingCourse({
+      userId: req.user ? req.user.userId : null,
+      region,
+      localTime,
+    });
+    return success(res, result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { nearby, walkingCourse };

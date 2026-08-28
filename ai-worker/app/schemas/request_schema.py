@@ -89,6 +89,21 @@ class NearbyScoreRequest(BaseModel):
     userTagScores: Dict[str, float] = {}
 
 
+class GeocodeRequest(BaseModel):
+    query: str
+
+
+class WalkingCourseRequest(BaseModel):
+    regionName: str
+    centerLatitude: float
+    centerLongitude: float
+    localTime: str
+    radiusMeters: int = 3000
+    bookmarkCandidates: List[NearbyPlaceCandidate] = []
+    userEmbedding: Optional[List[float]] = None
+    userTagScores: Dict[str, float] = {}
+
+
 class EmbeddingRequest(BaseModel):
     text: str
 

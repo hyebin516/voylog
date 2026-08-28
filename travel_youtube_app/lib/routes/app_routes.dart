@@ -27,6 +27,8 @@ import '../screens/taste_preference_screen.dart';
 import '../screens/trip_detail_screen.dart';
 import '../screens/trip_list_screen.dart';
 import '../screens/video_analysis_screen.dart';
+import '../screens/walking_course_region_screen.dart';
+import '../screens/walking_course_result_screen.dart';
 
 class AppRoutes {
   AppRoutes._();
@@ -57,6 +59,8 @@ class AppRoutes {
   static const String signupDetails = '/signup/details';
   static const String nearbyRecommendations = '/recommendations/nearby';
   static const String tastePreferences = '/taste-preferences';
+  static const String walkingCourseRegion = '/walking-course/region';
+  static const String walkingCourseResult = '/walking-course/result';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -119,6 +123,10 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const NearbyRecommendationsScreen(), settings: settings);
       case AppRoutes.tastePreferences:
         return MaterialPageRoute(builder: (_) => const TastePreferenceScreen(), settings: settings);
+      case AppRoutes.walkingCourseRegion:
+        return MaterialPageRoute(builder: (_) => const WalkingCourseRegionScreen(), settings: settings);
+      case AppRoutes.walkingCourseResult:
+        return MaterialPageRoute(builder: (_) => const WalkingCourseResultScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

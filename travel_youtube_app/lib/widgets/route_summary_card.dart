@@ -2,10 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../models/itinerary_model.dart';
 
+/// Renders a route's summary (round-trip/hotel-to-hotel chip, transport
+/// mode, total time/distance, ordered stops). Takes plain fields rather
+/// than an `ItineraryModel` so it can also render an ephemeral,
+/// not-yet-saved course (e.g. the region walking-course discovery flow)
+/// that has no `itineraryId`/`tripId` of its own.
 class RouteSummaryCard extends StatelessWidget {
-  final ItineraryModel itinerary;
+  final bool isRoundTrip;
+  final String transportMode;
+  final int? totalDurationSec;
+  final int? totalDistanceM;
+  final List<RoutePointModel> routeData;
 
-  const RouteSummaryCard({super.key, required this.itinerary});
+  const RouteSummaryCard({
+    super.key,
+    required this.isRoundTrip,
+    required this.transportMode,
+    required this.totalDurationSec,
+    required this.totalDistanceM,
+    required this.routeData,
+  });
 
   String _formatDuration(int? seconds) {
     if (seconds == null) return '-';
@@ -34,25 +50,25 @@ class RouteSummaryCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Chip(label: Text(itinerary.isRoundTrip ? '왕복' : '호텔 → 호텔')),
+                Chip(label: Text(isRoundTrip ? '왕복' : '호텔 → 호텔')),
                 const SizedBox(width: 8),
                 Icon(
-                  itinerary.isWalk ? Icons.directions_walk_rounded : Icons.directions_car_rounded,
+                  transportMode == 'walk' ? Icons.directions_walk_rounded : Icons.directions_car_rounded,
                   size: 18,
                   color: colorScheme.onSurfaceVariant,
                 ),
                 const Spacer(),
                 Icon(Icons.timer_outlined, size: 18, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Text(_formatDuration(itinerary.totalDurationSec), style: textTheme.bodyMedium),
+                Text(_formatDuration(totalDurationSec), style: textTheme.bodyMedium),
                 const SizedBox(width: 16),
                 Icon(Icons.route_outlined, size: 18, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),
-                Text(_formatDistance(itinerary.totalDistanceM), style: textTheme.bodyMedium),
+                Text(_formatDistance(totalDistanceM), style: textTheme.bodyMedium),
               ],
             ),
             const SizedBox(height: 12),
-            ...itinerary.routeData.map((point) {
+            ...routeData.map((point) {
               final isHotel = point.isHotel;
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),

@@ -8,8 +8,13 @@ const pool = require('../config/db');
  * excludePlaceIds is a required filter (not a scoring penalty): places the
  * user hid or marked not-interested (phase 5) never come back as candidates
  * at all, regardless of how well they'd otherwise score.
+ *
+ * bookmarkedOnly restricts candidates to places bookmarked by *any* user
+ * (not just the requester) -- used by the region walking-course feature,
+ * where the candidate pool is meant to reflect what people have actually
+ * found worth saving, not just proximity.
  */
-async function findNearby(latitude, longitude, radiusMeters, limit, excludePlaceIds = []) {
+async function findNearby(latitude, longitude, radiusMeters, limit, excludePlaceIds = [], bookmarkedOnly = false) {
   const { rows } = await pool.query(
     `SELECT * FROM (
        SELECT p.*, pe.embedding AS embedding,
@@ -23,11 +28,12 @@ async function findNearby(latitude, longitude, radiusMeters, limit, excludePlace
        LEFT JOIN place_embeddings pe ON pe.place_id = p.place_id
        WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL AND p.deleted_at IS NULL
          AND NOT (p.place_id = ANY($5::uuid[]))
+         AND ($6 = false OR EXISTS (SELECT 1 FROM bookmarks bk WHERE bk.place_id = p.place_id))
      ) sub
      WHERE distance_m <= $3
      ORDER BY distance_m
      LIMIT $4`,
-    [latitude, longitude, radiusMeters, limit, excludePlaceIds]
+    [latitude, longitude, radiusMeters, limit, excludePlaceIds, bookmarkedOnly]
   );
   return rows;
 }

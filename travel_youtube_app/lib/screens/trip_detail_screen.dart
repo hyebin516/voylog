@@ -98,7 +98,13 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
               for (final day in trip.days) ...[
                 Text('${day.dayNumber}일차', style: Theme.of(context).textTheme.titleMedium),
                 const SizedBox(height: AppSpacing.sm),
-                RouteSummaryCard(itinerary: day),
+                RouteSummaryCard(
+                  isRoundTrip: day.isRoundTrip,
+                  transportMode: day.transportMode,
+                  totalDurationSec: day.totalDurationSec,
+                  totalDistanceM: day.totalDistanceM,
+                  routeData: day.routeData,
+                ),
                 const SizedBox(height: AppSpacing.md),
               ],
               PrimaryButton(

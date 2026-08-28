@@ -9,6 +9,12 @@ const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 20;
 const MAX_CANDIDATES = 100;
 
+// Downtown/neighborhood scale -- a walking course generated from a broad
+// region name (e.g. "제주", "서울") is centered on one geocoded point, not
+// the whole area, so this stays small enough to still be walkable.
+const WALKING_COURSE_RADIUS_M = 3000;
+const MAX_WALKING_COURSE_CANDIDATES = 60;
+
 function toCandidate(place) {
   return {
     placeId: place.place_id,
@@ -69,4 +75,47 @@ async function getNearbyRecommendations({ userId, latitude, longitude, localTime
   );
 }
 
-module.exports = { getNearbyRecommendations };
+async function getWalkingCourse({ userId, region, localTime }) {
+  // Not caught here -- a GEOCODING_FAILED AppError from callAiWorker should
+  // propagate to the controller unchanged, same as every other AI Worker
+  // failure in this service.
+  const center = await callAiWorker('/geocode', { query: region }, 10000);
+
+  const excludePlaceIds = userId ? await behaviorRepository.findHiddenPlaceIds(userId) : [];
+  const bookmarkedCandidates = await recommendationRepository.findNearby(
+    center.latitude,
+    center.longitude,
+    WALKING_COURSE_RADIUS_M,
+    MAX_WALKING_COURSE_CANDIDATES,
+    excludePlaceIds,
+    true // bookmarkedOnly -- pooled across all users, not just the requester
+  );
+
+  let userEmbedding = null;
+  let userTagScores = {};
+  if (userId) {
+    const preference = await tastePreferenceRepository.find(userId);
+    if (preference) {
+      userEmbedding = preference.embedding;
+      userTagScores =
+        preference.tag_scores || Object.fromEntries((preference.source_tags || []).map((tag) => [tag, 1.0]));
+    }
+  }
+
+  return callAiWorker(
+    '/recommendations/walking-course',
+    {
+      regionName: region,
+      centerLatitude: center.latitude,
+      centerLongitude: center.longitude,
+      localTime,
+      radiusMeters: WALKING_COURSE_RADIUS_M,
+      bookmarkCandidates: bookmarkedCandidates.map(toCandidate),
+      userEmbedding,
+      userTagScores,
+    },
+    15000
+  );
+}
+
+module.exports = { getNearbyRecommendations, getWalkingCourse };

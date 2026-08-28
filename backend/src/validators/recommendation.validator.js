@@ -24,4 +24,16 @@ function validateNearbyRequest(req, res, next) {
   return next();
 }
 
-module.exports = { validateNearbyRequest };
+function validateWalkingCourseRequest(req, res, next) {
+  const { region, localTime } = req.body;
+
+  if (typeof region !== 'string' || region.trim().length === 0) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A non-empty region is required'));
+  }
+  if (typeof localTime !== 'string' || Number.isNaN(Date.parse(localTime))) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A valid ISO 8601 localTime is required'));
+  }
+  return next();
+}
+
+module.exports = { validateNearbyRequest, validateWalkingCourseRequest };

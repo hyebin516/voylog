@@ -146,7 +146,13 @@ class RoutePlannerScreen extends StatelessWidget {
                   onRetry: canOptimize ? () => _optimize(context) : null,
                 ),
               if (itineraryProvider.result != null) ...[
-                RouteSummaryCard(itinerary: itineraryProvider.result!),
+                RouteSummaryCard(
+                  isRoundTrip: itineraryProvider.result!.isRoundTrip,
+                  transportMode: itineraryProvider.result!.transportMode,
+                  totalDurationSec: itineraryProvider.result!.totalDurationSec,
+                  totalDistanceM: itineraryProvider.result!.totalDistanceM,
+                  routeData: itineraryProvider.result!.routeData,
+                ),
                 const SizedBox(height: AppSpacing.md),
                 Builder(
                   builder: (context) {
