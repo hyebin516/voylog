@@ -156,7 +156,7 @@ def test_kakao_travel_time_calls_the_walk_endpoint_and_parses_its_response_shape
             pass
 
         def json(self):
-            return {"route": {"properties": {"totalDistance": 1195, "totalTime": 1250}}}
+            return {"status": "OK", "route": {"properties": {"totalDistance": 1195, "totalTime": 1250}}}
 
     class FakeClient:
         def __init__(self):
@@ -183,3 +183,51 @@ def test_kakao_travel_time_calls_the_walk_endpoint_and_parses_its_response_shape
     }
     assert distance_m == 1195.0
     assert duration_sec == 1250.0
+
+
+def test_kakao_travel_time_rejects_a_too_far_away_walk_response_instead_of_treating_it_as_zero(monkeypatch):
+    """Kakao's walk API returns HTTP 200 with status=TOO_FAR_AWAY and a zeroed-out
+    route (not an HTTP error) when no walking route exists between two points
+    (e.g. across water, or unreasonably far apart) — confirmed against the real
+    API. If unhandled, this makes an unwalkable pair look like a free (0m, 0s)
+    move to the optimizer, which would then happily route through it."""
+    monkeypatch.setattr(svc, "KAKAO_REST_API_KEY", "fake-key")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"status": "TOO_FAR_AWAY", "route": {"legs": [], "properties": {"totalDistance": 0, "totalTime": 0}}}
+
+    class FakeClient:
+        async def get(self, url, headers=None, params=None):
+            return FakeResponse()
+
+    origin = {"latitude": 37.4979, "longitude": 127.0276}
+    dest = {"latitude": 37.4602, "longitude": 126.4407}
+
+    with pytest.raises(Exception):
+        asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "walk"))
+
+
+def test_travel_time_falls_back_to_haversine_for_a_too_far_away_walk_pair(monkeypatch):
+    """End-to-end through _travel_time: a TOO_FAR_AWAY response must not be
+    reported as a 0-second move — it should fall back to the (large) Haversine
+    + walking-speed estimate instead."""
+    monkeypatch.setattr(svc, "KAKAO_REST_API_KEY", "fake-key")
+
+    async def too_far_away(client, origin, dest, mode):
+        raise ValueError("Kakao walk routing returned status='TOO_FAR_AWAY'")
+
+    monkeypatch.setattr(svc, "_kakao_travel_time", too_far_away)
+
+    origin = {"latitude": 37.4979, "longitude": 127.0276}
+    dest = {"latitude": 37.4602, "longitude": 126.4407}  # ~50km away
+
+    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
+
+    expected_distance = haversine_distance_m(37.4979, 127.0276, 37.4602, 126.4407)
+    assert distance_m == pytest.approx(expected_distance)
+    assert distance_m > 10_000  # sanity check: this pair really is far apart
+    assert duration_sec == pytest.approx(expected_distance / svc.ASSUMED_SPEED_MPS["walk"])

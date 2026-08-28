@@ -34,6 +34,12 @@ async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict
         response = await client.get(KAKAO_DIRECTIONS_URL["walk"], headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
+        # The API returns HTTP 200 with a zeroed-out route (not an error) when no
+        # walking route exists (e.g. across water, or too far apart) — treat any
+        # non-"OK" status as a failure so callers fall back to Haversine instead
+        # of silently treating an unreachable pair as a free (0m, 0s) move.
+        if data.get("status") != "OK":
+            raise ValueError(f"Kakao walk routing returned status={data.get('status')!r}")
         props = data["route"]["properties"]
         return float(props["totalDistance"]), float(props["totalTime"])
 
