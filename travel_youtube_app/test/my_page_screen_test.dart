@@ -83,6 +83,8 @@ void main() {
     await tester.pumpWidget(_wrap());
 
     await tester.dragUntilVisible(find.text('고객센터'), find.byType(Scrollable), const Offset(0, -100));
+    await tester.ensureVisible(find.text('고객센터'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('고객센터'));
     await tester.pumpAndSettle();
 
