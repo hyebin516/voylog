@@ -23,6 +23,17 @@ class RouteSummaryCard extends StatelessWidget {
     required this.routeData,
   });
 
+  IconData get _transportModeIcon {
+    switch (transportMode) {
+      case 'walk':
+        return Icons.directions_walk_rounded;
+      case 'transit':
+        return Icons.directions_transit_rounded;
+      default:
+        return Icons.directions_car_rounded;
+    }
+  }
+
   String _formatDuration(int? seconds) {
     if (seconds == null) return '-';
     final hours = seconds ~/ 3600;
@@ -52,11 +63,7 @@ class RouteSummaryCard extends StatelessWidget {
               children: [
                 Chip(label: Text(isRoundTrip ? '왕복' : '호텔 → 호텔')),
                 const SizedBox(width: 8),
-                Icon(
-                  transportMode == 'walk' ? Icons.directions_walk_rounded : Icons.directions_car_rounded,
-                  size: 18,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+                Icon(_transportModeIcon, size: 18, color: colorScheme.onSurfaceVariant),
                 const Spacer(),
                 Icon(Icons.timer_outlined, size: 18, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),

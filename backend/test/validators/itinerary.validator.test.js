@@ -105,6 +105,14 @@ describe('validateCreateItinerary', () => {
     expect(req.body.transportMode).toBe('walk');
   });
 
+  it('accepts an explicit transit transportMode', () => {
+    const req = mockReq({ body: { ...VALID_BODY, transportMode: 'transit' } });
+    const next = jest.fn();
+    validateCreateItinerary(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.body.transportMode).toBe('transit');
+  });
+
   it('rejects an invalid transportMode', () => {
     const req = mockReq({ body: { ...VALID_BODY, transportMode: 'bike' } });
     const next = jest.fn();

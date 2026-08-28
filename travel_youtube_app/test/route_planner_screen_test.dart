@@ -240,6 +240,28 @@ void main() {
     expect(itineraryRepository.lastCall?['transportMode'], 'walk');
   });
 
+  testWidgets('selecting 대중교통 switches the optimize call to transit transport mode', (tester) async {
+    final itineraryRepository = FakeItineraryRepository()..resultToReturn = _optimizedResult;
+    final itineraryProvider = ItineraryProvider(repository: itineraryRepository)
+      ..togglePlaceSelection('p1')
+      ..togglePlaceSelection('p2');
+    final hotelProvider = HotelProvider()
+      ..selectStartHotel(_hotelA)
+      ..selectEndHotel(_hotelB);
+    final tripProvider = TripProvider()..startBuildingDay('t1', 1);
+
+    await tester.pumpWidget(_wrap(hotelProvider: hotelProvider, itineraryProvider: itineraryProvider, tripProvider: tripProvider));
+    await _openRoutePlanner(tester);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '대중교통'));
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, '동선 최적화'));
+    await tester.pumpAndSettle();
+
+    expect(itineraryRepository.lastCall?['transportMode'], 'transit');
+  });
+
   testWidgets('shows an error view with a retry option when optimization fails', (tester) async {
     final itineraryRepository = FakeItineraryRepository()
       ..errorToThrow = const ApiException(code: 'HOTEL_NOT_FOUND', message: 'not found');

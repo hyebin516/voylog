@@ -135,6 +135,21 @@ def test_optimize_route_defaults_to_car_and_echoes_walk_when_requested():
     assert result.transportMode == "walk"
 
 
+def test_optimize_route_echoes_transit_when_requested():
+    request = RouteOptimizationRequest(
+        startHotel=HOTEL_A,
+        endHotel=HOTEL_B,
+        places=[PLACE_1, PLACE_2],
+        routeType="hotelToHotel",
+        optimizationPriority="duration",
+        transportMode="transit",
+    )
+
+    result = asyncio.run(svc.optimize_route(request))
+
+    assert result.transportMode == "transit"
+
+
 def test_travel_time_falls_back_to_walking_speed_haversine_for_walk_mode():
     origin = {"latitude": 37.5, "longitude": 127.0}
     dest = {"latitude": 37.6, "longitude": 127.1}
@@ -231,3 +246,73 @@ def test_travel_time_falls_back_to_haversine_for_a_too_far_away_walk_pair(monkey
     assert distance_m == pytest.approx(expected_distance)
     assert distance_m > 10_000  # sanity check: this pair really is far apart
     assert duration_sec == pytest.approx(expected_distance / svc.ASSUMED_SPEED_MPS["walk"])
+
+
+def test_travel_time_falls_back_to_transit_speed_haversine_for_transit_mode():
+    origin = {"latitude": 37.5, "longitude": 127.0}
+    dest = {"latitude": 37.6, "longitude": 127.1}
+
+    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "transit"))
+
+    expected_distance = haversine_distance_m(37.5, 127.0, 37.6, 127.1)
+    assert distance_m == pytest.approx(expected_distance)
+    assert duration_sec == pytest.approx(expected_distance / svc.ASSUMED_SPEED_MPS["transit"])
+    # Transit (with waiting/transfers) is assumed slower than driving but
+    # faster than walking.
+    assert svc.ASSUMED_SPEED_MPS["walk"] < svc.ASSUMED_SPEED_MPS["transit"] < svc.ASSUMED_SPEED_MPS["car"]
+
+
+def test_kakao_travel_time_picks_the_fastest_transit_route_among_several_options(monkeypatch):
+    """Kakao's public-transit API returns several route options (bus-only,
+    subway-only, combined transfers, ...) in one response -- confirmed
+    against the real API. This app only ever optimizes on duration, so it
+    should pick whichever option has the lowest totalTime, not just the
+    first one in the list."""
+    monkeypatch.setattr(svc, "KAKAO_REST_API_KEY", "fake-key")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {
+                "status": "OK",
+                "routes": [
+                    {"properties": {"type": "BUS", "totalDistance": 1198, "totalTime": 521}},
+                    {"properties": {"type": "SUBWAY", "totalDistance": 1211, "totalTime": 606}},
+                    {"properties": {"type": "BUS_AND_SUBWAY", "totalDistance": 2966, "totalTime": 1334}},
+                ],
+            }
+
+    class FakeClient:
+        async def get(self, url, headers=None, params=None):
+            return FakeResponse()
+
+    origin = {"latitude": 37.4979, "longitude": 127.0276}
+    dest = {"latitude": 37.5015, "longitude": 127.0396}
+
+    distance_m, duration_sec = asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "transit"))
+
+    assert distance_m == 1198.0
+    assert duration_sec == 521.0
+
+
+def test_kakao_travel_time_rejects_a_non_ok_transit_response_instead_of_treating_it_as_zero(monkeypatch):
+    monkeypatch.setattr(svc, "KAKAO_REST_API_KEY", "fake-key")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"status": "NOT_FOUND", "routes": []}
+
+    class FakeClient:
+        async def get(self, url, headers=None, params=None):
+            return FakeResponse()
+
+    origin = {"latitude": 37.4979, "longitude": 127.0276}
+    dest = {"latitude": 37.4602, "longitude": 126.4407}
+
+    with pytest.raises(Exception):
+        asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "transit"))

@@ -59,7 +59,7 @@ class RouteOptimizationRequest(BaseModel):
     places: List[PlaceInput]
     routeType: Literal["roundTrip", "hotelToHotel"] = "roundTrip"
     optimizationPriority: Literal["duration"] = "duration"
-    transportMode: Literal["car", "walk"] = "car"
+    transportMode: Literal["car", "walk", "transit"] = "car"
 
 
 class NearbyPlaceTagInput(BaseModel):

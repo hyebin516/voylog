@@ -13,35 +13,49 @@ from app.utils.logger import logger
 KAKAO_DIRECTIONS_URL = {
     "car": "https://apis-navi.kakaomobility.com/v1/directions",
     "walk": "https://dapi.kakao.com/v2/routing/walk",
+    "transit": "https://dapi.kakao.com/v2/routing/publictraffic",
 }
 ASSUMED_CITY_SPEED_MPS = 8.3  # ~30 km/h fallback for car duration estimation
 ASSUMED_SPEED_MPS = {
     "car": ASSUMED_CITY_SPEED_MPS,
     "walk": 1.1,  # ~4 km/h, average walking pace
+    "transit": 4.2,  # ~15 km/h effective average incl. waiting/transfers
 }
 
 
 async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict, mode: str) -> Tuple[float, float]:
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
 
-    if mode == "walk":
+    if mode in ("walk", "transit"):
         params = {
             "start_x": origin["longitude"],
             "start_y": origin["latitude"],
             "end_x": dest["longitude"],
             "end_y": dest["latitude"],
         }
-        response = await client.get(KAKAO_DIRECTIONS_URL["walk"], headers=headers, params=params)
+        response = await client.get(KAKAO_DIRECTIONS_URL[mode], headers=headers, params=params)
         response.raise_for_status()
         data = response.json()
-        # The API returns HTTP 200 with a zeroed-out route (not an error) when no
-        # walking route exists (e.g. across water, or too far apart) — treat any
-        # non-"OK" status as a failure so callers fall back to Haversine instead
-        # of silently treating an unreachable pair as a free (0m, 0s) move.
+        # Both the walk and public-transit APIs return HTTP 200 with a
+        # zeroed-out/empty result (not an HTTP error) when no route exists
+        # (e.g. across water, or too far apart) — treat any non-"OK" status
+        # as a failure so callers fall back to Haversine instead of
+        # silently treating an unreachable pair as a free (0m, 0s) move.
         if data.get("status") != "OK":
-            raise ValueError(f"Kakao walk routing returned status={data.get('status')!r}")
-        props = data["route"]["properties"]
-        return float(props["totalDistance"]), float(props["totalTime"])
+            raise ValueError(f"Kakao {mode} routing returned status={data.get('status')!r}")
+
+        if mode == "walk":
+            props = data["route"]["properties"]
+            return float(props["totalDistance"]), float(props["totalTime"])
+
+        # transit: the API returns several route options (bus-only,
+        # subway-only, combined transfers, ...) -- pick the fastest one,
+        # consistent with this app only ever optimizing on duration.
+        routes = data.get("routes", [])
+        if not routes:
+            raise ValueError("Kakao transit routing returned no routes")
+        best = min(routes, key=lambda r: r["properties"]["totalTime"])
+        return float(best["properties"]["totalDistance"]), float(best["properties"]["totalTime"])
 
     params = {
         "origin": f"{origin['longitude']},{origin['latitude']}",

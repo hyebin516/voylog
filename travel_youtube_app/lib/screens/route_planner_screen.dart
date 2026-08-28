@@ -121,6 +121,12 @@ class RoutePlannerScreen extends StatelessWidget {
                       selected: itineraryProvider.transportMode == 'walk',
                       onSelected: (_) => itineraryProvider.selectTransportMode('walk'),
                     ),
+                    ChoiceChip(
+                      label: const Text('대중교통'),
+                      avatar: const Icon(Icons.directions_transit_rounded, size: 18),
+                      selected: itineraryProvider.transportMode == 'transit',
+                      onSelected: (_) => itineraryProvider.selectTransportMode('transit'),
+                    ),
                   ],
                 ),
               ],

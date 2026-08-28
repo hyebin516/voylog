@@ -1,7 +1,7 @@
 const AppError = require('../utils/AppError');
 const isUuid = require('../utils/isUuid');
 
-const VALID_TRANSPORT_MODES = ['car', 'walk'];
+const VALID_TRANSPORT_MODES = ['car', 'walk', 'transit'];
 
 function validateCreateItinerary(req, res, next) {
   const { hotelId, placeIds, tripId, dayNumber, transportMode } = req.body;
@@ -18,7 +18,7 @@ function validateCreateItinerary(req, res, next) {
   if (transportMode === undefined) {
     req.body.transportMode = 'car';
   } else if (!VALID_TRANSPORT_MODES.includes(transportMode)) {
-    return next(new AppError(400, 'INVALID_REQUEST', "transportMode must be 'car' or 'walk'"));
+    return next(new AppError(400, 'INVALID_REQUEST', "transportMode must be 'car', 'walk', or 'transit'"));
   }
 
   if (!isUuid(tripId)) {
