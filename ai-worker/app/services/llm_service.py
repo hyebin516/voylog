@@ -5,7 +5,8 @@ from openai import OpenAI
 
 from app.config import ANTHROPIC_API_KEY, LLM_TIMEOUT_SECONDS, OPENAI_API_KEY
 from app.prompts.place_extraction_prompt import SYSTEM_PROMPT
-from app.schemas.response_schema import LlmPlaceExtractionResult
+from app.prompts.place_summary_prompt import SYSTEM_PROMPT as SUMMARY_SYSTEM_PROMPT
+from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceSummaryResult
 from app.utils.exceptions import AiProviderError
 from app.utils.logger import logger
 
@@ -67,3 +68,50 @@ def extract_places(user_prompt: str, provider: str = "auto") -> LlmPlaceExtracti
     except AiProviderError:
         logger.info("Falling back to Claude after OpenAI failure")
         return _call_with_retry(_call_claude, user_prompt, "claude")
+
+
+def _parse_summary_json(raw_text: str) -> PlaceSummaryResult:
+    data = json.loads(raw_text)
+    return PlaceSummaryResult(**data)
+
+
+def _call_openai_summary(user_prompt: str) -> PlaceSummaryResult:
+    if not _openai_client:
+        raise RuntimeError("OpenAI client is not configured")
+
+    response = _openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": SUMMARY_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return _parse_summary_json(response.choices[0].message.content)
+
+
+def _call_claude_summary(user_prompt: str) -> PlaceSummaryResult:
+    if not _anthropic_client:
+        raise RuntimeError("Claude client is not configured")
+
+    response = _anthropic_client.messages.create(
+        model="claude-3-5-sonnet-latest",
+        max_tokens=512,
+        system=SUMMARY_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return _parse_summary_json(response.content[0].text)
+
+
+def summarize_place(user_prompt: str, provider: str = "auto") -> PlaceSummaryResult:
+    if provider == "openai":
+        return _call_with_retry(_call_openai_summary, user_prompt, "openai")
+
+    if provider == "claude":
+        return _call_with_retry(_call_claude_summary, user_prompt, "claude")
+
+    try:
+        return _call_with_retry(_call_openai_summary, user_prompt, "openai")
+    except AiProviderError:
+        logger.info("Falling back to Claude after OpenAI failure")
+        return _call_with_retry(_call_claude_summary, user_prompt, "claude")

@@ -43,6 +43,7 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
                 category=candidate.category,
                 businessHours=candidate.businessHours,
                 tags=_valid_tags(candidate.tags),
+                mentionNote=candidate.mentionNote,
             )
         )
 

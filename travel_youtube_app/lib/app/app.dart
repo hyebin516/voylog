@@ -9,6 +9,7 @@ import '../providers/hotel_provider.dart';
 import '../providers/itinerary_provider.dart';
 import '../providers/location_provider.dart';
 import '../providers/notification_settings_provider.dart';
+import '../providers/place_summary_provider.dart';
 import '../providers/recommendation_provider.dart';
 import '../providers/recommendation_wizard_provider.dart';
 import '../providers/saved_walking_course_provider.dart';
@@ -41,6 +42,7 @@ class TravelYoutubeApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => WalkingCourseProvider()),
         ChangeNotifierProvider(create: (_) => SavedWalkingCourseProvider()),
         ChangeNotifierProvider(create: (_) => SimilarTasteProvider()),
+        ChangeNotifierProvider(create: (_) => PlaceSummaryProvider()),
       ],
       child: MaterialApp(
         title: '여행 유튜브 요약',

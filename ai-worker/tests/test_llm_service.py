@@ -1,10 +1,11 @@
 import pytest
 
 from app.services import llm_service
-from app.schemas.response_schema import LlmPlaceExtractionResult
+from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceSummaryResult
 from app.utils.exceptions import AiProviderError
 
 SUCCESS_RESULT = LlmPlaceExtractionResult(places=[])
+SUCCESS_SUMMARY_RESULT = PlaceSummaryResult(pros="좋아요", cons="아쉬워요")
 
 
 def test_call_with_retry_succeeds_on_first_attempt():
@@ -93,3 +94,33 @@ def test_extract_places_auto_mode_raises_when_both_providers_exhaust_retries(mon
 
     with pytest.raises(AiProviderError):
         llm_service.extract_places("prompt", provider="auto")
+
+
+def test_summarize_place_explicit_openai_provider_never_falls_back_to_claude(monkeypatch):
+    openai_calls = []
+    claude_calls = []
+    monkeypatch.setattr(llm_service, "_call_openai_summary", lambda p: (openai_calls.append(p), SUCCESS_SUMMARY_RESULT)[1])
+    monkeypatch.setattr(llm_service, "_call_claude_summary", lambda p: (claude_calls.append(p), SUCCESS_SUMMARY_RESULT)[1])
+
+    result = llm_service.summarize_place("prompt", provider="openai")
+
+    assert result is SUCCESS_SUMMARY_RESULT
+    assert len(openai_calls) == 1
+    assert len(claude_calls) == 0
+
+
+def test_summarize_place_auto_mode_falls_back_to_claude_after_openai_exhausts_retries(monkeypatch):
+    monkeypatch.setattr(llm_service, "_call_openai_summary", lambda p: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(llm_service, "_call_claude_summary", lambda p: SUCCESS_SUMMARY_RESULT)
+
+    result = llm_service.summarize_place("prompt", provider="auto")
+
+    assert result is SUCCESS_SUMMARY_RESULT
+
+
+def test_summarize_place_auto_mode_raises_when_both_providers_exhaust_retries(monkeypatch):
+    monkeypatch.setattr(llm_service, "_call_openai_summary", lambda p: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(llm_service, "_call_claude_summary", lambda p: (_ for _ in ()).throw(RuntimeError("also down")))
+
+    with pytest.raises(AiProviderError):
+        llm_service.summarize_place("prompt", provider="auto")

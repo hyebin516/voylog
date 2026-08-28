@@ -51,6 +51,7 @@ class PlaceCandidate(BaseModel):
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
     tags: List[PlaceTag] = []
+    mentionNote: Optional[str] = None
 
 
 class LlmPlaceExtractionResult(BaseModel):
@@ -68,6 +69,7 @@ class GeocodedPlace(BaseModel):
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
     tags: List[PlaceTag] = []
+    mentionNote: Optional[str] = None
 
 
 class PlaceExtractionResponse(BaseModel):
@@ -158,3 +160,13 @@ class WalkingCourseResponse(BaseModel):
     # (e.g. a region with little bookmark/Kakao coverage) -- not an error.
     course: Optional[RouteOptimizationResponse] = None
     recommendations: List[NearbyRecommendation] = []
+
+
+class PlaceSummaryResult(BaseModel):
+    pros: Optional[str] = None
+    cons: Optional[str] = None
+
+
+class PlaceSummaryResponse(BaseModel):
+    pros: Optional[str] = None
+    cons: Optional[str] = None

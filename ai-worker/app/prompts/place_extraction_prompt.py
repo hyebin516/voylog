@@ -41,7 +41,8 @@ Schema:
       }} or null,
       "tags": [
         {{"code": "string", "confidence": 0.0}}
-      ]
+      ],
+      "mentionNote": "string or null"
     }}
   ]
 }}
@@ -65,6 +66,14 @@ tags: 0 to 5 tags describing the place, chosen ONLY from this fixed list
 {_TAG_LIST_TEXT}
 Each tag needs a confidence between 0 and 1. Only include a tag when it is
 clearly supported by the transcript/description context.
+
+mentionNote: ONE short sentence (in Korean) capturing what the vlogger
+actually said or felt about this specific place -- a comment, reaction, or
+opinion (e.g. "웨이팅이 길었지만 뷰가 좋다고 언급함", "가격이 합리적이라고
+칭찬함"). Only include this if the transcript expresses an actual opinion
+or notable comment about the place. If the place is only named in passing
+with no opinion or comment attached, set mentionNote to null. Never invent
+an opinion that was not expressed.
 """
 
 

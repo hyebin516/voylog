@@ -124,6 +124,12 @@ class SimilarTasteRequest(BaseModel):
     limit: int = 20
 
 
+class PlaceSummaryRequest(BaseModel):
+    placeName: str
+    notes: List[str] = []
+    llmProvider: Literal["auto", "openai", "claude"] = "auto"
+
+
 class EmbeddingRequest(BaseModel):
     text: str
 
