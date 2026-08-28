@@ -10,43 +10,64 @@ from app.schemas.response_schema import RouteOptimizationResponse, RoutePoint
 from app.utils.distance import haversine_distance_m
 from app.utils.logger import logger
 
-KAKAO_DIRECTIONS_URL = "https://apis-navi.kakaomobility.com/v1/directions"
-ASSUMED_CITY_SPEED_MPS = 8.3  # ~30 km/h fallback for duration estimation
+KAKAO_DIRECTIONS_URL = {
+    "car": "https://apis-navi.kakaomobility.com/v1/directions",
+    "walk": "https://dapi.kakao.com/v2/routing/walk",
+}
+ASSUMED_CITY_SPEED_MPS = 8.3  # ~30 km/h fallback for car duration estimation
+ASSUMED_SPEED_MPS = {
+    "car": ASSUMED_CITY_SPEED_MPS,
+    "walk": 1.1,  # ~4 km/h, average walking pace
+}
 
 
-async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict) -> Tuple[float, float]:
+async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict, mode: str) -> Tuple[float, float]:
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
+
+    if mode == "walk":
+        params = {
+            "start_x": origin["longitude"],
+            "start_y": origin["latitude"],
+            "end_x": dest["longitude"],
+            "end_y": dest["latitude"],
+        }
+        response = await client.get(KAKAO_DIRECTIONS_URL["walk"], headers=headers, params=params)
+        response.raise_for_status()
+        data = response.json()
+        props = data["route"]["properties"]
+        return float(props["totalDistance"]), float(props["totalTime"])
+
     params = {
         "origin": f"{origin['longitude']},{origin['latitude']}",
         "destination": f"{dest['longitude']},{dest['latitude']}",
     }
-    response = await client.get(KAKAO_DIRECTIONS_URL, headers=headers, params=params)
+    response = await client.get(KAKAO_DIRECTIONS_URL["car"], headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
     summary = data["routes"][0]["summary"]
     return float(summary["distance"]), float(summary["duration"])
 
 
-async def _travel_time(client: httpx.AsyncClient, origin: dict, dest: dict) -> Tuple[float, float]:
+async def _travel_time(client: httpx.AsyncClient, origin: dict, dest: dict, mode: str = "car") -> Tuple[float, float]:
     if KAKAO_REST_API_KEY:
         try:
-            return await _kakao_travel_time(client, origin, dest)
+            return await _kakao_travel_time(client, origin, dest, mode)
         except Exception as exc:
-            logger.warning("Kakao Mobility API failed, falling back to Haversine: %s", exc)
+            logger.warning("Kakao API failed for mode=%s, falling back to Haversine: %s", mode, exc)
 
     distance_m = haversine_distance_m(origin["latitude"], origin["longitude"], dest["latitude"], dest["longitude"])
-    duration_sec = distance_m / ASSUMED_CITY_SPEED_MPS
+    duration_sec = distance_m / ASSUMED_SPEED_MPS[mode]
     return distance_m, duration_sec
 
 
-async def _build_matrices(nodes: List[dict]) -> Tuple[List[List[float]], List[List[float]]]:
+async def _build_matrices(nodes: List[dict], mode: str = "car") -> Tuple[List[List[float]], List[List[float]]]:
     n = len(nodes)
     distance_matrix = [[0.0] * n for _ in range(n)]
     duration_matrix = [[0.0] * n for _ in range(n)]
 
     async with httpx.AsyncClient(timeout=KAKAO_TIMEOUT_SECONDS) as client:
         pairs = [(i, j) for i, j in product(range(n), range(n)) if i != j]
-        results = await asyncio.gather(*(_travel_time(client, nodes[i], nodes[j]) for i, j in pairs))
+        results = await asyncio.gather(*(_travel_time(client, nodes[i], nodes[j], mode) for i, j in pairs))
 
     for (i, j), (distance_m, duration_sec) in zip(pairs, results):
         distance_matrix[i][j] = distance_m
@@ -111,7 +132,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
     end_idx = len(nodes) - 1
     middle_indices = list(range(1, end_idx))
 
-    distance_matrix, duration_matrix = await _build_matrices(nodes)
+    distance_matrix, duration_matrix = await _build_matrices(nodes, request.transportMode)
 
     initial_route = _nearest_neighbor_path(duration_matrix, start_idx, end_idx, middle_indices)
     optimized_indices = _two_opt(initial_route, duration_matrix)
@@ -153,6 +174,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
     return RouteOptimizationResponse(
         routeType=request.routeType,
         optimizationPriority=request.optimizationPriority,
+        transportMode=request.transportMode,
         startPlace=optimized_route[0],
         endPlace=optimized_route[-1],
         optimizedRoute=optimized_route,

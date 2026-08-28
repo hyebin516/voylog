@@ -2,8 +2,8 @@ const pool = require('../config/db');
 
 async function create(userId, tripId, dayNumber, startHotelId, endHotelId, optimizedResult) {
   const { rows } = await pool.query(
-    `INSERT INTO itineraries (user_id, trip_id, day_number, start_hotel_id, end_hotel_id, route_type, optimization_priority, total_distance_m, total_duration_sec, route_data)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO itineraries (user_id, trip_id, day_number, start_hotel_id, end_hotel_id, route_type, optimization_priority, transport_mode, total_distance_m, total_duration_sec, route_data)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      RETURNING *`,
     [
       userId,
@@ -13,6 +13,7 @@ async function create(userId, tripId, dayNumber, startHotelId, endHotelId, optim
       endHotelId,
       optimizedResult.routeType,
       optimizedResult.optimizationPriority,
+      optimizedResult.transportMode,
       optimizedResult.totalDistanceM,
       optimizedResult.totalDurationSec,
       JSON.stringify(optimizedResult.optimizedRoute),

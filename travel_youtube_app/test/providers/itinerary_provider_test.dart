@@ -5,7 +5,7 @@ import 'package:travel_youtube_app/providers/itinerary_provider.dart';
 import 'package:travel_youtube_app/repositories/itinerary_repository.dart';
 import 'package:travel_youtube_app/utils/view_state.dart';
 
-ItineraryModel _result({required String startHotelId, required String endHotelId}) {
+ItineraryModel _result({required String startHotelId, required String endHotelId, String transportMode = 'car'}) {
   return ItineraryModel(
     itineraryId: 'it1',
     tripId: 'trip1',
@@ -14,6 +14,7 @@ ItineraryModel _result({required String startHotelId, required String endHotelId
     endHotelId: endHotelId,
     routeType: startHotelId == endHotelId ? 'roundTrip' : 'hotelToHotel',
     optimizationPriority: 'duration',
+    transportMode: transportMode,
     totalDistanceM: 1000,
     totalDurationSec: 600,
     routeData: const [],
@@ -32,6 +33,7 @@ class FakeItineraryRepository extends ItineraryRepository {
     required String startHotelId,
     required String endHotelId,
     required List<String> placeIds,
+    String transportMode = 'car',
   }) async {
     lastCallArgs = {
       'tripId': tripId,
@@ -39,6 +41,7 @@ class FakeItineraryRepository extends ItineraryRepository {
       'startHotelId': startHotelId,
       'endHotelId': endHotelId,
       'placeIds': placeIds,
+      'transportMode': transportMode,
     };
     if (error != null) throw error!;
     return resultToReturn!;
@@ -86,7 +89,30 @@ void main() {
     });
   });
 
+  group('transportMode', () {
+    test('defaults to car', () {
+      expect(provider.transportMode, 'car');
+    });
+
+    test('selectTransportMode updates the selected mode', () {
+      provider.selectTransportMode('walk');
+      expect(provider.transportMode, 'walk');
+    });
+  });
+
   group('optimize', () {
+    test('sends the selected transportMode to the repository', () async {
+      provider.togglePlaceSelection('p1');
+      provider.togglePlaceSelection('p2');
+      provider.selectTransportMode('walk');
+      repository.resultToReturn = _result(startHotelId: 'h1', endHotelId: 'h1', transportMode: 'walk');
+
+      await provider.optimize(tripId: 'trip1', dayNumber: 1, startHotelId: 'h1', endHotelId: 'h1');
+
+      expect(repository.lastCallArgs?['transportMode'], 'walk');
+      expect(provider.result?.isWalk, isTrue);
+    });
+
     test('does nothing when fewer than 2 places are selected (guarded by canOptimize)', () async {
       provider.togglePlaceSelection('p1');
 
@@ -124,10 +150,11 @@ void main() {
     });
   });
 
-  test('reset clears selection, result, and returns to idle', () async {
+  test('reset clears selection, result, transportMode, and returns to idle', () async {
     provider.togglePlaceSelection('p1');
     provider.togglePlaceSelection('p2');
-    repository.resultToReturn = _result(startHotelId: 'h1', endHotelId: 'h1');
+    provider.selectTransportMode('walk');
+    repository.resultToReturn = _result(startHotelId: 'h1', endHotelId: 'h1', transportMode: 'walk');
     await provider.optimize(tripId: 'trip1', dayNumber: 1, startHotelId: 'h1', endHotelId: 'h1');
 
     provider.reset();
@@ -135,5 +162,6 @@ void main() {
     expect(provider.selectedPlaceIds, isEmpty);
     expect(provider.result, isNull);
     expect(provider.state, ViewState.idle);
+    expect(provider.transportMode, 'car');
   });
 }

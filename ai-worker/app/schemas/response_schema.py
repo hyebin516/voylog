@@ -124,6 +124,7 @@ class RoutePoint(BaseModel):
 class RouteOptimizationResponse(BaseModel):
     routeType: str
     optimizationPriority: str
+    transportMode: str
     startPlace: RoutePoint
     endPlace: RoutePoint
     optimizedRoute: List[RoutePoint]

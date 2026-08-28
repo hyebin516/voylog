@@ -40,6 +40,7 @@ class ItineraryModel {
   final String endHotelId;
   final String routeType; // 'roundTrip' | 'hotelToHotel'
   final String optimizationPriority;
+  final String transportMode; // 'car' | 'walk'
   final int? totalDistanceM;
   final int? totalDurationSec;
   final List<RoutePointModel> routeData;
@@ -52,12 +53,14 @@ class ItineraryModel {
     required this.endHotelId,
     required this.routeType,
     required this.optimizationPriority,
+    required this.transportMode,
     required this.totalDistanceM,
     required this.totalDurationSec,
     required this.routeData,
   });
 
   bool get isRoundTrip => routeType == 'roundTrip';
+  bool get isWalk => transportMode == 'walk';
 
   factory ItineraryModel.fromJson(Map<String, dynamic> json) {
     return ItineraryModel(
@@ -68,6 +71,7 @@ class ItineraryModel {
       endHotelId: json['endHotelId'] as String,
       routeType: json['routeType'] as String,
       optimizationPriority: json['optimizationPriority'] as String,
+      transportMode: json['transportMode'] as String? ?? 'car',
       totalDistanceM: json['totalDistanceM'] as int?,
       totalDurationSec: json['totalDurationSec'] as int?,
       routeData: (json['routeData'] as List<dynamic>? ?? [])

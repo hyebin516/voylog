@@ -10,6 +10,7 @@ function toItineraryResponse(itinerary) {
     endHotelId: itinerary.end_hotel_id,
     routeType: itinerary.route_type,
     optimizationPriority: itinerary.optimization_priority,
+    transportMode: itinerary.transport_mode,
     totalDistanceM: itinerary.total_distance_m,
     totalDurationSec: itinerary.total_duration_sec,
     routeData: itinerary.route_data,
@@ -19,14 +20,15 @@ function toItineraryResponse(itinerary) {
 
 async function create(req, res, next) {
   try {
-    const { tripId, dayNumber, startHotelId, endHotelId, placeIds } = req.body;
+    const { tripId, dayNumber, startHotelId, endHotelId, placeIds, transportMode } = req.body;
     const itinerary = await itineraryService.createItinerary(
       req.user.userId,
       tripId,
       dayNumber,
       startHotelId,
       endHotelId,
-      placeIds
+      placeIds,
+      transportMode
     );
     return success(res, toItineraryResponse(itinerary), 201);
   } catch (err) {

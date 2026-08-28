@@ -21,6 +21,7 @@ void main() {
           'endHotelId': 'h1',
           'routeType': 'roundTrip',
           'optimizationPriority': 'duration',
+          'transportMode': 'car',
           'totalDistanceM': 1000,
           'totalDurationSec': 600,
           'routeData': [
@@ -50,6 +51,42 @@ void main() {
       'startHotelId': 'h1',
       'endHotelId': 'h1',
       'placeIds': ['p1', 'p2'],
+      'transportMode': 'car',
     });
+  });
+
+  test('createItinerary sends an explicit walk transportMode', () async {
+    final adapter = FakeDioAdapter(
+      statusCode: 201,
+      body: {
+        'success': true,
+        'data': {
+          'itineraryId': 'it1',
+          'tripId': 'trip1',
+          'dayNumber': 1,
+          'startHotelId': 'h1',
+          'endHotelId': 'h1',
+          'routeType': 'roundTrip',
+          'optimizationPriority': 'duration',
+          'transportMode': 'walk',
+          'totalDistanceM': 1000,
+          'totalDurationSec': 600,
+          'routeData': [],
+        },
+      },
+    );
+    DioClient().dio.httpClientAdapter = adapter;
+
+    final itinerary = await ItineraryRepository().createItinerary(
+      tripId: 'trip1',
+      dayNumber: 1,
+      startHotelId: 'h1',
+      endHotelId: 'h1',
+      placeIds: ['p1', 'p2'],
+      transportMode: 'walk',
+    );
+
+    expect(itinerary.isWalk, isTrue);
+    expect(adapter.lastOptions?.data, containsPair('transportMode', 'walk'));
   });
 }

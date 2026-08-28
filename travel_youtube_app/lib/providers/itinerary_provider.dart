@@ -17,12 +17,19 @@ class ItineraryProvider extends ChangeNotifier {
   final Set<String> _selectedPlaceIds = {};
   ItineraryModel? _result;
   String? _errorMessage;
+  String _transportMode = 'car';
 
   ViewState get state => _state;
   Set<String> get selectedPlaceIds => _selectedPlaceIds;
   ItineraryModel? get result => _result;
   String? get errorMessage => _errorMessage;
   bool get isLoading => _state == ViewState.loading;
+  String get transportMode => _transportMode;
+
+  void selectTransportMode(String mode) {
+    _transportMode = mode;
+    notifyListeners();
+  }
 
   bool get canOptimize =>
       _selectedPlaceIds.length >= kMinRoutePlaces && _selectedPlaceIds.length <= kMaxRoutePlaces;
@@ -57,6 +64,7 @@ class ItineraryProvider extends ChangeNotifier {
         startHotelId: startHotelId,
         endHotelId: endHotelId,
         placeIds: _selectedPlaceIds.toList(),
+        transportMode: _transportMode,
       );
       _state = ViewState.success;
     } on ApiException catch (e) {
@@ -71,6 +79,7 @@ class ItineraryProvider extends ChangeNotifier {
     _selectedPlaceIds.clear();
     _result = null;
     _state = ViewState.idle;
+    _transportMode = 'car';
     notifyListeners();
   }
 }

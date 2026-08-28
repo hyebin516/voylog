@@ -104,6 +104,26 @@ class RoutePlannerScreen extends StatelessWidget {
                   ),
                 ),
               ],
+              if (itineraryProvider.result == null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: AppSpacing.sm,
+                  children: [
+                    ChoiceChip(
+                      label: const Text('자동차'),
+                      avatar: const Icon(Icons.directions_car_rounded, size: 18),
+                      selected: itineraryProvider.transportMode == 'car',
+                      onSelected: (_) => itineraryProvider.selectTransportMode('car'),
+                    ),
+                    ChoiceChip(
+                      label: const Text('도보'),
+                      avatar: const Icon(Icons.directions_walk_rounded, size: 18),
+                      selected: itineraryProvider.transportMode == 'walk',
+                      onSelected: (_) => itineraryProvider.selectTransportMode('walk'),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: AppSpacing.lg),
               Text(
                 '선택한 장소 ${itineraryProvider.selectedPlaceIds.length}개',

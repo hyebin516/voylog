@@ -37,6 +37,7 @@ void main() {
           'endHotelId': endHotelId,
           'routeType': startHotelId == endHotelId ? 'roundTrip' : 'hotelToHotel',
           'optimizationPriority': 'duration',
+          'transportMode': 'car',
           'totalDistanceM': 1000,
           'totalDurationSec': 600,
           'routeData': [
@@ -68,6 +69,22 @@ void main() {
       final itinerary = ItineraryModel.fromJson(json);
 
       expect(itinerary.routeData, isEmpty);
+    });
+
+    test('isWalk is true when transportMode is walk, false for car', () {
+      final walkJson = baseJson(startHotelId: 'h1', endHotelId: 'h1')..['transportMode'] = 'walk';
+      final carJson = baseJson(startHotelId: 'h1', endHotelId: 'h1');
+
+      expect(ItineraryModel.fromJson(walkJson).isWalk, isTrue);
+      expect(ItineraryModel.fromJson(carJson).isWalk, isFalse);
+    });
+
+    test('defaults transportMode to car when missing', () {
+      final json = baseJson(startHotelId: 'h1', endHotelId: 'h1')..remove('transportMode');
+      final itinerary = ItineraryModel.fromJson(json);
+
+      expect(itinerary.transportMode, 'car');
+      expect(itinerary.isWalk, isFalse);
     });
   });
 }

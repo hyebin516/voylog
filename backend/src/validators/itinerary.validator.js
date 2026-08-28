@@ -1,8 +1,10 @@
 const AppError = require('../utils/AppError');
 const isUuid = require('../utils/isUuid');
 
+const VALID_TRANSPORT_MODES = ['car', 'walk'];
+
 function validateCreateItinerary(req, res, next) {
-  const { hotelId, placeIds, tripId, dayNumber } = req.body;
+  const { hotelId, placeIds, tripId, dayNumber, transportMode } = req.body;
   let { startHotelId, endHotelId } = req.body;
 
   // Backward compatibility: old clients send a single hotelId for a round trip.
@@ -11,6 +13,12 @@ function validateCreateItinerary(req, res, next) {
     endHotelId = hotelId;
     req.body.startHotelId = startHotelId;
     req.body.endHotelId = endHotelId;
+  }
+
+  if (transportMode === undefined) {
+    req.body.transportMode = 'car';
+  } else if (!VALID_TRANSPORT_MODES.includes(transportMode)) {
+    return next(new AppError(400, 'INVALID_REQUEST', "transportMode must be 'car' or 'walk'"));
   }
 
   if (!isUuid(tripId)) {

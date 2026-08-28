@@ -103,7 +103,7 @@ GradudtionProject/
 | POST/GET/PUT/DELETE | `/api/v1/hotels`, `/api/v1/hotels/:id` | 필수 (JWT) | 호텔 CRUD |
 | POST/GET | `/api/v1/trips` | 필수 (JWT) | 여행 생성 body: `{ name }` / 내 여행 목록 조회 (각 여행에 `dayCount` 포함) |
 | GET/DELETE | `/api/v1/trips/:id` | 필수 (JWT) | 여행 상세(날짜별 동선 목록 `days[]`) 조회 / 여행 삭제(소속 날짜 동선도 함께 소프트 삭제) |
-| POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[] }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
+| POST | `/api/v1/itineraries` | 필수 (JWT) | 여행의 특정 날짜 동선 생성. body: `{ tripId, dayNumber, startHotelId, endHotelId, placeIds[], transportMode? }` (장소 최소 2개, 최대 10개). `tripId`는 요청 사용자 소유 여행이어야 하고, 같은 `tripId`+`dayNumber` 조합은 하나만 존재 가능(중복 시 409 DAY_EXISTS). `startHotelId == endHotelId`면 왕복(roundTrip), 다르면 호텔 간 이동(hotelToHotel)으로 서버가 자동 판별 — 날짜마다 독립적으로 판별되므로 같은 여행 안에서도 날짜별로 다를 수 있음. `transportMode`는 `car`(기본) | `walk` 중 하나(생략 시 `car`) — 이동수단에 따라 AI Worker가 다른 Kakao 경로 API로 시간·거리를 계산. 구버전 호환: `{ hotelId }`만 오면 `startHotelId = endHotelId = hotelId`로 취급 |
 | GET/PUT | `/api/v1/notification-settings` | 필수 (JWT) | 알림 설정 조회(저장된 값이 없으면 기본값 반환) / 수정. body(PUT): `{ tripAlerts, serviceAlerts, marketingAlerts }` (모두 boolean 필수). 실제 푸시 발송 인프라는 없음 — 설정값만 저장 |
 | POST | `/api/v1/recommendations/nearby` | 선택 (JWT, 미인증도 허용) | 위치·시간 기반 주변 장소 추천. body: `{ latitude, longitude, localTime, radiusMeters?, limit? }` (`localTime`은 ISO 8601, 기기의 로컬 시각 그대로 — 시간대 변환 없이 요일/시각 판단에 사용). 서버가 로그인 사용자면 먼저 `recommendation_behaviors`에서 hide/not_interested 처리한 장소 id를 조회해 후보에서 제외하고, `places`에서 반경 내 나머지 후보(임베딩·태그 포함)를 조회, `user_preference_embeddings`(임베딩+`tag_scores` — 학습된 값이 없으면 `source_tags`를 1.0으로 대체)도 함께 조회해 AI Worker(`/recommendations/nearby-score`)로 전달 — 거리/시간대/영업여부(LLM 추정) + (양쪽에 임베딩이 있을 때만) 코사인 유사도 + (양쪽에 태그가 있을 때만) 학습된 선호도 가중 태그 일치도를 결합해 점수·정렬·매칭된 태그 목록·추천 이유(템플릿 문장) 계산. 각 신호는 있을 때만 가중치에 포함되고 없는 신호의 비중은 나머지 신호로 자동 재분배 |
 | POST | `/api/v1/recommendations/behaviors` | 필수 (JWT) | 추천 장소에 대한 사용자 행동 기록(FR-15 행동 기반 자동 학습). body: `{ placeId, action, screen?, distanceMeters? }` — `action`은 `view_detail`(+1)/`map_view`(+2)/`share`(+3)/`bookmark`(+4)/`add_to_itinerary`(+5)/`like`(+5)/`hide`(-4)/`not_interested`(-5) 중 하나(가중치는 `backend/src/services/behavior-scoring-policy.js`에 고정). `recommendation_behaviors`에 원본 이벤트를 남긴 뒤, 장소 임베딩·태그를 가중치(같은 사용자·장소·행동 반복 시 `1/sqrt(과거횟수+1)`로 감쇠) 적용해 AI Worker(`/embeddings/update-preference`)로 사용자 선호 임베딩을 갱신하고 `tag_scores`(태그별 학습된 선호 강도, [-2, 2] 클램프)도 함께 갱신. hide/not_interested는 이후 `/recommendations/nearby`에서 해당 장소를 아예 후보에서 제외(스코어 감점이 아닌 필수 필터). 위도/경도·이동 경로는 저장하지 않음(반경 버킷만) |
@@ -145,7 +145,7 @@ GradudtionProject/
 - **bookmark_folders**: `folder_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at`, `deleted_at` — 사용자가 만드는 북마크 폴더
 - **bookmark_folder_items**: `folder_id(FK → bookmark_folders.folder_id)`, `bookmark_id(FK → bookmarks.bookmark_id)`, `created_at`, PK(`folder_id`, `bookmark_id`) — 폴더↔북마크 다대다 조인 테이블(북마크 하나가 여러 폴더에 동시에 속할 수 있음, 태그 방식)
 - **trips**: `trip_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at` — 여러 날짜(itineraries)를 묶는 상위 "여행" 단위
-- **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `trip_id(FK → trips.trip_id, NOT NULL)`, `day_number(INTEGER, NOT NULL, > 0)` — 여행 내 몇 일차인지, `(trip_id, day_number)` UNIQUE(소프트 삭제 제외), `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
+- **itineraries**: `itinerary_id(PK)`, `user_id(FK)`, `trip_id(FK → trips.trip_id, NOT NULL)`, `day_number(INTEGER, NOT NULL, > 0)` — 여행 내 몇 일차인지, `(trip_id, day_number)` UNIQUE(소프트 삭제 제외), `start_hotel_id(FK → hotels.hotel_id)`, `end_hotel_id(FK → hotels.hotel_id)`, `route_type`(roundTrip | hotelToHotel, `start_hotel_id == end_hotel_id`일 때 roundTrip), `optimization_priority`(duration), `transport_mode`(car | walk, 기본 car — `route_type`과 독립적인 축, 이동수단에 따라 이동 시간·거리 계산 API가 달라짐), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB), `created_at`, `updated_at`
 - **notification_settings**: `user_id(PK, FK → users.user_id)`, `trip_alerts`(boolean, 기본 true), `service_alerts`(boolean, 기본 true), `marketing_alerts`(boolean, 기본 false), `created_at`, `updated_at` — 사용자당 1행, 저장된 행이 없으면 API가 기본값을 즉석에서 반환(레코드 미리 생성 안 함)
 - **place_embeddings**: `place_id(PK, FK → places.place_id)`, `embedding`(JSONB — float 배열, pgvector 미사용), `model`, `dimensions`, `source_text_hash`(재생성 필요 여부 판단용), `created_at`, `updated_at` — 장소 분석(영상 분석) 시점에 이름+카테고리+주소를 합친 텍스트로 자동 생성·캐싱, 임베딩 실패는 best-effort(전체 영상 분석을 막지 않음)
 - **user_preference_embeddings**: `user_id(PK, FK → users.user_id)`, `embedding`(JSONB), `source_tags`(JSONB — 취향 설문에서 선택한 태그 원본), `source_text`, `model`, `dimensions`, `tag_scores`(JSONB, nullable — `{code: score}` 형태, 설문 선택 시 1.0으로 초기화되고 이후 행동 기록마다 가중치만큼 오르내림, [-2, 2] 클램프), `created_at`, `updated_at` — 사용자당 1행. 설문(`PUT /taste-preferences`) 또는 행동 기록(`POST /recommendations/behaviors`) 어느 쪽이든 최초 1회 생성될 수 있음(설문을 건너뛰어도 행동만으로 임베딩이 생성될 수 있음). 행이 없으면 "취향 미설정"으로 간주해 추천이 임베딩 없이 상황 기반으로만 동작
@@ -172,10 +172,10 @@ GradudtionProject/
 ### 동선 최적화 (여행의 특정 날짜, 시작/종료 호텔 기반)
 1. `tripId`가 요청 사용자 소유 여행인지 확인 (아니면 404 TRIP_NOT_FOUND), 해당 `tripId`+`dayNumber` 조합이 이미 존재하는지 확인 (있으면 409 DAY_EXISTS)
 2. `startHotelId`, `endHotelId` + `placeIds` 최소 2개, 최대 10개 검증. 둘 다 요청 사용자 소유 호텔이어야 함
-3. `route_type`을 서버에서 자동 판별: `startHotelId == endHotelId` → `roundTrip`, 다르면 → `hotelToHotel` (클라이언트가 보낸 routeType은 신뢰하지 않음)
+3. `route_type`을 서버에서 자동 판별: `startHotelId == endHotelId` → `roundTrip`, 다르면 → `hotelToHotel` (클라이언트가 보낸 routeType은 신뢰하지 않음). `transportMode`(car|walk, 기본 car)는 클라이언트가 선택한 값을 그대로 사용(자동 판별 대상 아님)
 4. 시작 호텔·종료 호텔·각 장소 좌표 조회 (좌표 없는 장소는 제외)
-5. Kakao Mobility(길찾기) API로 이동 시간 계산, 실패 시 Haversine 직선거리로 대체
-6. 시작 호텔과 종료 호텔을 고정 양 끝점으로 유지한 채 장소들의 방문 순서만 TSP 스타일로 최적화: 시작 호텔(출발) → 장소들 → 종료 호텔(도착), 10개 초과는 최적화 대상에서 제외
+5. `transportMode`에 따라 이동 시간 계산 API가 다름 — `car`는 Kakao Mobility(자동차 길찾기, `apis-navi.kakaomobility.com/v1/directions`), `walk`는 Kakao 도보 경로 조회(`dapi.kakao.com/v2/routing/walk`). 두 경우 모두 실패 시 각 이동수단의 평균 속도(자동차 ~30km/h, 도보 ~4km/h) 기준 Haversine 직선거리로 대체
+6. 시작 호텔과 종료 호텔을 고정 양 끝점으로 유지한 채 장소들의 방문 순서만 TSP 스타일로 최적화: 시작 호텔(출발) → 장소들 → 종료 호텔(도착), 10개 초과는 최적화 대상에서 제외 (최적화 알고리즘 자체는 이동수단과 무관하게 동일 — 어느 매트릭스를 쓰느냐만 다름)
 7. `itineraries`(`trip_id`, `day_number` 포함, `route_data`는 JSONB) 저장 후 반환
 
 ## LLM 규칙
@@ -204,7 +204,7 @@ GradudtionProject/
 ## 요구사항 참조
 
 - **FR-01** URL 분석 / **FR-02** 해시태그 탐색 / **FR-03** 장소 카드 / **FR-04** 타임스탬프 이동
-- **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
+- **FR-05** 지도 보기(Kakao) / **FR-06** 북마크 / **FR-07** 시작/종료 호텔 기반 AI 동선(왕복·호텔 간 이동, 자동차/도보 이동수단 선택) / **FR-08** 소셜 로그인(Kakao) / **FR-09** 캐싱
 - **FR-10** 지역/테마/기간 추천 마법사 / **FR-11** 북마크 폴더(다대다 태그) / **FR-12** 알림 설정(서버 저장, 발송 인프라 없음) / **FR-13** 고객센터(정적 FAQ + 연락처 안내)
 - **FR-14** 네이티브 회원가입/로그인(이메일+비밀번호, OTP 이메일 인증) — 카카오 소셜 로그인(FR-08)과 별개의 로그인 수단, 두 provider 모두 동일한 JWT 발급 흐름을 공유
 - **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 또는 행동 이력 존재 시) 임베딩 유사도·학습된 태그 선호도 하이브리드 정렬 + 행동 기반 자동 학습(조회/북마크/일정추가/공유/좋아요는 선호 강화, 숨김/관심없음은 약화 및 향후 추천에서 완전 제외). 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고

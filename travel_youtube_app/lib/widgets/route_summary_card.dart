@@ -35,6 +35,12 @@ class RouteSummaryCard extends StatelessWidget {
             Row(
               children: [
                 Chip(label: Text(itinerary.isRoundTrip ? '왕복' : '호텔 → 호텔')),
+                const SizedBox(width: 8),
+                Icon(
+                  itinerary.isWalk ? Icons.directions_walk_rounded : Icons.directions_car_rounded,
+                  size: 18,
+                  color: colorScheme.onSurfaceVariant,
+                ),
                 const Spacer(),
                 Icon(Icons.timer_outlined, size: 18, color: colorScheme.onSurfaceVariant),
                 const SizedBox(width: 4),

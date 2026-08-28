@@ -19,6 +19,7 @@ ItineraryModel _day(String tripId, int dayNumber) {
     endHotelId: 'h1',
     routeType: 'roundTrip',
     optimizationPriority: 'duration',
+    transportMode: 'car',
     totalDistanceM: 1000,
     totalDurationSec: 600,
     routeData: const [],

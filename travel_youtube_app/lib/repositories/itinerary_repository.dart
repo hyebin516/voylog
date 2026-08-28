@@ -13,6 +13,7 @@ class ItineraryRepository {
     required String startHotelId,
     required String endHotelId,
     required List<String> placeIds,
+    String transportMode = 'car',
   }) async {
     try {
       final response = await _dio.post('/itineraries', data: {
@@ -21,6 +22,7 @@ class ItineraryRepository {
         'startHotelId': startHotelId,
         'endHotelId': endHotelId,
         'placeIds': placeIds,
+        'transportMode': transportMode,
       });
       return ItineraryModel.fromJson(response.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {

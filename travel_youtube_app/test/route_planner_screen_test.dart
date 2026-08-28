@@ -27,6 +27,7 @@ const ItineraryModel _optimizedResult = ItineraryModel(
   endHotelId: 'h2',
   routeType: 'hotelToHotel',
   optimizationPriority: 'duration',
+  transportMode: 'car',
   totalDistanceM: 4200,
   totalDurationSec: 1800,
   routeData: [
@@ -48,6 +49,7 @@ class FakeItineraryRepository extends ItineraryRepository {
     required String startHotelId,
     required String endHotelId,
     required List<String> placeIds,
+    String transportMode = 'car',
   }) async {
     lastCall = {
       'tripId': tripId,
@@ -55,6 +57,7 @@ class FakeItineraryRepository extends ItineraryRepository {
       'startHotelId': startHotelId,
       'endHotelId': endHotelId,
       'placeIds': placeIds,
+      'transportMode': transportMode,
     };
     if (errorToThrow != null) throw errorToThrow!;
     return resultToReturn!;
@@ -207,11 +210,34 @@ void main() {
       'startHotelId': 'h1',
       'endHotelId': 'h2',
       'placeIds': ['p1', 'p2'],
+      'transportMode': 'car',
     });
     expect(find.text('marker:A호텔'), findsOneWidget);
     expect(find.text('marker:B호텔'), findsOneWidget);
     expect(find.text('marker:해운대해수욕장'), findsOneWidget);
     expect(find.text('저장 완료 — 여행으로 돌아가기'), findsOneWidget);
+  });
+
+  testWidgets('selecting 도보 switches the optimize call to walk transport mode', (tester) async {
+    final itineraryRepository = FakeItineraryRepository()..resultToReturn = _optimizedResult;
+    final itineraryProvider = ItineraryProvider(repository: itineraryRepository)
+      ..togglePlaceSelection('p1')
+      ..togglePlaceSelection('p2');
+    final hotelProvider = HotelProvider()
+      ..selectStartHotel(_hotelA)
+      ..selectEndHotel(_hotelB);
+    final tripProvider = TripProvider()..startBuildingDay('t1', 1);
+
+    await tester.pumpWidget(_wrap(hotelProvider: hotelProvider, itineraryProvider: itineraryProvider, tripProvider: tripProvider));
+    await _openRoutePlanner(tester);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '도보'));
+    await tester.pump();
+
+    await tester.tap(find.widgetWithText(ElevatedButton, '동선 최적화'));
+    await tester.pumpAndSettle();
+
+    expect(itineraryRepository.lastCall?['transportMode'], 'walk');
   });
 
   testWidgets('shows an error view with a retry option when optimization fails', (tester) async {

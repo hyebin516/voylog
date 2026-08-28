@@ -38,6 +38,7 @@ def test_optimize_route_accepts_two_places_and_delegates_to_the_service(monkeypa
         return RouteOptimizationResponse(
             routeType=request.routeType,
             optimizationPriority=request.optimizationPriority,
+            transportMode=request.transportMode,
             startPlace=RoutePoint(order=0, type="hotel", hotelId="h1", name="Hotel", latitude=37.5, longitude=127.0),
             endPlace=RoutePoint(order=2, type="hotel", hotelId="h1", name="Hotel", latitude=37.5, longitude=127.0),
             optimizedRoute=[],

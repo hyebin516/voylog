@@ -88,4 +88,29 @@ describe('validateCreateItinerary', () => {
     validateCreateItinerary(req, mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
+
+  it('defaults transportMode to car when omitted', () => {
+    const req = mockReq({ body: { ...VALID_BODY } });
+    const next = jest.fn();
+    validateCreateItinerary(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.body.transportMode).toBe('car');
+  });
+
+  it('accepts an explicit walk transportMode', () => {
+    const req = mockReq({ body: { ...VALID_BODY, transportMode: 'walk' } });
+    const next = jest.fn();
+    validateCreateItinerary(req, mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+    expect(req.body.transportMode).toBe('walk');
+  });
+
+  it('rejects an invalid transportMode', () => {
+    const req = mockReq({ body: { ...VALID_BODY, transportMode: 'bike' } });
+    const next = jest.fn();
+    validateCreateItinerary(req, mockRes(), next);
+    const err = next.mock.calls[0][0];
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.message).toMatch(/transportMode/);
+  });
 });

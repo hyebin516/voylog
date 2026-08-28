@@ -117,3 +117,69 @@ def test_optimize_route_echoes_the_requested_route_type_and_priority():
 
     assert result.routeType == "roundTrip"
     assert result.optimizationPriority == "duration"
+    assert result.transportMode == "car"
+
+
+def test_optimize_route_defaults_to_car_and_echoes_walk_when_requested():
+    request = RouteOptimizationRequest(
+        startHotel=HOTEL_A,
+        endHotel=HOTEL_B,
+        places=[PLACE_1, PLACE_2],
+        routeType="hotelToHotel",
+        optimizationPriority="duration",
+        transportMode="walk",
+    )
+
+    result = asyncio.run(svc.optimize_route(request))
+
+    assert result.transportMode == "walk"
+
+
+def test_travel_time_falls_back_to_walking_speed_haversine_for_walk_mode():
+    origin = {"latitude": 37.5, "longitude": 127.0}
+    dest = {"latitude": 37.6, "longitude": 127.1}
+
+    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
+
+    expected_distance = haversine_distance_m(37.5, 127.0, 37.6, 127.1)
+    assert distance_m == pytest.approx(expected_distance)
+    assert duration_sec == pytest.approx(expected_distance / svc.ASSUMED_SPEED_MPS["walk"])
+    # Walking is slower than the car assumption, so it should take longer for the same distance.
+    assert svc.ASSUMED_SPEED_MPS["walk"] < svc.ASSUMED_SPEED_MPS["car"]
+
+
+def test_kakao_travel_time_calls_the_walk_endpoint_and_parses_its_response_shape(monkeypatch):
+    monkeypatch.setattr(svc, "KAKAO_REST_API_KEY", "fake-key")
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"route": {"properties": {"totalDistance": 1195, "totalTime": 1250}}}
+
+    class FakeClient:
+        def __init__(self):
+            self.called_url = None
+            self.called_params = None
+
+        async def get(self, url, headers=None, params=None):
+            self.called_url = url
+            self.called_params = params
+            return FakeResponse()
+
+    fake_client = FakeClient()
+    origin = {"latitude": 37.4979, "longitude": 127.0276}
+    dest = {"latitude": 37.5015, "longitude": 127.0396}
+
+    distance_m, duration_sec = asyncio.run(svc._kakao_travel_time(fake_client, origin, dest, "walk"))
+
+    assert fake_client.called_url == svc.KAKAO_DIRECTIONS_URL["walk"]
+    assert fake_client.called_params == {
+        "start_x": origin["longitude"],
+        "start_y": origin["latitude"],
+        "end_x": dest["longitude"],
+        "end_y": dest["latitude"],
+    }
+    assert distance_m == 1195.0
+    assert duration_sec == 1250.0

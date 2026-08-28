@@ -34,8 +34,8 @@ beforeEach(() => {
 
 afterEach(() => jest.clearAllMocks());
 
-function create(startHotelId, endHotelId, placeIds, dayNumber = 1) {
-  return createItinerary(USER_ID, TRIP_ID, dayNumber, startHotelId, endHotelId, placeIds);
+function create(startHotelId, endHotelId, placeIds, dayNumber = 1, transportMode = undefined) {
+  return createItinerary(USER_ID, TRIP_ID, dayNumber, startHotelId, endHotelId, placeIds, transportMode);
 }
 
 describe('createItinerary trip/day ownership', () => {
@@ -118,6 +118,26 @@ describe('createItinerary place validation', () => {
     const [, payload] = callAiWorker.mock.calls[0];
     expect(payload.places).toHaveLength(2);
     expect(payload.places.map((p) => p.placeId)).toEqual(['p1', 'p2']);
+  });
+});
+
+describe('createItinerary transportMode', () => {
+  it('defaults to car when not provided', async () => {
+    placeRepository.findByIds.mockResolvedValue([geocodedPlace('p1'), geocodedPlace('p2')]);
+
+    await create(HOTEL_A, HOTEL_A, ['p1', 'p2']);
+
+    const [, payload] = callAiWorker.mock.calls[0];
+    expect(payload.transportMode).toBe('car');
+  });
+
+  it('passes an explicit walk mode through to the AI worker', async () => {
+    placeRepository.findByIds.mockResolvedValue([geocodedPlace('p1'), geocodedPlace('p2')]);
+
+    await create(HOTEL_A, HOTEL_A, ['p1', 'p2'], 1, 'walk');
+
+    const [, payload] = callAiWorker.mock.calls[0];
+    expect(payload.transportMode).toBe('walk');
   });
 });
 

@@ -15,7 +15,7 @@ function toHotelPayload(hotel) {
   };
 }
 
-async function createItinerary(userId, tripId, dayNumber, startHotelId, endHotelId, placeIds) {
+async function createItinerary(userId, tripId, dayNumber, startHotelId, endHotelId, placeIds, transportMode = 'car') {
   await tripService.getOwnedTrip(userId, tripId);
 
   const existingDay = await itineraryRepository.findByTripAndDay(tripId, dayNumber);
@@ -50,6 +50,7 @@ async function createItinerary(userId, tripId, dayNumber, startHotelId, endHotel
       })),
       routeType,
       optimizationPriority: 'duration',
+      transportMode,
     },
     15000
   );
