@@ -1,51 +1,53 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:youtube_player_iframe/youtube_player_iframe.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/map_view_types.dart';
 import '../models/place_model.dart';
 import '../providers/video_provider.dart';
 import '../repositories/map_repository.dart';
+import '../repositories/video_player_repository.dart';
 import '../routes/app_routes.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/place_card.dart';
-import '../widgets/video_player_section.dart';
 
 class VideoAnalysisScreen extends StatefulWidget {
   /// Defaults to the real native Kakao map. Widget tests inject
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
-  const VideoAnalysisScreen({super.key, this.mapRepository = const KakaoMapRepository()});
+  /// Defaults to the real WebView-backed YouTube player. Widget tests
+  /// inject `FakeVideoPlayerRepository()` instead.
+  final VideoPlayerRepository videoPlayerRepository;
+
+  const VideoAnalysisScreen({
+    super.key,
+    this.mapRepository = const KakaoMapRepository(),
+    this.videoPlayerRepository = const YoutubeIframePlayerRepository(),
+  });
 
   @override
   State<VideoAnalysisScreen> createState() => _VideoAnalysisScreenState();
 }
 
 class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
-  late final YoutubePlayerController _playerController;
+  late final VideoPlayerInstance _player;
 
   @override
   void initState() {
     super.initState();
     final videoId = context.read<VideoProvider>().currentVideo?.videoId;
-    _playerController = YoutubePlayerController(
-      params: const YoutubePlayerParams(showControls: true, showFullscreenButton: true),
-    );
-    if (videoId != null) {
-      _playerController.loadVideoById(videoId: videoId);
-    }
+    _player = widget.videoPlayerRepository.createPlayer(videoId);
   }
 
   @override
   void dispose() {
-    _playerController.close();
+    _player.handle.dispose();
     super.dispose();
   }
 
   void _seekTo(int seconds) {
-    _playerController.seekTo(seconds: seconds.toDouble(), allowSeekAhead: true);
+    _player.handle.seekTo(seconds);
   }
 
   Future<void> _openDetail(PlaceModel place) async {
@@ -108,7 +110,7 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(AppSpacing.md),
-            child: VideoPlayerSection(controller: _playerController),
+            child: _player.widget,
           ),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
