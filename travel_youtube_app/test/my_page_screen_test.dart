@@ -26,6 +26,11 @@ void main() {
     expect(find.text('뚜벅이 코스'), findsOneWidget);
     expect(find.text('내 코스 목록'), findsOneWidget);
     expect(find.text('고객센터'), findsOneWidget);
+
+    // The list has grown enough that "설정" is below the fold in the test
+    // viewport and isn't built yet (Flutter's ListView is lazy/sliver-based
+    // even for a plain children: [...] list) -- scroll it into view first.
+    await tester.dragUntilVisible(find.text('설정'), find.byType(Scrollable), const Offset(0, -100));
     expect(find.text('설정'), findsOneWidget);
   });
 
@@ -77,6 +82,7 @@ void main() {
   testWidgets('tapping 고객센터 navigates to the customer service route', (tester) async {
     await tester.pumpWidget(_wrap());
 
+    await tester.dragUntilVisible(find.text('고객센터'), find.byType(Scrollable), const Offset(0, -100));
     await tester.tap(find.text('고객센터'));
     await tester.pumpAndSettle();
 
