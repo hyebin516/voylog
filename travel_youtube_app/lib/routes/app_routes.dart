@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/place_model.dart';
+import '../models/saved_walking_course_model.dart';
 import '../screens/bookmark_folder_detail_screen.dart';
 import '../screens/bookmark_folder_list_screen.dart';
 import '../screens/bookmark_folder_picker_screen.dart';
@@ -18,6 +19,8 @@ import '../screens/recommendation_region_screen.dart';
 import '../screens/recommendation_results_screen.dart';
 import '../screens/recommendation_theme_screen.dart';
 import '../screens/route_planner_screen.dart';
+import '../screens/saved_walking_course_detail_screen.dart';
+import '../screens/saved_walking_courses_screen.dart';
 import '../screens/settings_screen.dart';
 import '../screens/signup_details_screen.dart';
 import '../screens/signup_email_screen.dart';
@@ -61,6 +64,8 @@ class AppRoutes {
   static const String tastePreferences = '/taste-preferences';
   static const String walkingCourseRegion = '/walking-course/region';
   static const String walkingCourseResult = '/walking-course/result';
+  static const String savedWalkingCourses = '/walking-courses/saved';
+  static const String savedWalkingCourseDetail = '/walking-courses/saved-detail';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -127,6 +132,11 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const WalkingCourseRegionScreen(), settings: settings);
       case AppRoutes.walkingCourseResult:
         return MaterialPageRoute(builder: (_) => const WalkingCourseResultScreen(), settings: settings);
+      case AppRoutes.savedWalkingCourses:
+        return MaterialPageRoute(builder: (_) => const SavedWalkingCoursesScreen(), settings: settings);
+      case AppRoutes.savedWalkingCourseDetail:
+        final course = settings.arguments as SavedWalkingCourseModel;
+        return MaterialPageRoute(builder: (_) => SavedWalkingCourseDetailScreen(course: course), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

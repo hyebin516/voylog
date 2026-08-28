@@ -7,8 +7,10 @@ import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/itinerary_model.dart';
 import 'package:travel_youtube_app/models/nearby_recommendation_model.dart';
 import 'package:travel_youtube_app/models/walking_course_model.dart';
+import 'package:travel_youtube_app/models/saved_walking_course_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/walking_course_provider.dart';
+import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/repositories/walking_course_repository.dart';
 import 'package:travel_youtube_app/screens/walking_course_result_screen.dart';
 
@@ -49,6 +51,27 @@ const _course = WalkingCourseRouteModel(
   totalDurationSec: 1500,
   routeData: [],
 );
+
+class FakeSavedWalkingCourseRepository extends SavedWalkingCourseRepository {
+  ApiException? error;
+  String? lastRegion;
+
+  @override
+  Future<SavedWalkingCourseModel> save({required String region, required WalkingCourseRouteModel course}) async {
+    lastRegion = region;
+    if (error != null) throw error!;
+    return SavedWalkingCourseModel(
+      savedCourseId: 'sc1',
+      region: region,
+      routeType: course.routeType,
+      transportMode: course.transportMode,
+      totalDistanceM: course.totalDistanceM,
+      totalDurationSec: course.totalDurationSec,
+      routeData: course.routeData,
+      createdAt: DateTime(2026, 8, 28),
+    );
+  }
+}
 
 class FakeWalkingCourseRepository extends WalkingCourseRepository {
   WalkingCourseModel? resultToReturn;
@@ -153,5 +176,61 @@ void main() {
 
     // Only the bookmarkable (non-"kakao:"-prefixed) recommendation gets a bookmark button.
     expect(find.byTooltip('북마크'), findsOneWidget);
+  });
+
+  testWidgets('tapping "코스 저장하기" saves the course and relabels the button once saved', (tester) async {
+    const courseWithRoute = WalkingCourseRouteModel(
+      routeType: 'roundTrip',
+      transportMode: 'walk',
+      totalDistanceM: 1800,
+      totalDurationSec: 1500,
+      routeData: [
+        RoutePointModel(order: 0, type: 'hotel', hotelId: 'region-center', placeId: null, name: '제주 중심', latitude: 33.5, longitude: 126.5),
+      ],
+    );
+    final repository = FakeWalkingCourseRepository()
+      ..resultToReturn = const WalkingCourseModel(course: courseWithRoute, recommendations: []);
+    final savedRepository = FakeSavedWalkingCourseRepository();
+    final provider = WalkingCourseProvider(repository: repository, savedCourseRepository: savedRepository);
+    await provider.generate('제주');
+
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pumpAndSettle();
+
+    expect(find.text('코스 저장하기'), findsOneWidget);
+
+    await tester.tap(find.text('코스 저장하기'));
+    await tester.pumpAndSettle();
+
+    expect(savedRepository.lastRegion, '제주');
+    expect(find.text('저장됨'), findsOneWidget);
+    expect(find.text('코스를 저장했어요.'), findsOneWidget); // SnackBar
+  });
+
+  testWidgets('shows a snackbar with the friendly error message when saving fails', (tester) async {
+    const courseWithRoute = WalkingCourseRouteModel(
+      routeType: 'roundTrip',
+      transportMode: 'walk',
+      totalDistanceM: 1800,
+      totalDurationSec: 1500,
+      routeData: [
+        RoutePointModel(order: 0, type: 'hotel', hotelId: 'region-center', placeId: null, name: '제주 중심', latitude: 33.5, longitude: 126.5),
+      ],
+    );
+    final repository = FakeWalkingCourseRepository()
+      ..resultToReturn = const WalkingCourseModel(course: courseWithRoute, recommendations: []);
+    final savedRepository = FakeSavedWalkingCourseRepository()
+      ..error = const ApiException(code: 'NETWORK_ERROR', message: 'boom');
+    final provider = WalkingCourseProvider(repository: repository, savedCourseRepository: savedRepository);
+    await provider.generate('제주');
+
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('코스 저장하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('네트워크 연결을 확인해 주세요.'), findsOneWidget);
+    expect(find.text('코스 저장하기'), findsOneWidget); // button stays enabled to retry
   });
 }

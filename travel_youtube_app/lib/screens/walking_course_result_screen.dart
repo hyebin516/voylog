@@ -10,6 +10,7 @@ import '../utils/view_state.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/route_summary_card.dart';
 
@@ -24,6 +25,15 @@ class WalkingCourseResultScreen extends StatelessWidget {
     final provider = context.read<WalkingCourseProvider>();
     final region = provider.region;
     if (region != null) provider.generate(region);
+  }
+
+  Future<void> _onSavePressed(BuildContext context) async {
+    final provider = context.read<WalkingCourseProvider>();
+    final success = await provider.save();
+    if (!context.mounted) return;
+
+    final message = success ? '코스를 저장했어요.' : (provider.saveErrorMessage ?? '코스를 저장하지 못했습니다.');
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -100,6 +110,16 @@ class WalkingCourseResultScreen extends StatelessWidget {
                       ),
                     ),
                   ],
+                  const SizedBox(height: AppSpacing.md),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                    child: PrimaryButton(
+                      label: provider.saved ? '저장됨' : '코스 저장하기',
+                      icon: provider.saved ? Icons.check_rounded : Icons.bookmark_add_outlined,
+                      isLoading: provider.isSaving,
+                      onPressed: provider.saved ? null : () => _onSavePressed(context),
+                    ),
+                  ),
                   const SizedBox(height: AppSpacing.lg),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
