@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -52,8 +54,14 @@ class FakeWalkingCourseRepository extends WalkingCourseRepository {
   WalkingCourseModel? resultToReturn;
   ApiException? error;
 
+  /// When set, `generate()` waits on this instead of resolving immediately
+  /// -- lets a test observe the provider's loading state deterministically
+  /// instead of racing a real (unawaited) async gap against `pumpWidget`.
+  Completer<WalkingCourseModel>? pendingCompleter;
+
   @override
   Future<WalkingCourseModel> generate({required String region, required DateTime localTime}) async {
+    if (pendingCompleter != null) return pendingCompleter!.future;
     if (error != null) throw error!;
     return resultToReturn!;
   }
@@ -73,14 +81,20 @@ Widget _wrap(WalkingCourseProvider provider) {
 
 void main() {
   testWidgets('shows a loading indicator while the course is being generated', (tester) async {
-    final repository = FakeWalkingCourseRepository()..resultToReturn = const WalkingCourseModel(course: null, recommendations: []);
+    final completer = Completer<WalkingCourseModel>();
+    final repository = FakeWalkingCourseRepository()..pendingCompleter = completer;
     final provider = WalkingCourseProvider(repository: repository);
 
     final generateFuture = provider.generate('제주');
     await tester.pumpWidget(_wrap(provider));
 
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+
+    completer.complete(const WalkingCourseModel(course: null, recommendations: []));
     await generateFuture;
+    await tester.pumpAndSettle();
+
+    expect(find.byType(CircularProgressIndicator), findsNothing);
   });
 
   testWidgets('shows an error view with a retry option on failure', (tester) async {
