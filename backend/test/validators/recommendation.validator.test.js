@@ -1,4 +1,8 @@
-const { validateNearbyRequest, validateWalkingCourseRequest } = require('../../src/validators/recommendation.validator');
+const {
+  validateNearbyRequest,
+  validateWalkingCourseRequest,
+  validateSimilarTasteLimit,
+} = require('../../src/validators/recommendation.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
@@ -78,6 +82,38 @@ describe('validateWalkingCourseRequest', () => {
   it('rejects an unparseable localTime', () => {
     const next = jest.fn();
     validateWalkingCourseRequest(mockReq({ body: { ...VALID_COURSE_BODY, localTime: 'not-a-date' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateSimilarTasteLimit', () => {
+  it('passes when limit is omitted', () => {
+    const next = jest.fn();
+    validateSimilarTasteLimit(mockReq({ query: {} }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('passes for a limit within bounds', () => {
+    const next = jest.fn();
+    validateSimilarTasteLimit(mockReq({ query: { limit: '10' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a limit above the cap', () => {
+    const next = jest.fn();
+    validateSimilarTasteLimit(mockReq({ query: { limit: '999' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a non-numeric limit', () => {
+    const next = jest.fn();
+    validateSimilarTasteLimit(mockReq({ query: { limit: 'abc' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a zero or negative limit', () => {
+    const next = jest.fn();
+    validateSimilarTasteLimit(mockReq({ query: { limit: '0' } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

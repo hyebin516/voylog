@@ -104,6 +104,26 @@ class WalkingCourseRequest(BaseModel):
     userTagScores: Dict[str, float] = {}
 
 
+class SimilarTastePlaceCandidate(BaseModel):
+    placeId: str
+    name: str
+    latitude: float
+    longitude: float
+    category: Optional[str] = None
+
+
+class SimilarTasteUserInput(BaseModel):
+    userId: str
+    embedding: Optional[List[float]] = None
+    bookmarkedPlaces: List[SimilarTastePlaceCandidate] = []
+
+
+class SimilarTasteRequest(BaseModel):
+    userEmbedding: List[float]
+    otherUsers: List[SimilarTasteUserInput] = []
+    limit: int = 20
+
+
 class EmbeddingRequest(BaseModel):
     text: str
 

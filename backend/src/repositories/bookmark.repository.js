@@ -34,4 +34,24 @@ async function remove(bookmarkId) {
   await pool.query('DELETE FROM bookmarks WHERE bookmark_id = $1', [bookmarkId]);
 }
 
-module.exports = { findByUserAndPlace, create, findAllByUser, findById, remove };
+/**
+ * Bookmarked places across a given set of users (e.g. "users with similar
+ * taste"), tagged with which user bookmarked each one so the caller can
+ * attribute a signal per bookmarker. excludePlaceIds filters out places the
+ * requester has already bookmarked or hidden -- there's no point
+ * recommending those back.
+ */
+async function findByUsers(userIds, excludePlaceIds = []) {
+  if (userIds.length === 0) return [];
+  const { rows } = await pool.query(
+    `SELECT b.user_id, p.*
+     FROM bookmarks b
+     JOIN places p ON p.place_id = b.place_id
+     WHERE b.user_id = ANY($1::uuid[]) AND p.deleted_at IS NULL
+       AND NOT (p.place_id = ANY($2::uuid[]))`,
+    [userIds, excludePlaceIds]
+  );
+  return rows;
+}
+
+module.exports = { findByUserAndPlace, create, findAllByUser, findById, remove, findByUsers };

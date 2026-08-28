@@ -32,4 +32,17 @@ async function walkingCourse(req, res, next) {
   }
 }
 
-module.exports = { nearby, walkingCourse };
+async function similarTaste(req, res, next) {
+  try {
+    const limit = req.query.limit !== undefined ? Number(req.query.limit) : undefined;
+    const result = await recommendationService.getSimilarTasteRecommendations({
+      userId: req.user.userId,
+      limit,
+    });
+    return success(res, result);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { nearby, walkingCourse, similarTaste };

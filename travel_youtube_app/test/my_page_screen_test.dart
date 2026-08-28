@@ -22,6 +22,7 @@ void main() {
     expect(find.text('북마크 폴더'), findsOneWidget);
     expect(find.text('내 여행'), findsOneWidget);
     expect(find.text('취향 설정'), findsOneWidget);
+    expect(find.text('비슷한 취향 추천'), findsOneWidget);
     expect(find.text('뚜벅이 코스'), findsOneWidget);
     expect(find.text('내 코스 목록'), findsOneWidget);
     expect(find.text('고객센터'), findsOneWidget);
@@ -53,6 +54,15 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('route:/taste-preferences'), findsOneWidget);
+  });
+
+  testWidgets('tapping 비슷한 취향 추천 navigates to the similar taste recommendations route', (tester) async {
+    await tester.pumpWidget(_wrap());
+
+    await tester.tap(find.text('비슷한 취향 추천'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('route:/recommendations/similar-taste'), findsOneWidget);
   });
 
   testWidgets('tapping 북마크 폴더 navigates to the bookmark folders route', (tester) async {

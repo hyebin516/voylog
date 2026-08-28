@@ -1,13 +1,19 @@
 jest.mock('../../src/repositories/recommendation.repository');
 jest.mock('../../src/repositories/taste-preference.repository');
 jest.mock('../../src/repositories/behavior.repository');
+jest.mock('../../src/repositories/bookmark.repository');
 jest.mock('../../src/services/aiWorkerClient');
 
 const recommendationRepository = require('../../src/repositories/recommendation.repository');
 const tastePreferenceRepository = require('../../src/repositories/taste-preference.repository');
 const behaviorRepository = require('../../src/repositories/behavior.repository');
+const bookmarkRepository = require('../../src/repositories/bookmark.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { getNearbyRecommendations, getWalkingCourse } = require('../../src/services/recommendation.service');
+const {
+  getNearbyRecommendations,
+  getWalkingCourse,
+  getSimilarTasteRecommendations,
+} = require('../../src/services/recommendation.service');
 
 beforeEach(() => {
   behaviorRepository.findHiddenPlaceIds.mockResolvedValue([]);
@@ -304,5 +310,91 @@ describe('getWalkingCourse', () => {
       expect.objectContaining({ userEmbedding: null, userTagScores: {} }),
       15000
     );
+  });
+});
+
+describe('getSimilarTasteRecommendations', () => {
+  it('returns an empty list without calling the AI worker when the requester has no preference embedding', async () => {
+    tastePreferenceRepository.find.mockResolvedValue(null);
+
+    const result = await getSimilarTasteRecommendations({ userId: 'u1' });
+
+    expect(result).toEqual({ recommendations: [], hasPreference: false });
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(tastePreferenceRepository.findAllExcept).not.toHaveBeenCalled();
+  });
+
+  it('returns an empty list without calling the AI worker when no other user has a preference embedding yet', async () => {
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [1, 0] });
+    tastePreferenceRepository.findAllExcept.mockResolvedValue([]);
+
+    const result = await getSimilarTasteRecommendations({ userId: 'u1' });
+
+    expect(result).toEqual({ recommendations: [], hasPreference: true });
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(bookmarkRepository.findByUsers).not.toHaveBeenCalled();
+  });
+
+  it('excludes the requester\'s own bookmarks and hidden places, and groups other users\' bookmarks by user', async () => {
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [1, 0] });
+    tastePreferenceRepository.findAllExcept.mockResolvedValue([
+      { user_id: 'u2', embedding: [0.9, 0.1] },
+      { user_id: 'u3', embedding: [0.8, 0.2] },
+    ]);
+    bookmarkRepository.findAllByUser.mockResolvedValue([{ place_id: 'my-place' }]);
+    behaviorRepository.findHiddenPlaceIds.mockResolvedValue(['hidden-place']);
+    bookmarkRepository.findByUsers.mockResolvedValue([
+      { user_id: 'u2', place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0', category: 'cafe' },
+      { user_id: 'u3', place_id: 'p2', name: 'Place 2', latitude: '37.6', longitude: '127.1', category: null },
+    ]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getSimilarTasteRecommendations({ userId: 'u1' });
+
+    expect(bookmarkRepository.findByUsers).toHaveBeenCalledWith(['u2', 'u3'], ['my-place', 'hidden-place']);
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/similar-taste-score',
+      {
+        userEmbedding: [1, 0],
+        otherUsers: [
+          {
+            userId: 'u2',
+            embedding: [0.9, 0.1],
+            bookmarkedPlaces: [{ placeId: 'p1', name: 'Place 1', latitude: 37.5, longitude: 127.0, category: 'cafe' }],
+          },
+          {
+            userId: 'u3',
+            embedding: [0.8, 0.2],
+            bookmarkedPlaces: [{ placeId: 'p2', name: 'Place 2', latitude: 37.6, longitude: 127.1, category: null }],
+          },
+        ],
+        limit: 20,
+      },
+      10000
+    );
+  });
+
+  it('caps limit at its maximum', async () => {
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [1, 0] });
+    tastePreferenceRepository.findAllExcept.mockResolvedValue([{ user_id: 'u2', embedding: [0.9, 0.1] }]);
+    bookmarkRepository.findAllByUser.mockResolvedValue([]);
+    bookmarkRepository.findByUsers.mockResolvedValue([]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getSimilarTasteRecommendations({ userId: 'u1', limit: 999 });
+
+    expect(callAiWorker).toHaveBeenCalledWith('/recommendations/similar-taste-score', expect.objectContaining({ limit: 50 }), 10000);
+  });
+
+  it('returns hasPreference: true alongside the AI worker result on success', async () => {
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [1, 0] });
+    tastePreferenceRepository.findAllExcept.mockResolvedValue([{ user_id: 'u2', embedding: [0.9, 0.1] }]);
+    bookmarkRepository.findAllByUser.mockResolvedValue([]);
+    bookmarkRepository.findByUsers.mockResolvedValue([]);
+    callAiWorker.mockResolvedValue({ recommendations: [{ placeId: 'p1' }] });
+
+    const result = await getSimilarTasteRecommendations({ userId: 'u1' });
+
+    expect(result).toEqual({ recommendations: [{ placeId: 'p1' }], hasPreference: true });
   });
 });

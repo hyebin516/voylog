@@ -22,6 +22,7 @@ import '../screens/route_planner_screen.dart';
 import '../screens/saved_walking_course_detail_screen.dart';
 import '../screens/saved_walking_courses_screen.dart';
 import '../screens/settings_screen.dart';
+import '../screens/similar_taste_recommendations_screen.dart';
 import '../screens/signup_details_screen.dart';
 import '../screens/signup_email_screen.dart';
 import '../screens/signup_otp_screen.dart';
@@ -66,6 +67,7 @@ class AppRoutes {
   static const String walkingCourseResult = '/walking-course/result';
   static const String savedWalkingCourses = '/walking-courses/saved';
   static const String savedWalkingCourseDetail = '/walking-courses/saved-detail';
+  static const String similarTasteRecommendations = '/recommendations/similar-taste';
 
   static Route<dynamic> onGenerateRoute(RouteSettings settings) {
     switch (settings.name) {
@@ -137,6 +139,8 @@ class AppRoutes {
       case AppRoutes.savedWalkingCourseDetail:
         final course = settings.arguments as SavedWalkingCourseModel;
         return MaterialPageRoute(builder: (_) => SavedWalkingCourseDetailScreen(course: course), settings: settings);
+      case AppRoutes.similarTasteRecommendations:
+        return MaterialPageRoute(builder: (_) => const SimilarTasteRecommendationsScreen(), settings: settings);
       default:
         return MaterialPageRoute(
           builder: (_) => Scaffold(body: Center(child: Text('알 수 없는 경로: ${settings.name}'))),

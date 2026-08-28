@@ -1,6 +1,7 @@
 const recommendationRepository = require('../repositories/recommendation.repository');
 const tastePreferenceRepository = require('../repositories/taste-preference.repository');
 const behaviorRepository = require('../repositories/behavior.repository');
+const bookmarkRepository = require('../repositories/bookmark.repository');
 const { callAiWorker } = require('./aiWorkerClient');
 
 const DEFAULT_RADIUS_M = 2000;
@@ -8,6 +9,9 @@ const MAX_RADIUS_M = 5000;
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 20;
 const MAX_CANDIDATES = 100;
+
+const DEFAULT_SIMILAR_TASTE_LIMIT = 20;
+const MAX_SIMILAR_TASTE_LIMIT = 50;
 
 // Downtown/neighborhood scale -- a walking course generated from a broad
 // region name (e.g. "제주", "서울") is centered on one geocoded point, not
@@ -118,4 +122,57 @@ async function getWalkingCourse({ userId, region, localTime }) {
   );
 }
 
-module.exports = { getNearbyRecommendations, getWalkingCourse };
+function toSimilarTasteCandidate(place) {
+  return {
+    placeId: place.place_id,
+    name: place.name,
+    latitude: Number(place.latitude),
+    longitude: Number(place.longitude),
+    category: place.category,
+  };
+}
+
+async function getSimilarTasteRecommendations({ userId, limit }) {
+  const resultLimit = Math.min(limit || DEFAULT_SIMILAR_TASTE_LIMIT, MAX_SIMILAR_TASTE_LIMIT);
+
+  const myPreference = await tastePreferenceRepository.find(userId);
+  if (!myPreference || !myPreference.embedding) {
+    // Not an error -- just means there's nothing to compare against yet.
+    return { recommendations: [], hasPreference: false };
+  }
+
+  const others = await tastePreferenceRepository.findAllExcept(userId);
+  if (others.length === 0) {
+    return { recommendations: [], hasPreference: true };
+  }
+
+  const myBookmarkedPlaceIds = (await bookmarkRepository.findAllByUser(userId)).map((b) => b.place_id);
+  const hiddenPlaceIds = await behaviorRepository.findHiddenPlaceIds(userId);
+  const excludePlaceIds = [...myBookmarkedPlaceIds, ...hiddenPlaceIds];
+
+  const otherUserIds = others.map((o) => o.user_id);
+  const bookmarksByOthers = await bookmarkRepository.findByUsers(otherUserIds, excludePlaceIds);
+
+  const bookmarksByUser = {};
+  for (const row of bookmarksByOthers) {
+    (bookmarksByUser[row.user_id] ||= []).push(toSimilarTasteCandidate(row));
+  }
+
+  const result = await callAiWorker(
+    '/recommendations/similar-taste-score',
+    {
+      userEmbedding: myPreference.embedding,
+      otherUsers: others.map((o) => ({
+        userId: o.user_id,
+        embedding: o.embedding,
+        bookmarkedPlaces: bookmarksByUser[o.user_id] || [],
+      })),
+      limit: resultLimit,
+    },
+    10000
+  );
+
+  return { ...result, hasPreference: true };
+}
+
+module.exports = { getNearbyRecommendations, getWalkingCourse, getSimilarTasteRecommendations };

@@ -49,4 +49,16 @@ async function remove(userId) {
   await pool.query('DELETE FROM user_preference_embeddings WHERE user_id = $1', [userId]);
 }
 
-module.exports = { find, upsert, updateFromBehavior, remove };
+// Every other user who has a preference embedding (from a taste survey or
+// learned from behavior) -- used to find "similar taste" users. Only
+// embedding is needed here (not tag_scores) since similarity is computed
+// on the embedding alone.
+async function findAllExcept(userId) {
+  const { rows } = await pool.query(
+    'SELECT user_id, embedding FROM user_preference_embeddings WHERE user_id != $1 AND embedding IS NOT NULL',
+    [userId]
+  );
+  return rows;
+}
+
+module.exports = { find, upsert, updateFromBehavior, remove, findAllExcept };

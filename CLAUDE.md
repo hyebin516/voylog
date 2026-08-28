@@ -113,6 +113,7 @@ GradudtionProject/
 | POST | `/api/v1/recommendations/walking-course` | 선택 (JWT, 미인증도 허용) | 지역 기반 도보 코스 자동 생성(FR-17). body: `{ region, localTime }` (`region`은 프론트 고정 지역 목록 중 하나). 서버가 AI Worker(`/geocode`)로 지역 중심 좌표를 구한 뒤, `places`에서 그 좌표 반경 내 **전체 사용자의 북마크된 장소**만 후보로 조회(`bookmarkedOnly`, 특정 사용자가 아님 — 콜드스타트 대응)하고, 로그인 사용자면 취향 임베딩/`tag_scores`도 함께 AI Worker(`/recommendations/walking-course`)로 전달 — AI Worker가 Kakao 상권 검색(카페/음식점/관광명소) 후보를 보강하고, `/recommendations/nearby-score`와 동일한 점수화 로직으로 전체 후보 점수를 매긴 뒤 점수 높은 순으로 훑으며 이미 선택된 장소와 도보 거리(1.2km) 이내인 것만 채택하는 그리디 클러스터링으로 2~10개를 뽑아 walk 모드 `/optimize-route`로 순서를 최적화해 반환. 지역 중심점을 시작=종료 가상 지점으로 씀(실제 `hotels` 테이블에 저장하지 않는 임시 값). 서로 도보 거리인 장소가 2개 미만이면 `course: null` + 점수화된 후보 목록만 반환(에러 아님) |
 | POST/GET | `/api/v1/walking-courses` | 필수 (JWT) | 위 도보 코스 생성 결과를 "내 코스 목록"에 저장. body(POST): `{ region, routeType, transportMode, totalDistanceM?, totalDurationSec?, routeData[] }` — trip/hotel과 무관한 독립적인 스냅샷 저장(Kakao 상권 후보처럼 `places` 테이블에 없는 장소도 `routeData`에 그대로 저장 가능, FK 제약 없음) / 내 저장 코스 목록 조회 |
 | DELETE | `/api/v1/walking-courses/:id` | 필수 (JWT) | 저장한 코스 삭제(소프트 삭제). 요청 사용자 소유가 아니면 404 SAVED_COURSE_NOT_FOUND |
+| GET | `/api/v1/recommendations/similar-taste` | 필수 (JWT) | 취향이 비슷한 사용자가 북마크한 장소 추천(FR-18). query: `?limit?`(기본 20, 최대 50). 요청 사용자의 `user_preference_embeddings`가 없으면 `{ recommendations: [], hasPreference: false }` 반환(에러 아님 — 프론트가 취향 설정 화면으로 안내). 있으면 다른 모든 사용자의 임베딩을 조회해 AI Worker(`/recommendations/similar-taste-score`)로 전달, 코사인 유사도 0.3 이상인 사용자들의 북마크만 신호로 채택(유사도 합산으로 장소 점수 계산, 여러 유사 사용자가 북마크했을수록 점수↑) — 요청 사용자가 이미 북마크했거나 숨긴 장소는 후보에서 제외 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
 | POST | `/api/v1/auth/signup/request-otp` | 불필요 | 네이티브 회원가입 1단계: body `{ email }`. 이미 가입된 이메일이면 409 EMAIL_EXISTS. 6자리 인증코드를 생성해 SMTP로 이메일 발송(5분 유효) |
 | POST | `/api/v1/auth/signup/verify-otp` | 불필요 | 네이티브 회원가입 2단계: body `{ email, code }` (`code`는 6자리 숫자). 코드 불일치 시 400 OTP_INVALID(시도 횟수 누적), 만료·시도 초과·미발급 시 400 OTP_EXPIRED |
@@ -214,6 +215,7 @@ GradudtionProject/
 - **FR-15** 내 주변 추천 — 위치·현지 시각·반경 내 기존 `places` 기반 거리/시간대/영업여부(LLM 추정) + (취향 설정 또는 행동 이력 존재 시) 임베딩 유사도·학습된 태그 선호도 하이브리드 정렬 + 행동 기반 자동 학습(조회/북마크/일정추가/공유/좋아요는 선호 강화, 숨김/관심없음은 약화 및 향후 추천에서 완전 제외). 콜드 스타트 전용 로직, Two-Tower 확장 모델은 후속 단계(미구현) — 자세한 단계별 로드맵은 세션 기록 참고
 - **FR-16** 취향 설정(선택형 임베딩 + 태그) — 고정 태그 목록에서 선택하면 사전학습 임베딩 모델로 취향 벡터를 생성하고, 선택한 태그 자체도 `source_tags`로 저장해 FR-15의 세부 태그 일치도 계산에 함께 사용. 건너뛰기/초기화 가능, 미설정 시 FR-15는 상황 기반으로만 동작
 - **FR-17** 지역 기반 도보 코스 자동 생성 및 저장 — 지역 선택 시 (전체 사용자의 북마크된 장소 + Kakao 상권 검색 실시간 데이터) 하이브리드 후보 풀을 FR-15와 동일한 점수화 로직으로 평가하고, 서로 도보 거리(1.2km) 이내인 장소끼리만 그리디 클러스터링해 2~10개를 뽑아 도보 동선을 자동 구성(FR-07의 walk 모드 재사용). 북마크가 없는 지역에서도 Kakao 상권 검색으로 콜드스타트 대응. 생성된 코스는 trip/hotel과 무관한 독립 스냅샷(`saved_walking_courses`)으로 저장 가능
+- **FR-18** 비슷한 취향 추천(협업 필터링) — 내 취향 임베딩과 다른 모든 사용자의 취향 임베딩 간 코사인 유사도를 계산해, 유사도 0.3 이상인 사용자들이 북마크한 장소를 유사도 합산 점수로 정렬해 추천. 여러 유사 사용자가 겹쳐서 북마크한 장소일수록 점수가 높아짐(`contributorCount`로 몇 명이 겹쳤는지 함께 제공). 취향 미설정 사용자에게는 "먼저 취향 설정을 해보세요" 안내(FR-16과 연동), 아직 유사한 취향의 사용자가 없으면 빈 목록 반환(에러 아님)
 
 ## 자주 쓰는 명령어
 

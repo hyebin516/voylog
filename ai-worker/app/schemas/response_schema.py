@@ -107,6 +107,21 @@ class GeocodeResponse(BaseModel):
     address: Optional[str] = None
 
 
+class SimilarTasteRecommendation(BaseModel):
+    placeId: str
+    name: str
+    latitude: float
+    longitude: float
+    category: Optional[str] = None
+    score: float
+    contributorCount: int
+    reason: str
+
+
+class SimilarTasteResponse(BaseModel):
+    recommendations: List[SimilarTasteRecommendation] = []
+
+
 class EmbeddingResponse(BaseModel):
     embedding: List[float]
     model: str

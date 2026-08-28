@@ -36,4 +36,17 @@ function validateWalkingCourseRequest(req, res, next) {
   return next();
 }
 
-module.exports = { validateNearbyRequest, validateWalkingCourseRequest };
+const MAX_SIMILAR_TASTE_LIMIT = 50;
+
+function validateSimilarTasteLimit(req, res, next) {
+  const { limit } = req.query;
+  if (limit !== undefined) {
+    const parsed = Number(limit);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > MAX_SIMILAR_TASTE_LIMIT) {
+      return next(new AppError(400, 'INVALID_REQUEST', `limit must be between 1 and ${MAX_SIMILAR_TASTE_LIMIT}`));
+    }
+  }
+  return next();
+}
+
+module.exports = { validateNearbyRequest, validateWalkingCourseRequest, validateSimilarTasteLimit };
