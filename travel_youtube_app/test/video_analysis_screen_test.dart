@@ -164,7 +164,7 @@ void main() {
       _wrap(videoProvider: videoProvider, videoPlayerRepository: FakeVideoPlayerRepository()),
     );
 
-    final mapButton = tester.widget<IconButton>(find.byIcon(Icons.map_outlined));
+    final mapButton = tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.map_outlined));
     expect(mapButton.onPressed, isNull);
   });
 

@@ -251,6 +251,8 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, '동선 최적화'));
     await tester.pumpAndSettle();
 
+    await tester.ensureVisible(find.text('저장 완료 — 여행으로 돌아가기'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('저장 완료 — 여행으로 돌아가기'));
     await tester.pumpAndSettle();
 
