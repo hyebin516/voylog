@@ -6,6 +6,7 @@ import '../models/bookmark_folder_model.dart';
 import '../providers/bookmark_folder_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
+import '../widgets/app_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 
@@ -117,17 +118,28 @@ class _BookmarkFolderListScreenState extends State<BookmarkFolderListScreen> {
             separatorBuilder: (context, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
               final folder = folderProvider.folders[index];
-              return Card(
-                child: ListTile(
-                  leading: const Icon(Icons.folder_outlined),
-                  title: Text(folder.name),
-                  subtitle: Text('${folder.bookmarkCount}개 저장됨'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded),
-                    tooltip: '폴더 삭제',
-                    onPressed: () => _confirmDeleteFolder(folder),
-                  ),
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.bookmarkFolderDetail, arguments: folder.folderId),
+              return AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                onTap: () => Navigator.pushNamed(context, AppRoutes.bookmarkFolderDetail, arguments: folder.folderId),
+                child: Row(
+                  children: [
+                    Icon(Icons.folder_outlined, color: Theme.of(context).colorScheme.primary),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(folder.name, style: Theme.of(context).textTheme.titleMedium),
+                          Text('${folder.bookmarkCount}개 저장됨', style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      tooltip: '폴더 삭제',
+                      onPressed: () => _confirmDeleteFolder(folder),
+                    ),
+                  ],
                 ),
               );
             },

@@ -53,6 +53,11 @@ function toResponse(video, places, isCached) {
       address: p.address,
       source: p.source,
       confidence: Number(p.confidence),
+      category: p.category,
+      businessHours: p.business_hours,
+      businessHoursIsEstimated: Boolean(p.business_hours_is_estimated),
+      tags: p.tags || [],
+      mentionNote: p.mention_note,
     })),
   };
 }

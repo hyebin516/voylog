@@ -6,6 +6,7 @@ import '../models/bookmark_model.dart';
 import '../providers/bookmark_folder_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
+import '../widgets/app_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 
@@ -76,15 +77,26 @@ class _BookmarkFolderDetailScreenState extends State<BookmarkFolderDetailScreen>
             separatorBuilder: (context, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
               final BookmarkModel bookmark = folderProvider.folderBookmarks[index];
-              return Card(
-                child: ListTile(
-                  title: Text(bookmark.name),
-                  subtitle: bookmark.address != null ? Text(bookmark.address!) : null,
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close_rounded),
-                    tooltip: '폴더에서 제거',
-                    onPressed: () => folderProvider.toggleBookmarkInFolder(widget.folderId, bookmark.bookmarkId),
-                  ),
+              return AppCard(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(bookmark.name, style: Theme.of(context).textTheme.titleMedium),
+                          if (bookmark.address != null)
+                            Text(bookmark.address!, style: Theme.of(context).textTheme.bodySmall),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      tooltip: '폴더에서 제거',
+                      onPressed: () => folderProvider.toggleBookmarkInFolder(widget.folderId, bookmark.bookmarkId),
+                    ),
+                  ],
                 ),
               );
             },

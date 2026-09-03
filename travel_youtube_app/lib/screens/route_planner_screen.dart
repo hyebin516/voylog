@@ -13,6 +13,7 @@ import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
+import '../widgets/app_card.dart';
 import '../widgets/route_summary_card.dart';
 import 'hotel_search_screen.dart';
 
@@ -177,7 +178,7 @@ class RoutePlannerScreen extends StatelessWidget {
                     return SizedBox(
                       height: 320,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         child: mapRepository.buildMap(
                           initialLatitude: routeMarkers.first.latitude,
                           initialLongitude: routeMarkers.first.longitude,
@@ -216,13 +217,24 @@ class _HotelSelectTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: const Icon(Icons.hotel_rounded),
-        title: Text(label),
-        subtitle: Text(hotelName ?? '호텔을 선택하세요'),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        onTap: onTap,
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      onTap: onTap,
+      child: Row(
+        children: [
+          const Icon(Icons.hotel_rounded, color: AppColors.primary),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: Theme.of(context).textTheme.titleSmall),
+                Text(hotelName ?? '호텔을 선택하세요', style: Theme.of(context).textTheme.bodyMedium),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+        ],
       ),
     );
   }
