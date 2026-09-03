@@ -35,16 +35,8 @@ class RecommendationThemeScreen extends StatelessWidget {
                   for (final theme in RecommendationOptions.themes)
                     FilterChip(
                       key: Key('theme_$theme'),
-                      label: Text(
-                        theme,
-                        style: TextStyle(
-                          color: wizard.selectedThemes.contains(theme) ? Colors.white : AppColors.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      label: Text(theme),
                       selected: wizard.selectedThemes.contains(theme),
-                      selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
                       onSelected: (_) => wizard.toggleTheme(theme),
                     ),
                 ],

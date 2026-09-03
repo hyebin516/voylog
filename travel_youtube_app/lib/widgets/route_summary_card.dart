@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../models/itinerary_model.dart';
-import 'app_card.dart';
 
 /// Renders a route's summary (round-trip/hotel-to-hotel chip, transport
 /// mode, total time/distance, ordered stops). Takes plain fields rather
@@ -54,50 +53,53 @@ class RouteSummaryCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Chip(label: Text(isRoundTrip ? '왕복' : '호텔 → 호텔')),
-              const SizedBox(width: 8),
-              Icon(_transportModeIcon, size: 18, color: colorScheme.onSurfaceVariant),
-              const Spacer(),
-              Icon(Icons.timer_outlined, size: 18, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text(_formatDuration(totalDurationSec), style: textTheme.bodyMedium),
-              const SizedBox(width: 16),
-              Icon(Icons.route_outlined, size: 18, color: colorScheme.onSurfaceVariant),
-              const SizedBox(width: 4),
-              Text(_formatDistance(totalDistanceM), style: textTheme.bodyMedium),
-            ],
-          ),
-          const SizedBox(height: 12),
-          ...routeData.map((point) {
-            final isHotel = point.isHotel;
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  CircleAvatar(
-                    radius: 12,
-                    backgroundColor: isHotel ? colorScheme.primary : colorScheme.secondaryContainer,
-                    child: Icon(
-                      isHotel ? Icons.hotel_rounded : Icons.place_rounded,
-                      size: 14,
-                      color: isHotel ? colorScheme.onPrimary : colorScheme.onSecondaryContainer,
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Chip(label: Text(isRoundTrip ? '왕복' : '호텔 → 호텔')),
+                const SizedBox(width: 8),
+                Icon(_transportModeIcon, size: 18, color: colorScheme.onSurfaceVariant),
+                const Spacer(),
+                Icon(Icons.timer_outlined, size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(_formatDuration(totalDurationSec), style: textTheme.bodyMedium),
+                const SizedBox(width: 16),
+                Icon(Icons.route_outlined, size: 18, color: colorScheme.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text(_formatDistance(totalDistanceM), style: textTheme.bodyMedium),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...routeData.map((point) {
+              final isHotel = point.isHotel;
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 12,
+                      backgroundColor: isHotel ? colorScheme.primary : colorScheme.secondaryContainer,
+                      child: Icon(
+                        isHotel ? Icons.hotel_rounded : Icons.place_rounded,
+                        size: 14,
+                        color: isHotel ? colorScheme.onPrimary : colorScheme.onSecondaryContainer,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(point.name, style: textTheme.bodyMedium, overflow: TextOverflow.ellipsis),
-                  ),
-                ],
-              ),
-            );
-          }),
-        ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(point.name, style: textTheme.bodyMedium, overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
       ),
     );
   }

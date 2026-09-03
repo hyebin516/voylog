@@ -35,16 +35,8 @@ class RecommendationRegionScreen extends StatelessWidget {
                   for (final region in RecommendationOptions.regions)
                     FilterChip(
                       key: Key('region_$region'),
-                      label: Text(
-                        region,
-                        style: TextStyle(
-                          color: wizard.selectedRegions.contains(region) ? Colors.white : AppColors.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      label: Text(region),
                       selected: wizard.selectedRegions.contains(region),
-                      selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
                       onSelected: (_) => wizard.toggleRegion(region),
                     ),
                 ],

@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
-import '../models/trip_model.dart';
 import '../providers/hotel_provider.dart';
 import '../providers/itinerary_provider.dart';
 import '../providers/trip_provider.dart';
 import '../routes/app_routes.dart';
-import '../services/itinerary_share_service.dart';
 import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
@@ -24,9 +22,6 @@ class TripDetailScreen extends StatefulWidget {
 }
 
 class _TripDetailScreenState extends State<TripDetailScreen> {
-  final ItineraryShareService _shareService = const ItineraryShareService();
-  bool _isSharing = false;
-
   @override
   void initState() {
     super.initState();
@@ -67,19 +62,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     }
   }
 
-  Future<void> _onSharePressed(TripDetailModel trip) async {
-    setState(() => _isSharing = true);
-    try {
-      await _shareService.shareTrip(context: context, trip: trip);
-    } catch (_) {
-      if (mounted) {
-        showErrorDialog(context, '이미지를 만들지 못했습니다. 잠시 후 다시 시도해 주세요.');
-      }
-    } finally {
-      if (mounted) setState(() => _isSharing = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final tripProvider = context.watch<TripProvider>();
@@ -112,13 +94,6 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
           return ListView(
             padding: const EdgeInsets.all(AppSpacing.md),
             children: [
-              PrimaryButton(
-                label: '이미지로 공유',
-                icon: Icons.image_outlined,
-                isLoading: _isSharing,
-                onPressed: trip.days.isEmpty ? null : () => _onSharePressed(trip),
-              ),
-              const SizedBox(height: AppSpacing.md),
               if (trip.days.isEmpty) const Center(child: Text('아직 저장된 일차가 없습니다.')),
               for (final day in trip.days) ...[
                 Text('${day.dayNumber}일차', style: Theme.of(context).textTheme.titleMedium),

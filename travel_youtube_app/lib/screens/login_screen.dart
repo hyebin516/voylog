@@ -7,11 +7,8 @@ import '../providers/auth_provider.dart';
 import '../routes/app_routes.dart';
 import '../services/kakao_auth_service.dart';
 import '../utils/view_state.dart';
-import '../widgets/auth_backdrop.dart';
 import '../widgets/error_view.dart';
 import '../widgets/primary_button.dart';
-import '../widgets/responsive_center.dart';
-import '../widgets/voylog_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -61,7 +58,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    final textTheme = Theme.of(context).textTheme;
 
     if (authProvider.state == ViewState.success && authProvider.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,91 +66,69 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
-      body: AuthBackdrop(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: ResponsiveCenter(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 48, AppSpacing.lg, AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Row(
-                    children: [
-                      VoylogLogoMark(),
-                      SizedBox(width: AppSpacing.sm),
-                      VoylogWordmark(),
-                    ],
-                  ),
-                  const SizedBox(height: 52),
-                  Text('반가워요!', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 6),
-                  Text('로그인하고 일정을 이어가요', style: textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55))),
-                  const SizedBox(height: AppSpacing.lg),
-                  TextField(
-                    key: const Key('loginEmailField'),
-                    controller: _emailController,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      hintText: '이메일',
-                      prefixIcon: Icon(Icons.mail_outline_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextField(
-                    key: const Key('loginPasswordField'),
-                    controller: _passwordController,
-                    obscureText: true,
-                    decoration: const InputDecoration(
-                      hintText: '비밀번호',
-                      prefixIcon: Icon(Icons.lock_outline_rounded),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.lg),
-                  PrimaryButton(
-                    label: '이메일로 로그인',
-                    isLoading: authProvider.isLoading,
-                    onPressed: () => _onEmailLoginPressed(authProvider),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  SizedBox(
-                    height: 52,
-                    child: OutlinedButton.icon(
-                      onPressed: authProvider.isLoading ? null : () => _onKakaoLoginPressed(context),
-                      icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-                      label: const Text('카카오로 로그인'),
-                      style: OutlinedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFEE500),
-                        foregroundColor: const Color(0xFF3A2B1A),
-                        side: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                    onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false),
-                    child: const Text('비회원으로 둘러보기'),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Voylog가 처음이신가요?', style: textTheme.bodySmall?.copyWith(color: AppColors.primary.withValues(alpha: 0.45))),
-                      TextButton(
-                        onPressed: () => Navigator.pushNamed(context, AppRoutes.signupEmail),
-                        child: const Text('이메일로 회원가입'),
-                      ),
-                    ],
-                  ),
-                  if (authProvider.state == ViewState.error) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    ErrorView(message: authProvider.errorMessage ?? '로그인에 실패했습니다.'),
-                  ],
-                ],
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.travel_explore_rounded, size: 72, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: AppSpacing.md),
+              Text('여행 유튜브 요약', style: Theme.of(context).textTheme.headlineSmall),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                '유튜브 영상 속 장소를 찾고, 최적의 여행 동선을 계획하세요.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-            ),
+              const SizedBox(height: AppSpacing.xl),
+              TextField(
+                key: const Key('loginEmailField'),
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  hintText: '이메일',
+                  prefixIcon: Icon(Icons.mail_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              TextField(
+                key: const Key('loginPasswordField'),
+                controller: _passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  hintText: '비밀번호',
+                  prefixIcon: Icon(Icons.lock_outline_rounded),
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              PrimaryButton(
+                label: '이메일로 로그인',
+                isLoading: authProvider.isLoading,
+                onPressed: () => _onEmailLoginPressed(authProvider),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, AppRoutes.signupEmail),
+                child: const Text('이메일로 회원가입'),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              const Divider(),
+              const SizedBox(height: AppSpacing.md),
+              PrimaryButton(
+                label: '카카오로 로그인',
+                icon: Icons.chat_bubble_rounded,
+                isLoading: authProvider.isLoading,
+                onPressed: () => _onKakaoLoginPressed(context),
+              ),
+              if (authProvider.state == ViewState.error) ...[
+                const SizedBox(height: AppSpacing.md),
+                ErrorView(message: authProvider.errorMessage ?? '로그인에 실패했습니다.'),
+              ],
+            ],
           ),
         ),
       ),
     );
   }
 }
+

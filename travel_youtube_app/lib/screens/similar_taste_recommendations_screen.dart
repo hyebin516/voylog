@@ -7,7 +7,6 @@ import '../models/similar_taste_recommendation_model.dart';
 import '../providers/similar_taste_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
-import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
@@ -96,38 +95,26 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
               final SimilarTasteRecommendationModel rec = result.recommendations[index];
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: AppCard(
-                  onTap: () => Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: _toPlaceModel(rec)),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
+                child: Card(
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: _toPlaceModel(rec)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(child: Text(rec.name, style: Theme.of(context).textTheme.titleMedium)),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceTint,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.people_alt_rounded, size: 13, color: AppColors.primary),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${rec.contributorCount}명',
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary),
-                                ),
-                              ],
-                            ),
+                          Row(
+                            children: [
+                              Expanded(child: Text(rec.name, style: Theme.of(context).textTheme.titleMedium)),
+                              BookmarkButton(placeId: rec.placeId),
+                            ],
                           ),
-                          BookmarkButton(placeId: rec.placeId),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(rec.reason, style: Theme.of(context).textTheme.bodySmall),
                         ],
                       ),
-                      const SizedBox(height: AppSpacing.xs),
-                      Text(rec.reason, style: Theme.of(context).textTheme.bodySmall),
-                    ],
+                    ),
                   ),
                 ),
               );

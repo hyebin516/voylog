@@ -6,7 +6,6 @@ import '../models/saved_walking_course_model.dart';
 import '../providers/saved_walking_course_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
-import '../widgets/app_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 
@@ -67,27 +66,14 @@ class _SavedWalkingCoursesScreenState extends State<SavedWalkingCoursesScreen> {
             separatorBuilder: (context, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
               final SavedWalkingCourseModel course = provider.courses[index];
-              return AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.savedWalkingCourseDetail, arguments: course),
-                child: Row(
-                  children: [
-                    const Icon(Icons.directions_walk_rounded, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(course.region, style: Theme.of(context).textTheme.titleMedium),
-                          Text(
-                            '${_formatDistance(course.totalDistanceM)} · ${_formatDuration(course.totalDurationSec)}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
-                  ],
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.directions_walk_rounded),
+                  title: Text(course.region),
+                  subtitle: Text('${_formatDistance(course.totalDistanceM)} · ${_formatDuration(course.totalDurationSec)}'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () =>
+                      Navigator.pushNamed(context, AppRoutes.savedWalkingCourseDetail, arguments: course),
                 ),
               );
             },

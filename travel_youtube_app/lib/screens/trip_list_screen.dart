@@ -6,7 +6,6 @@ import '../models/trip_model.dart';
 import '../providers/trip_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
-import '../widgets/app_card.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 
@@ -96,24 +95,13 @@ class _TripListScreenState extends State<TripListScreen> {
             separatorBuilder: (context, _) => const SizedBox(height: AppSpacing.sm),
             itemBuilder: (context, index) {
               final TripModel trip = tripProvider.trips[index];
-              return AppCard(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.tripDetail, arguments: trip.tripId),
-                child: Row(
-                  children: [
-                    const Icon(Icons.card_travel_rounded, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(trip.name, style: Theme.of(context).textTheme.titleMedium),
-                          Text('${trip.dayCount}일차 저장됨', style: Theme.of(context).textTheme.bodySmall),
-                        ],
-                      ),
-                    ),
-                    const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
-                  ],
+              return Card(
+                child: ListTile(
+                  leading: const Icon(Icons.card_travel_rounded),
+                  title: Text(trip.name),
+                  subtitle: Text('${trip.dayCount}일차 저장됨'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.tripDetail, arguments: trip.tripId),
                 ),
               );
             },

@@ -30,8 +30,6 @@ class ApiException implements Exception {
         return '이메일 인증을 먼저 완료해 주세요.';
       case 'INVALID_CREDENTIALS':
         return '이메일 또는 비밀번호가 올바르지 않습니다.';
-      case 'INVALID_REQUEST':
-        return '입력한 내용을 다시 확인해 주세요.';
       case 'AI_TIMEOUT':
       case 'AI_PROVIDER_ERROR':
         return 'AI 분석에 실패했습니다. 잠시 후 다시 시도해 주세요.';

@@ -10,7 +10,6 @@ import '../utils/timestamp_format.dart';
 import '../utils/view_state.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/primary_button.dart';
-import '../widgets/tag_chip.dart';
 
 class PlaceDetailScreen extends StatefulWidget {
   final PlaceModel place;
@@ -55,7 +54,7 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
           SizedBox(
             height: 220,
             child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(16),
               child: place.hasCoordinates
                   ? mapRepository.buildMap(
                       initialLatitude: place.latitude!,
@@ -69,30 +68,19 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                         ),
                       ],
                     )
-                  : const ColoredBox(
-                      color: AppColors.surfaceTint,
-                      child: Center(child: Text('위치 정보가 없습니다.')),
+                  : ColoredBox(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      child: const Center(child: Text('위치 정보가 없습니다.')),
                     ),
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(place.name, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-              ),
-              if (place.category != null) ...[
-                const SizedBox(width: AppSpacing.sm),
-                TagChip(label: place.category!),
-              ],
-            ],
-          ),
+          Text(place.name, style: textTheme.headlineSmall),
           if (place.address != null && place.address!.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
-                const Icon(Icons.place_outlined, size: 18, color: AppColors.primary),
+                const Icon(Icons.place_outlined, size: 18),
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(child: Text(place.address!, style: textTheme.bodyMedium)),
               ],
@@ -102,30 +90,11 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             const SizedBox(height: AppSpacing.sm),
             Row(
               children: [
-                const Icon(Icons.schedule_outlined, size: 18, color: AppColors.primary),
+                const Icon(Icons.schedule_outlined, size: 18),
                 const SizedBox(width: AppSpacing.xs),
                 Text('영상 ${formatTimestamp(place.timestampSec!)} 지점에 등장', style: textTheme.bodyMedium),
               ],
             ),
-          ],
-          if (place.businessHours != null && place.businessHours!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _BusinessHoursSection(
-              businessHours: place.businessHours!,
-              isEstimated: place.businessHoursIsEstimated,
-            ),
-          ],
-          if (place.tags.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [for (final tag in place.tags) TagChip(label: tag)],
-            ),
-          ],
-          if (place.mentionNote != null && place.mentionNote!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _MentionNoteSection(note: place.mentionNote!),
           ],
           const SizedBox(height: AppSpacing.lg),
           const _PlaceSummarySection(),
@@ -136,91 +105,6 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
               icon: Icons.play_circle_outline_rounded,
               onPressed: () => Navigator.pop(context, place.timestampSec),
             ),
-        ],
-      ),
-    );
-  }
-}
-
-/// The `business_hours` JSONB column is a free-form day-\>hours map (only
-/// populated when the source video's transcript actually states hours --
-/// never guessed), so this just lists whatever keys came back rather than
-/// assuming a fixed 7-day shape.
-class _BusinessHoursSection extends StatelessWidget {
-  const _BusinessHoursSection({required this.businessHours, required this.isEstimated});
-
-  final Map<String, dynamic> businessHours;
-  final bool isEstimated;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTint,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.access_time_rounded, size: 16, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.xs),
-              Text('영업시간', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          for (final entry in businessHours.entries)
-            Padding(
-              padding: const EdgeInsets.only(top: 2),
-              child: Text('${entry.key}: ${entry.value}', style: textTheme.bodyMedium),
-            ),
-          if (isEstimated) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              '* 영업시간은 영상 정보 기반 추정치예요',
-              style: textTheme.bodySmall?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// The one-sentence comment the LLM pulled from this video's transcript
-/// about this specific place (`mention_note`) -- never fabricated, only
-/// shown when the video actually said something about it.
-class _MentionNoteSection extends StatelessWidget {
-  const _MentionNoteSection({required this.note});
-
-  final String note;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTint,
-        borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: AppColors.accentCyan, width: 3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Icon(Icons.format_quote_rounded, size: 18, color: AppColors.accentCyan),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              note,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
-            ),
-          ),
         ],
       ),
     );
@@ -263,13 +147,13 @@ class _PlaceSummarySection extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(AppSpacing.md),
           decoration: BoxDecoration(
-            color: AppColors.surfaceTint,
-            borderRadius: BorderRadius.circular(16),
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('여러 영상 속 방문자 의견', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              Text('여러 영상 속 방문자 의견', style: textTheme.titleSmall),
               const SizedBox(height: AppSpacing.sm),
               if (summary.pros != null) _SummaryLine(icon: Icons.thumb_up_outlined, text: summary.pros!),
               if (summary.cons != null) ...[
@@ -295,7 +179,7 @@ class _SummaryLine extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 16, color: AppColors.primary),
+        Icon(icon, size: 16),
         const SizedBox(width: AppSpacing.xs),
         Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
       ],

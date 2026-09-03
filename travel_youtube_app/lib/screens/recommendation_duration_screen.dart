@@ -48,15 +48,8 @@ class RecommendationDurationScreen extends StatelessWidget {
                   for (final duration in RecommendationOptions.durations)
                     ChoiceChip(
                       key: Key('duration_$duration'),
-                      label: Text(
-                        duration,
-                        style: TextStyle(
-                          color: wizard.selectedDuration == duration ? Colors.white : AppColors.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      label: Text(duration),
                       selected: wizard.selectedDuration == duration,
-                      selectedColor: AppColors.primary,
                       onSelected: (_) => wizard.selectDuration(duration),
                     ),
                 ],

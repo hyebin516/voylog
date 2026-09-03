@@ -53,15 +53,8 @@ class _WalkingCourseRegionScreenState extends State<WalkingCourseRegionScreen> {
                   for (final region in RecommendationOptions.regions)
                     ChoiceChip(
                       key: Key('walkingCourseRegion_$region'),
-                      label: Text(
-                        region,
-                        style: TextStyle(
-                          color: _selectedRegion == region ? Colors.white : AppColors.ink,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      label: Text(region),
                       selected: _selectedRegion == region,
-                      selectedColor: AppColors.primary,
                       onSelected: (_) => setState(() => _selectedRegion = region),
                     ),
                 ],

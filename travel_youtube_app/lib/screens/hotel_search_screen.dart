@@ -174,14 +174,11 @@ class _HotelSearchScreenState extends State<HotelSearchScreen> {
               ],
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                '저장된 호텔',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
+              child: Text('저장된 호텔', style: TextStyle(fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

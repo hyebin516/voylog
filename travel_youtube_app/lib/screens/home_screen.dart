@@ -12,7 +12,6 @@ import '../widgets/loading_indicator.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/video_search_result_card.dart';
-import '../widgets/voylog_logo.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -73,18 +72,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final videoProvider = context.watch<VideoProvider>();
-    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            VoylogLogoMark(size: 32),
-            SizedBox(width: AppSpacing.sm),
-            VoylogWordmark(fontSize: 18),
-          ],
-        ),
+        title: const Text('여행 유튜브 요약'),
         actions: [
           IconButton(
             icon: const Icon(Icons.near_me_outlined),
@@ -103,13 +94,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, AppRoutes.tripList),
-        tooltip: '내 여행',
-        backgroundColor: AppColors.primary,
-        shape: const StadiumBorder(),
-        child: const Icon(Icons.map_rounded, color: Colors.white),
-      ),
       body: SingleChildScrollView(
         child: ResponsiveCenter(
           padding: const EdgeInsets.symmetric(
@@ -120,13 +104,8 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '브이로그로 동선을\n만들어드려요',
-                style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 6),
-              Text(
                 '분석할 유튜브 영상 URL을 입력하세요',
-                style: textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
+                style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.md),
               TextField(
@@ -134,7 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 controller: _urlController,
                 keyboardType: TextInputType.url,
                 decoration: InputDecoration(
-                  hintText: '브이로그 URL을 붙여넣으세요',
+                  hintText: 'https://youtube.com/watch?v=...',
                   errorText: _inputError,
                   prefixIcon: const Icon(Icons.link_rounded),
                 ),
@@ -156,7 +135,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: AppSpacing.xl),
               const Divider(),
               const SizedBox(height: AppSpacing.md),
-              Text('해시태그로 브이로그 탐색', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                '해시태그로 브이로그 탐색',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: AppSpacing.md),
               TextField(
                 key: const Key('hashtagField'),
@@ -189,11 +171,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (videoProvider.searchResults.isEmpty)
                   const Text('검색 결과가 없습니다.')
                 else
-                  ListView.separated(
+                  ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: videoProvider.searchResults.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
                     itemBuilder: (context, index) {
                       final result = videoProvider.searchResults[index];
                       return VideoSearchResultCard(
@@ -206,7 +187,10 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: AppSpacing.xl),
               const Divider(),
               const SizedBox(height: AppSpacing.md),
-              Text('지역/테마로 브이로그 추천받기', style: textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+              Text(
+                '지역/테마로 브이로그 추천받기',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
               const SizedBox(height: AppSpacing.md),
               OutlinedButton.icon(
                 key: const Key('recommendationWizardButton'),

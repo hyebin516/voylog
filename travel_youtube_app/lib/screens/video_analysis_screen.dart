@@ -74,7 +74,7 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
               const SizedBox(height: AppSpacing.sm),
               Expanded(
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(16),
                   child: widget.mapRepository.buildMap(
                     initialLatitude: place.latitude!,
                     initialLongitude: place.longitude!,
@@ -112,14 +112,11 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
             padding: const EdgeInsets.all(AppSpacing.md),
             child: _player.widget,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                '장소 목록',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-              ),
+              child: Text('장소 목록', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             ),
           ),
           const SizedBox(height: AppSpacing.sm),

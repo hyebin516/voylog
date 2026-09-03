@@ -58,29 +58,13 @@ void main() {
     expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
   });
 
-  testWidgets('shows an inline error when the password confirmation does not match', (tester) async {
-    final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
-
-    await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
-    await tester.enterText(find.byKey(const Key('signupPasswordConfirmField')), 'different123');
-    await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong');
-    await tester.tap(find.text('회원가입 완료'));
-    await tester.pump();
-
-    expect(find.text('비밀번호가 일치하지 않아요.'), findsOneWidget);
-    expect(repository.lastNickname, isNull);
-  });
-
   testWidgets('signing up successfully navigates to home and clears the stack', (tester) async {
     final repository = FakeAuthRepository();
     final authProvider = AuthProvider(repository: repository);
     await tester.pumpWidget(_wrap(authProvider));
 
     await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
-    await tester.enterText(find.byKey(const Key('signupPasswordConfirmField')), 'password123');
     await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong');
-    await tester.tap(find.byKey(const Key('signupTermsCheckbox')));
     await tester.tap(find.text('회원가입 완료'));
     await tester.pumpAndSettle();
 
@@ -90,28 +74,12 @@ void main() {
     expect(find.text('home screen'), findsOneWidget);
   });
 
-  testWidgets('shows an inline error when the terms checkbox is not checked', (tester) async {
-    final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
-
-    await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
-    await tester.enterText(find.byKey(const Key('signupPasswordConfirmField')), 'password123');
-    await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong');
-    await tester.tap(find.text('회원가입 완료'));
-    await tester.pump();
-
-    expect(find.text('이용약관에 동의해 주세요.'), findsOneWidget);
-    expect(repository.lastNickname, isNull);
-  });
-
   testWidgets('shows an error view when the OTP was not verified', (tester) async {
     final repository = FakeAuthRepository()..signupError = const ApiException(code: 'OTP_NOT_VERIFIED', message: 'boom');
     await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
 
     await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
-    await tester.enterText(find.byKey(const Key('signupPasswordConfirmField')), 'password123');
     await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong');
-    await tester.tap(find.byKey(const Key('signupTermsCheckbox')));
     await tester.tap(find.text('회원가입 완료'));
     await tester.pumpAndSettle();
 
