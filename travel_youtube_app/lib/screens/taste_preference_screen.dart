@@ -85,8 +85,16 @@ class _TastePreferenceScreenState extends State<TastePreferenceScreen> {
                       for (final tag in TastePreferenceOptions.tags)
                         FilterChip(
                           key: Key('tastePreference_$tag'),
-                          label: Text(tag),
+                          label: Text(
+                            tag,
+                            style: TextStyle(
+                              color: provider.selectedTags.contains(tag) ? Colors.white : AppColors.ink,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           selected: provider.selectedTags.contains(tag),
+                          selectedColor: AppColors.primary,
+                          checkmarkColor: Colors.white,
                           onSelected: (_) => provider.toggleTag(tag),
                         ),
                     ],

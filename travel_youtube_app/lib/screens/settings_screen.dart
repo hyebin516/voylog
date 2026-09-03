@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../routes/app_routes.dart';
+import '../widgets/app_card.dart';
 import '../widgets/error_view.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -50,30 +51,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.md),
         children: [
-          const ListTile(
-            leading: Icon(Icons.info_outline_rounded),
-            title: Text('앱 이름'),
-            trailing: Text('Voylog'),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                const ListTile(
+                  leading: Icon(Icons.info_outline_rounded, color: AppColors.primary),
+                  title: Text('앱 이름'),
+                  trailing: Text('Voylog'),
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                const ListTile(
+                  leading: Icon(Icons.numbers_rounded, color: AppColors.primary),
+                  title: Text('버전'),
+                  trailing: Text('1.0.0'),
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.notifications_outlined, color: AppColors.primary),
+                  title: const Text('알림 설정'),
+                  trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.primary),
+                  onTap: () => Navigator.pushNamed(context, AppRoutes.notificationSettings),
+                ),
+              ],
+            ),
           ),
-          const ListTile(
-            leading: Icon(Icons.numbers_rounded),
-            title: Text('버전'),
-            trailing: Text('1.0.0'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.notifications_outlined),
-            title: const Text('알림 설정'),
-            trailing: const Icon(Icons.chevron_right_rounded),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.notificationSettings),
-          ),
-          const Divider(height: AppSpacing.xl),
-          ListTile(
-            leading: Icon(Icons.person_remove_outlined, color: Theme.of(context).colorScheme.error),
-            title: Text('회원 탈퇴', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            trailing: _isDeleting
-                ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                : null,
-            onTap: _isDeleting ? null : _confirmDeleteAccount,
+          const SizedBox(height: AppSpacing.md),
+          AppCard(
+            padding: EdgeInsets.zero,
+            child: ListTile(
+              leading: const Icon(Icons.person_remove_outlined, color: AppColors.coral),
+              title: const Text('회원 탈퇴', style: TextStyle(color: AppColors.coral, fontWeight: FontWeight.w600)),
+              trailing: _isDeleting
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : null,
+              onTap: _isDeleting ? null : _confirmDeleteAccount,
+            ),
           ),
         ],
       ),

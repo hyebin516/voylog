@@ -7,12 +7,14 @@ import '../models/nearby_recommendation_model.dart';
 import '../providers/walking_course_provider.dart';
 import '../repositories/map_repository.dart';
 import '../utils/view_state.dart';
+import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/route_summary_card.dart';
+import '../widgets/tag_chip.dart';
 
 class WalkingCourseResultScreen extends StatelessWidget {
   /// Defaults to the real native Kakao map. Widget tests inject
@@ -100,7 +102,7 @@ class WalkingCourseResultScreen extends StatelessWidget {
                     SizedBox(
                       height: 320,
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         child: mapRepository.buildMap(
                           initialLatitude: routeMarkers.first.latitude,
                           initialLongitude: routeMarkers.first.longitude,
@@ -149,42 +151,32 @@ class _RecommendationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.xs),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(recommendation.name, style: Theme.of(context).textTheme.titleMedium)),
-                  // Kakao-sourced candidates ("kakao:...") aren't rows in
-                  // our own `places` table, so there's no place_id a
-                  // bookmark could reference yet -- only offer bookmarking
-                  // for places that came from our own data.
-                  if (!recommendation.placeId.startsWith('kakao:'))
-                    BookmarkButton(placeId: recommendation.placeId),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.xs),
-              Text(recommendation.reason, style: Theme.of(context).textTheme.bodySmall),
-              if (recommendation.matchedTags.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.xs),
-                Wrap(
-                  spacing: AppSpacing.xs,
-                  runSpacing: AppSpacing.xs,
-                  children: [
-                    for (final tag in recommendation.matchedTags)
-                      Chip(
-                        label: Text(tag, style: const TextStyle(fontSize: 11)),
-                        visualDensity: VisualDensity.compact,
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                  ],
-                ),
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(child: Text(recommendation.name, style: Theme.of(context).textTheme.titleMedium)),
+                // Kakao-sourced candidates ("kakao:...") aren't rows in
+                // our own `places` table, so there's no place_id a
+                // bookmark could reference yet -- only offer bookmarking
+                // for places that came from our own data.
+                if (!recommendation.placeId.startsWith('kakao:'))
+                  BookmarkButton(placeId: recommendation.placeId),
               ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(recommendation.reason, style: Theme.of(context).textTheme.bodySmall),
+            if (recommendation.matchedTags.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Wrap(
+                spacing: AppSpacing.xs,
+                runSpacing: AppSpacing.xs,
+                children: [for (final tag in recommendation.matchedTags) TagChip(label: tag)],
+              ),
             ],
-          ),
+          ],
         ),
       ),
     );

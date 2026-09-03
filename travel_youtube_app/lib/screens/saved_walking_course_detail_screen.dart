@@ -91,7 +91,7 @@ class SavedWalkingCourseDetailScreen extends StatelessWidget {
                 SizedBox(
                   height: 320,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(20),
                     child: mapRepository.buildMap(
                       initialLatitude: routeMarkers.first.latitude,
                       initialLongitude: routeMarkers.first.longitude,

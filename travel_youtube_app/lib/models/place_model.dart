@@ -7,6 +7,11 @@ class PlaceModel {
   final String? address;
   final String source;
   final double confidence;
+  final String? category;
+  final Map<String, dynamic>? businessHours;
+  final bool businessHoursIsEstimated;
+  final List<String> tags;
+  final String? mentionNote;
 
   const PlaceModel({
     required this.placeId,
@@ -17,6 +22,11 @@ class PlaceModel {
     required this.address,
     required this.source,
     required this.confidence,
+    this.category,
+    this.businessHours,
+    this.businessHoursIsEstimated = false,
+    this.tags = const [],
+    this.mentionNote,
   });
 
   bool get hasCoordinates => latitude != null && longitude != null;
@@ -31,6 +41,14 @@ class PlaceModel {
       address: json['address'] as String?,
       source: json['source'] as String,
       confidence: (json['confidence'] as num).toDouble(),
+      category: json['category'] as String?,
+      businessHours: (json['businessHours'] as Map?)?.cast<String, dynamic>(),
+      businessHoursIsEstimated: json['businessHoursIsEstimated'] as bool? ?? false,
+      tags: (json['tags'] as List?)
+              ?.map((tag) => (tag as Map)['code'] as String)
+              .toList() ??
+          const [],
+      mentionNote: json['mentionNote'] as String?,
     );
   }
 }

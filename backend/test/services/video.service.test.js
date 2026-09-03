@@ -65,7 +65,23 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
       return Promise.resolve({ rows: [{ video_id: 'new-id', title: 'New video' }] });
     });
     videoRepository.createVideo.mockResolvedValue({ video_id: 'new-id', title: 'New video' });
-    videoRepository.createPlaces.mockResolvedValue([]);
+    videoRepository.createPlaces.mockResolvedValue([
+      {
+        place_id: 'p1',
+        name: '애월 카페',
+        timestamp_sec: 30,
+        latitude: 33.1,
+        longitude: 126.3,
+        address: '제주 애월읍',
+        source: 'transcript',
+        confidence: 0.9,
+        category: 'cafe',
+        business_hours: { mon: '09:00-18:00' },
+        business_hours_is_estimated: true,
+        tags: [{ code: '오션뷰', confidence: 0.8 }],
+        mention_note: '뷰가 정말 좋다고 언급함',
+      },
+    ]);
 
     const result = await analyzeVideo(YOUTUBE_URL);
 
@@ -74,6 +90,13 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
     expect(result.videoId).toBe('new-id');
     expect(client.query).toHaveBeenCalledWith('COMMIT');
     expect(redis.set).toHaveBeenCalled();
+    expect(result.places[0]).toMatchObject({
+      category: 'cafe',
+      businessHours: { mon: '09:00-18:00' },
+      businessHoursIsEstimated: true,
+      tags: [{ code: '오션뷰', confidence: 0.8 }],
+      mentionNote: '뷰가 정말 좋다고 언급함',
+    });
   });
 
   it('rolls back the transaction and propagates the error when saving places fails', async () => {

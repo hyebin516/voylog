@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../utils/timestamp_format.dart';
+import 'app_card.dart';
 import 'bookmark_button.dart';
 
 class PlaceCard extends StatelessWidget {
@@ -36,57 +37,53 @@ class PlaceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            children: [
-              if (selected != null)
-                Checkbox(value: selected, onChanged: onSelectedChanged),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      style: textTheme.titleMedium,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (address != null && address!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        address!,
-                        style: textTheme.bodySmall,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (timestampSec != null) ...[
-                      const SizedBox(height: 8),
-                      ActionChip(
-                        avatar: const Icon(
-                          Icons.play_circle_outline_rounded,
-                          size: 18,
-                        ),
-                        label: Text(formatTimestamp(timestampSec!)),
-                        onPressed: onTimestampTap,
-                      ),
-                    ],
-                  ],
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(12),
+      child: Row(
+        children: [
+          if (selected != null)
+            Checkbox(value: selected, onChanged: onSelectedChanged),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: textTheme.titleMedium,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              IconButton(
-                onPressed: onMapTap,
-                icon: const Icon(Icons.map_outlined),
-                tooltip: '지도 보기',
-              ),
-              if (showBookmarkButton) BookmarkButton(placeId: placeId),
-            ],
+                if (address != null && address!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    address!,
+                    style: textTheme.bodySmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                if (timestampSec != null) ...[
+                  const SizedBox(height: 8),
+                  ActionChip(
+                    avatar: const Icon(
+                      Icons.play_circle_outline_rounded,
+                      size: 18,
+                    ),
+                    label: Text(formatTimestamp(timestampSec!)),
+                    onPressed: onTimestampTap,
+                  ),
+                ],
+              ],
+            ),
           ),
-        ),
+          IconButton(
+            onPressed: onMapTap,
+            icon: const Icon(Icons.map_outlined),
+            tooltip: '지도 보기',
+          ),
+          if (showBookmarkButton) BookmarkButton(placeId: placeId),
+        ],
       ),
     );
   }
