@@ -101,6 +101,28 @@ describe('deleteAccount', () => {
   });
 });
 
+describe('updateNickname', () => {
+  it('updates the nickname of an existing user', async () => {
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', nickname: 'old' });
+    userRepository.updateNickname.mockResolvedValue({ user_id: 'u1', nickname: 'new' });
+
+    const user = await authService.updateNickname('u1', 'new');
+
+    expect(userRepository.updateNickname).toHaveBeenCalledWith('u1', 'new');
+    expect(user.nickname).toBe('new');
+  });
+
+  it('throws 404 USER_NOT_FOUND when the user does not exist', async () => {
+    userRepository.findById.mockResolvedValue(null);
+
+    await expect(authService.updateNickname('missing', 'new')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'USER_NOT_FOUND',
+    });
+    expect(userRepository.updateNickname).not.toHaveBeenCalled();
+  });
+});
+
 describe('requestSignupOtp', () => {
   it('throws 409 EMAIL_EXISTS when the email is already registered', async () => {
     userRepository.findByEmail.mockResolvedValue({ user_id: 'u1' });

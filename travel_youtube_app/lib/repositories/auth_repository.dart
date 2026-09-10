@@ -76,6 +76,15 @@ class AuthRepository {
     }
   }
 
+  Future<UserModel> updateNickname(String nickname) async {
+    try {
+      final response = await _dio.patch('/auth/profile', data: {'nickname': nickname});
+      return UserModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
   Future<bool> hasValidSession() async {
     final token = await _secureStorage.read(key: StorageKeys.jwt);
     return token != null;

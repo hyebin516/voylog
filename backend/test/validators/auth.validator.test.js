@@ -4,6 +4,7 @@ const {
   validateVerifyOtp,
   validateSignup,
   validateLogin,
+  validateUpdateNickname,
 } = require('../../src/validators/auth.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
@@ -92,6 +93,32 @@ describe('validateLogin', () => {
   it('rejects a missing password', () => {
     const next = jest.fn();
     validateLogin(mockReq({ body: { email: 'a@b.com' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateUpdateNickname', () => {
+  it('passes for a non-empty nickname', () => {
+    const next = jest.fn();
+    validateUpdateNickname(mockReq({ body: { nickname: '새 닉네임' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing nickname', () => {
+    const next = jest.fn();
+    validateUpdateNickname(mockReq({ body: {} }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a blank/whitespace-only nickname', () => {
+    const next = jest.fn();
+    validateUpdateNickname(mockReq({ body: { nickname: '   ' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a nickname longer than 100 characters', () => {
+    const next = jest.fn();
+    validateUpdateNickname(mockReq({ body: { nickname: 'a'.repeat(101) } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

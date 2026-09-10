@@ -37,6 +37,15 @@ async function deleteAccount(req, res, next) {
   }
 }
 
+async function updateProfile(req, res, next) {
+  try {
+    const user = await authService.updateNickname(req.user.userId, req.body.nickname);
+    return success(res, toUserResponse(user));
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function requestOtp(req, res, next) {
   try {
     await authService.requestSignupOtp(req.body.email);
@@ -73,4 +82,4 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { kakaoLogin, profile, deleteAccount, requestOtp, verifyOtp, signup, login };
+module.exports = { kakaoLogin, profile, deleteAccount, updateProfile, requestOtp, verifyOtp, signup, login };

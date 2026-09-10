@@ -146,6 +146,19 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
+  Future<bool> updateNickname(String nickname) async {
+    try {
+      _currentUser = await _repository.updateNickname(nickname);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
   void _handleUnauthorized() {
     _currentUser = null;
     _state = ViewState.idle;

@@ -6,6 +6,7 @@ const {
   validateVerifyOtp,
   validateSignup,
   validateLogin,
+  validateUpdateNickname,
 } = require('../validators/auth.validator');
 const authenticate = require('../middlewares/auth');
 
@@ -17,6 +18,7 @@ router.post('/signup/verify-otp', validateVerifyOtp, authController.verifyOtp);
 router.post('/signup', validateSignup, authController.signup);
 router.post('/login', validateLogin, authController.login);
 router.get('/profile', authenticate, authController.profile);
+router.patch('/profile', authenticate, validateUpdateNickname, authController.updateProfile);
 router.delete('/profile', authenticate, authController.deleteAccount);
 
 module.exports = router;

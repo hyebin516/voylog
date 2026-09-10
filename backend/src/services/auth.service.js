@@ -52,6 +52,14 @@ async function deleteAccount(userId) {
   await userRepository.softDelete(userId);
 }
 
+async function updateNickname(userId, nickname) {
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  return userRepository.updateNickname(userId, nickname);
+}
+
 function generateOtpCode() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, '0');
 }
@@ -120,6 +128,7 @@ module.exports = {
   kakaoLogin,
   getProfile,
   deleteAccount,
+  updateNickname,
   requestSignupOtp,
   verifySignupOtp,
   signup,

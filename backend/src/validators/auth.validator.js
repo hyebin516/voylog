@@ -57,10 +57,19 @@ function validateLogin(req, res, next) {
   return next();
 }
 
+function validateUpdateNickname(req, res, next) {
+  const { nickname } = req.body;
+  if (typeof nickname !== 'string' || !nickname.trim() || nickname.length > 100) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A non-empty nickname of at most 100 characters is required'));
+  }
+  return next();
+}
+
 module.exports = {
   validateKakaoLogin,
   validateRequestOtp,
   validateVerifyOtp,
   validateSignup,
   validateLogin,
+  validateUpdateNickname,
 };
