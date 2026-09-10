@@ -9,7 +9,7 @@ const placeRepository = require('../../src/repositories/place.repository');
 const placeEmbeddingRepository = require('../../src/repositories/place-embedding.repository');
 const tastePreferenceRepository = require('../../src/repositories/taste-preference.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
-const { recordBehavior } = require('../../src/services/behavior.service');
+const { recordBehavior, reverseScopedBehavior } = require('../../src/services/behavior.service');
 
 const USER_ID = 'user-1';
 const PLACE_ID = 'place-1';
@@ -17,6 +17,8 @@ const PLACE_ID = 'place-1';
 beforeEach(() => {
   behaviorRepository.create.mockResolvedValue({ behavior_id: 'b1' });
   behaviorRepository.countPastActions.mockResolvedValue(0);
+  behaviorRepository.deleteMostRecent.mockResolvedValue(null);
+  behaviorRepository.countAll.mockResolvedValue(0);
   placeRepository.findByIds.mockResolvedValue([{ place_id: PLACE_ID, tags: [] }]);
   placeEmbeddingRepository.findByPlaceIds.mockResolvedValue([]);
   tastePreferenceRepository.find.mockResolvedValue(null);
@@ -194,5 +196,96 @@ describe('recordBehavior', () => {
       { currentEmbedding: null, placeEmbedding: [1.0, 0.0], weight: 0.3 },
       15000
     );
+  });
+});
+
+describe('reverseScopedBehavior', () => {
+  it('does nothing when there is no matching behavior row to undo', async () => {
+    behaviorRepository.deleteMostRecent.mockResolvedValue(null);
+
+    await reverseScopedBehavior(USER_ID, PLACE_ID, 'like', 'shared_route_feed');
+
+    expect(behaviorRepository.countPastActions).not.toHaveBeenCalled();
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(tastePreferenceRepository.updateFromBehavior).not.toHaveBeenCalled();
+  });
+
+  it('fully resets the preference row when the undone like was the only signal that ever formed it (no survey, no other behavior)', async () => {
+    behaviorRepository.deleteMostRecent.mockResolvedValue({ behavior_id: 'b1' });
+    behaviorRepository.countAll.mockResolvedValue(0);
+    tastePreferenceRepository.find.mockResolvedValue({
+      embedding: [1.0, 0.0],
+      source_tags: [],
+      tag_scores: { 소금빵: 0.75 },
+    });
+
+    await reverseScopedBehavior(USER_ID, PLACE_ID, 'like', 'shared_route_feed');
+
+    // This is the case a naive negate-and-nudge silently fails at: when the
+    // vector was built from a zero base, normalize(weight*place) is the same
+    // unit vector for any positive weight, so the weight magnitude never
+    // survives into the stored embedding and subtracting it back out is a
+    // no-op. Resetting the row entirely is the only way to actually undo it.
+    expect(tastePreferenceRepository.remove).toHaveBeenCalledWith(USER_ID);
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(tastePreferenceRepository.updateFromBehavior).not.toHaveBeenCalled();
+  });
+
+  it('deletes the most recent matching row and nudges the preference vector back by the negated effective weight when other history remains', async () => {
+    behaviorRepository.deleteMostRecent.mockResolvedValue({ behavior_id: 'b1' });
+    // After deleting the one being undone, 0 same-action rows remain for this place --
+    // but countAll being nonzero means other behavior history exists, so this
+    // isn't the "only ever signal" case and should nudge rather than reset.
+    behaviorRepository.countPastActions.mockResolvedValue(0);
+    behaviorRepository.countAll.mockResolvedValue(1);
+    tastePreferenceRepository.find.mockResolvedValue({
+      embedding: [1.0, 0.0],
+      source_tags: [],
+      model: 'text-embedding-3-small',
+      dimensions: 2,
+      tag_scores: { 소금빵: 1.0 },
+    });
+    placeRepository.findByIds.mockResolvedValue([{ place_id: PLACE_ID, tags: [{ code: '소금빵', confidence: 1.0 }] }]);
+    placeEmbeddingRepository.findByPlaceIds.mockResolvedValue([
+      { place_id: PLACE_ID, embedding: [1.0, 0.0], model: 'text-embedding-3-small', dimensions: 2 },
+    ]);
+    callAiWorker.mockResolvedValue({ embedding: [1.0, 0.0] });
+
+    await reverseScopedBehavior(USER_ID, PLACE_ID, 'like', 'shared_route_feed');
+
+    expect(behaviorRepository.deleteMostRecent).toHaveBeenCalledWith(USER_ID, PLACE_ID, 'like', 'shared_route_feed');
+    expect(tastePreferenceRepository.remove).not.toHaveBeenCalled();
+    // like weight 5, pastCount 0 -> damping 1, learning rate 0.15 -> 0.75, negated -> -0.75
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/embeddings/update-preference',
+      { currentEmbedding: [1.0, 0.0], placeEmbedding: [1.0, 0.0], weight: -0.75 },
+      15000
+    );
+    expect(tastePreferenceRepository.updateFromBehavior).toHaveBeenCalledWith(
+      USER_ID,
+      expect.objectContaining({ tagScores: { 소금빵: 0.25 } })
+    );
+  });
+
+  it('nudges rather than resets when the user has taken the taste survey (source_tags non-empty), even with no other behavior', async () => {
+    behaviorRepository.deleteMostRecent.mockResolvedValue({ behavior_id: 'b1' });
+    behaviorRepository.countAll.mockResolvedValue(0);
+    tastePreferenceRepository.find.mockResolvedValue({
+      embedding: [1.0, 0.0],
+      source_tags: ['카페'],
+      model: 'text-embedding-3-small',
+      dimensions: 2,
+      tag_scores: {},
+    });
+    placeRepository.findByIds.mockResolvedValue([{ place_id: PLACE_ID, tags: [] }]);
+    placeEmbeddingRepository.findByPlaceIds.mockResolvedValue([
+      { place_id: PLACE_ID, embedding: [1.0, 0.0], model: 'text-embedding-3-small', dimensions: 2 },
+    ]);
+    callAiWorker.mockResolvedValue({ embedding: [1.0, 0.0] });
+
+    await reverseScopedBehavior(USER_ID, PLACE_ID, 'like', 'shared_route_feed');
+
+    expect(tastePreferenceRepository.remove).not.toHaveBeenCalled();
+    expect(callAiWorker).toHaveBeenCalled();
   });
 });
