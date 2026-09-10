@@ -49,4 +49,15 @@ class SavedWalkingCourseProvider extends ChangeNotifier {
     notifyListeners();
     return true;
   }
+
+  Future<bool> publishCourse({required String savedCourseId, required String title}) async {
+    try {
+      await _repository.publish(savedCourseId: savedCourseId, title: title);
+      return true;
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
 }

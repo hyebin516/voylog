@@ -61,4 +61,16 @@ async function findAllExcept(userId) {
   return rows;
 }
 
-module.exports = { find, upsert, updateFromBehavior, remove, findAllExcept };
+// Batch lookup for a known set of authors (e.g. the users behind one page of
+// the shared-route feed) -- unlike findAllExcept, this doesn't scan/exclude,
+// it just resolves exactly the ids the caller already has.
+async function findByUserIds(userIds) {
+  if (userIds.length === 0) return [];
+  const { rows } = await pool.query(
+    'SELECT user_id, embedding FROM user_preference_embeddings WHERE user_id = ANY($1::uuid[]) AND embedding IS NOT NULL',
+    [userIds]
+  );
+  return rows;
+}
+
+module.exports = { find, upsert, updateFromBehavior, remove, findAllExcept, findByUserIds };

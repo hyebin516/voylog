@@ -1,4 +1,5 @@
 const savedWalkingCourseService = require('../services/saved-walking-course.service');
+const { toPublishedRouteResponse } = require('./shared-route.controller');
 const { success } = require('../utils/response');
 
 function toSavedCourseResponse(course) {
@@ -49,4 +50,13 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, remove };
+async function publish(req, res, next) {
+  try {
+    const sharedRoute = await savedWalkingCourseService.publishCourse(req.user.userId, req.params.id, req.body.title);
+    return success(res, toPublishedRouteResponse(sharedRoute), 201);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, list, remove, publish };

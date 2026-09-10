@@ -40,4 +40,11 @@ function validateCreateItinerary(req, res, next) {
   return next();
 }
 
-module.exports = { validateCreateItinerary };
+function validateItineraryId(req, res, next) {
+  if (!isUuid(req.params.id)) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A valid itinerary id is required'));
+  }
+  return next();
+}
+
+module.exports = { validateCreateItinerary, validateItineraryId };

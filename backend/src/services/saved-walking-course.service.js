@@ -1,4 +1,6 @@
 const savedWalkingCourseRepository = require('../repositories/saved-walking-course.repository');
+const sharedRouteRepository = require('../repositories/shared-route.repository');
+const { buildPublicRouteSnapshot } = require('../utils/route-snapshot');
 const AppError = require('../utils/AppError');
 
 async function getOwnedCourse(userId, savedCourseId) {
@@ -22,4 +24,22 @@ async function deleteCourse(userId, savedCourseId) {
   await savedWalkingCourseRepository.softDelete(savedCourseId);
 }
 
-module.exports = { saveCourse, listCourses, deleteCourse, getOwnedCourse };
+async function publishCourse(userId, savedCourseId, title) {
+  const course = await getOwnedCourse(userId, savedCourseId);
+
+  const existing = await sharedRouteRepository.findActiveBySource(userId, 'saved_walking_course', course.saved_course_id);
+  if (existing) {
+    throw new AppError(409, 'ALREADY_PUBLISHED', 'This course is already published');
+  }
+
+  const snapshot = buildPublicRouteSnapshot(course.route_data);
+  return sharedRouteRepository.create(userId, {
+    sourceType: 'saved_walking_course',
+    sourceId: course.saved_course_id,
+    title,
+    transportMode: course.transport_mode,
+    ...snapshot,
+  });
+}
+
+module.exports = { saveCourse, listCourses, deleteCourse, getOwnedCourse, publishCourse };

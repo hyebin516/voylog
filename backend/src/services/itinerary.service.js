@@ -1,8 +1,10 @@
 const itineraryRepository = require('../repositories/itinerary.repository');
 const placeRepository = require('../repositories/place.repository');
+const sharedRouteRepository = require('../repositories/shared-route.repository');
 const hotelService = require('./hotel.service');
 const tripService = require('./trip.service');
 const { callAiWorker } = require('./aiWorkerClient');
+const { buildPublicRouteSnapshot } = require('../utils/route-snapshot');
 const AppError = require('../utils/AppError');
 
 function toHotelPayload(hotel) {
@@ -58,4 +60,30 @@ async function createItinerary(userId, tripId, dayNumber, startHotelId, endHotel
   return itineraryRepository.create(userId, tripId, dayNumber, startHotelId, endHotelId, optimizedResult);
 }
 
-module.exports = { createItinerary };
+async function getOwnedItinerary(userId, itineraryId) {
+  const itinerary = await itineraryRepository.findById(itineraryId);
+  if (!itinerary || itinerary.user_id !== userId) {
+    throw new AppError(404, 'ITINERARY_NOT_FOUND', 'Itinerary not found');
+  }
+  return itinerary;
+}
+
+async function publishItinerary(userId, itineraryId, title) {
+  const itinerary = await getOwnedItinerary(userId, itineraryId);
+
+  const existing = await sharedRouteRepository.findActiveBySource(userId, 'itinerary', itinerary.itinerary_id);
+  if (existing) {
+    throw new AppError(409, 'ALREADY_PUBLISHED', 'This itinerary is already published');
+  }
+
+  const snapshot = buildPublicRouteSnapshot(itinerary.route_data);
+  return sharedRouteRepository.create(userId, {
+    sourceType: 'itinerary',
+    sourceId: itinerary.itinerary_id,
+    title,
+    transportMode: itinerary.transport_mode,
+    ...snapshot,
+  });
+}
+
+module.exports = { createItinerary, getOwnedItinerary, publishItinerary };

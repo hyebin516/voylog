@@ -38,4 +38,11 @@ async function findByTripAndDay(tripId, dayNumber) {
   return rows[0] || null;
 }
 
-module.exports = { create, findAllByTrip, findByTripAndDay };
+async function findById(itineraryId) {
+  const { rows } = await pool.query('SELECT * FROM itineraries WHERE itinerary_id = $1 AND deleted_at IS NULL', [
+    itineraryId,
+  ]);
+  return rows[0] || null;
+}
+
+module.exports = { create, findAllByTrip, findByTripAndDay, findById };

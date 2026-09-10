@@ -10,6 +10,7 @@ const notificationSettingsRoutes = require('./notification-settings.routes');
 const recommendationRoutes = require('./recommendation.routes');
 const tastePreferenceRoutes = require('./taste-preference.routes');
 const savedWalkingCourseRoutes = require('./saved-walking-course.routes');
+const sharedRouteRoutes = require('./shared-route.routes');
 const authRoutes = require('./auth.routes');
 
 const router = express.Router();
@@ -25,6 +26,7 @@ router.use('/notification-settings', notificationSettingsRoutes);
 router.use('/recommendations', recommendationRoutes);
 router.use('/taste-preferences', tastePreferenceRoutes);
 router.use('/walking-courses', savedWalkingCourseRoutes);
+router.use('/routes', sharedRouteRoutes);
 router.use('/auth', authRoutes);
 
 module.exports = router;

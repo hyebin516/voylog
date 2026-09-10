@@ -10,8 +10,8 @@ async function getOwnedTrip(userId, tripId) {
   return trip;
 }
 
-async function createTrip(userId, name) {
-  return tripRepository.create(userId, name);
+async function createTrip(userId, name, startDate, endDate) {
+  return tripRepository.create(userId, name, startDate, endDate);
 }
 
 async function listTrips(userId) {
@@ -30,9 +30,34 @@ async function getTripWithDays(userId, tripId) {
   return { ...trip, days };
 }
 
+// No ownership check -- this backs the public "링크 복사" share page
+// (GET /trips/:id/share), intentionally reachable by anyone holding the
+// link, not just the trip's owner.
+async function getTripShareView(tripId) {
+  const trip = await tripRepository.findById(tripId);
+  if (!trip) {
+    throw new AppError(404, 'TRIP_NOT_FOUND', 'Trip not found');
+  }
+  const days = await itineraryRepository.findAllByTrip(tripId);
+  return { ...trip, days };
+}
+
 async function deleteTrip(userId, tripId) {
   await getOwnedTrip(userId, tripId);
   await tripRepository.softDelete(tripId);
 }
 
-module.exports = { getOwnedTrip, createTrip, listTrips, getTripWithDays, deleteTrip };
+async function updateTripDates(userId, tripId, startDate, endDate) {
+  await getOwnedTrip(userId, tripId);
+  return tripRepository.updateDates(tripId, startDate, endDate);
+}
+
+module.exports = {
+  getOwnedTrip,
+  createTrip,
+  listTrips,
+  getTripWithDays,
+  getTripShareView,
+  deleteTrip,
+  updateTripDates,
+};

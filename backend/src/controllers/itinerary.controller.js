@@ -1,4 +1,5 @@
 const itineraryService = require('../services/itinerary.service');
+const { toPublishedRouteResponse } = require('./shared-route.controller');
 const { success } = require('../utils/response');
 
 function toItineraryResponse(itinerary) {
@@ -36,4 +37,13 @@ async function create(req, res, next) {
   }
 }
 
-module.exports = { create, toItineraryResponse };
+async function publish(req, res, next) {
+  try {
+    const sharedRoute = await itineraryService.publishItinerary(req.user.userId, req.params.id, req.body.title);
+    return success(res, toPublishedRouteResponse(sharedRoute), 201);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, publish, toItineraryResponse };

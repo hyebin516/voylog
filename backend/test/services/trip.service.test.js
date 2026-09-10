@@ -34,9 +34,15 @@ describe('getOwnedTrip', () => {
 describe('createTrip', () => {
   it('creates a trip for the user with the given name', async () => {
     tripRepository.create.mockResolvedValue({ trip_id: TRIP_ID, name: '제주도 여행' });
-    const trip = await tripService.createTrip(USER_ID, '제주도 여행');
-    expect(tripRepository.create).toHaveBeenCalledWith(USER_ID, '제주도 여행');
+    const trip = await tripService.createTrip(USER_ID, '제주도 여행', undefined, undefined);
+    expect(tripRepository.create).toHaveBeenCalledWith(USER_ID, '제주도 여행', undefined, undefined);
     expect(trip.name).toBe('제주도 여행');
+  });
+
+  it('passes through an optional date range', async () => {
+    tripRepository.create.mockResolvedValue({ trip_id: TRIP_ID, name: '제주도 여행' });
+    await tripService.createTrip(USER_ID, '제주도 여행', '2026-09-12', '2026-09-14');
+    expect(tripRepository.create).toHaveBeenCalledWith(USER_ID, '제주도 여행', '2026-09-12', '2026-09-14');
   });
 });
 
@@ -77,6 +83,27 @@ describe('getTripWithDays', () => {
   });
 });
 
+describe('getTripShareView', () => {
+  it('returns the trip with its days regardless of who is asking (no ownership check)', async () => {
+    tripRepository.findById.mockResolvedValue({ trip_id: TRIP_ID, user_id: 'the-owner', name: '제주도 여행' });
+    itineraryRepository.findAllByTrip.mockResolvedValue([{ itinerary_id: 'day-1', day_number: 1 }]);
+
+    const trip = await tripService.getTripShareView(TRIP_ID);
+
+    expect(trip.days).toHaveLength(1);
+  });
+
+  it('throws 404 TRIP_NOT_FOUND when the trip does not exist', async () => {
+    tripRepository.findById.mockResolvedValue(null);
+
+    await expect(tripService.getTripShareView(TRIP_ID)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'TRIP_NOT_FOUND',
+    });
+    expect(itineraryRepository.findAllByTrip).not.toHaveBeenCalled();
+  });
+});
+
 describe('deleteTrip', () => {
   it('soft-deletes the trip after verifying ownership', async () => {
     tripRepository.findById.mockResolvedValue({ trip_id: TRIP_ID, user_id: USER_ID });
@@ -91,5 +118,30 @@ describe('deleteTrip', () => {
 
     await expect(tripService.deleteTrip(USER_ID, TRIP_ID)).rejects.toMatchObject({ statusCode: 404 });
     expect(tripRepository.softDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('updateTripDates', () => {
+  it('updates the trip dates after verifying ownership', async () => {
+    tripRepository.findById.mockResolvedValue({ trip_id: TRIP_ID, user_id: USER_ID });
+    tripRepository.updateDates.mockResolvedValue({
+      trip_id: TRIP_ID,
+      start_date: '2026-09-12',
+      end_date: '2026-09-14',
+    });
+
+    const trip = await tripService.updateTripDates(USER_ID, TRIP_ID, '2026-09-12', '2026-09-14');
+
+    expect(tripRepository.updateDates).toHaveBeenCalledWith(TRIP_ID, '2026-09-12', '2026-09-14');
+    expect(trip.start_date).toBe('2026-09-12');
+  });
+
+  it('refuses to update a trip owned by another user', async () => {
+    tripRepository.findById.mockResolvedValue({ trip_id: TRIP_ID, user_id: 'someone-else' });
+
+    await expect(tripService.updateTripDates(USER_ID, TRIP_ID, '2026-09-12', '2026-09-14')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(tripRepository.updateDates).not.toHaveBeenCalled();
   });
 });

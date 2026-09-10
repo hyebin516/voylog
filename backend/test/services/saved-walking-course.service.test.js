@@ -1,6 +1,8 @@
 jest.mock('../../src/repositories/saved-walking-course.repository');
+jest.mock('../../src/repositories/shared-route.repository');
 
 const savedWalkingCourseRepository = require('../../src/repositories/saved-walking-course.repository');
+const sharedRouteRepository = require('../../src/repositories/shared-route.repository');
 const savedWalkingCourseService = require('../../src/services/saved-walking-course.service');
 
 const USER_ID = 'user-1';
@@ -85,5 +87,57 @@ describe('deleteCourse', () => {
 
     await expect(savedWalkingCourseService.deleteCourse(USER_ID, COURSE_ID)).rejects.toMatchObject({ statusCode: 404 });
     expect(savedWalkingCourseRepository.softDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('publishCourse', () => {
+  it('builds a public snapshot (hotel point stripped) and creates a shared route', async () => {
+    savedWalkingCourseRepository.findById.mockResolvedValue({
+      saved_course_id: COURSE_ID,
+      user_id: USER_ID,
+      transport_mode: 'walk',
+      route_data: ROUTE_DATA,
+    });
+    sharedRouteRepository.findActiveBySource.mockResolvedValue(null);
+    sharedRouteRepository.create.mockResolvedValue({ shared_route_id: 'shared-1' });
+
+    const result = await savedWalkingCourseService.publishCourse(USER_ID, COURSE_ID, '제주 서쪽 카페 코스');
+
+    expect(sharedRouteRepository.create).toHaveBeenCalledWith(USER_ID, {
+      sourceType: 'saved_walking_course',
+      sourceId: COURSE_ID,
+      title: '제주 서쪽 카페 코스',
+      transportMode: 'walk',
+      routeData: [{ order: 0, type: 'place', placeId: 'p1', name: '흑돼지집', legDistanceM: null, legDurationSec: null }],
+      totalDistanceM: null,
+      totalDurationSec: null,
+      placeCount: 1,
+    });
+    expect(result.shared_route_id).toBe('shared-1');
+  });
+
+  it('refuses to publish a course owned by another user', async () => {
+    savedWalkingCourseRepository.findById.mockResolvedValue({ saved_course_id: COURSE_ID, user_id: 'someone-else' });
+
+    await expect(savedWalkingCourseService.publishCourse(USER_ID, COURSE_ID, 'title')).rejects.toMatchObject({
+      statusCode: 404,
+    });
+    expect(sharedRouteRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('refuses to publish the same course twice (409 ALREADY_PUBLISHED)', async () => {
+    savedWalkingCourseRepository.findById.mockResolvedValue({
+      saved_course_id: COURSE_ID,
+      user_id: USER_ID,
+      transport_mode: 'walk',
+      route_data: ROUTE_DATA,
+    });
+    sharedRouteRepository.findActiveBySource.mockResolvedValue({ shared_route_id: 'already-shared' });
+
+    await expect(savedWalkingCourseService.publishCourse(USER_ID, COURSE_ID, 'title')).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'ALREADY_PUBLISHED',
+    });
+    expect(sharedRouteRepository.create).not.toHaveBeenCalled();
   });
 });
