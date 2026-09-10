@@ -7,7 +7,7 @@
 **여행 유튜브 요약 서비스** — 유튜브 여행·브이로그 영상을 분석하여 영상 속 등장 장소를 자동 추출하고, 사용자가 만든 "여행(trip)" 아래 여러 날짜(1일차, 2일차...)로 나눠 각 날짜마다 시작/종료 호텔을 기준으로 북마크한 장소들을 순회하는 최적 동선(왕복 또는 호텔 간 이동)을 AI가 계획해주는 여행 일정 플래너 서비스. Clean Architecture(계층 분리)를 따른다.
 
 - **팀명**: 럭키비키 (팀장: 김혜빈 / 팀원: 최나경)
-- **문서 버전**: v2.7 (여러 브이로그를 참고한 장소 장단점 요약 — FR-19 반영)
+- **문서 버전**: v2.8 (여행 공유 링크·동선 공유 피드 — FR-20/FR-21 반영)
 
 ### 핵심 사용자 흐름
 1. 유튜브 URL 입력 또는 해시태그로 브이로그 탐색
@@ -113,6 +113,13 @@ GradudtionProject/
 | POST | `/api/v1/recommendations/walking-course` | 선택 (JWT, 미인증도 허용) | 지역 기반 도보 코스 자동 생성(FR-17). body: `{ region, localTime }` (`region`은 프론트 고정 지역 목록 중 하나). 서버가 AI Worker(`/geocode`)로 지역 중심 좌표를 구한 뒤, `places`에서 그 좌표 반경 내 **전체 사용자의 북마크된 장소**만 후보로 조회(`bookmarkedOnly`, 특정 사용자가 아님 — 콜드스타트 대응)하고, 로그인 사용자면 취향 임베딩/`tag_scores`도 함께 AI Worker(`/recommendations/walking-course`)로 전달 — AI Worker가 Kakao 상권 검색(카페/음식점/관광명소) 후보를 보강하고, `/recommendations/nearby-score`와 동일한 점수화 로직으로 전체 후보 점수를 매긴 뒤 점수 높은 순으로 훑으며 이미 선택된 장소와 도보 거리(1.2km) 이내인 것만 채택하는 그리디 클러스터링으로 2~10개를 뽑아 walk 모드 `/optimize-route`로 순서를 최적화해 반환. 지역 중심점을 시작=종료 가상 지점으로 씀(실제 `hotels` 테이블에 저장하지 않는 임시 값). 서로 도보 거리인 장소가 2개 미만이면 `course: null` + 점수화된 후보 목록만 반환(에러 아님) |
 | POST/GET | `/api/v1/walking-courses` | 필수 (JWT) | 위 도보 코스 생성 결과를 "내 코스 목록"에 저장. body(POST): `{ region, routeType, transportMode, totalDistanceM?, totalDurationSec?, routeData[] }` — trip/hotel과 무관한 독립적인 스냅샷 저장(Kakao 상권 후보처럼 `places` 테이블에 없는 장소도 `routeData`에 그대로 저장 가능, FK 제약 없음) / 내 저장 코스 목록 조회 |
 | DELETE | `/api/v1/walking-courses/:id` | 필수 (JWT) | 저장한 코스 삭제(소프트 삭제). 요청 사용자 소유가 아니면 404 SAVED_COURSE_NOT_FOUND |
+| POST | `/api/v1/walking-courses/:id/publish` | 필수 (JWT) | FR-21 저장한 뚜벅이 코스를 공개 피드에 게시. body: `{ title }`(1~100자). 요청 사용자 소유가 아니면 404 SAVED_COURSE_NOT_FOUND, 이미 게시된 코스면 409 ALREADY_PUBLISHED(재게시 불가 — 멱등하지 않게 중복 행이 쌓이는 걸 막음). `shared_routes`에 새 행 생성(호텔 포인트는 원래 없음 — 지역 중심 가상 좌표라 그대로도 안전) |
+| POST | `/api/v1/itineraries/:id/publish` | 필수 (JWT) | FR-21 여행의 특정 날짜 동선을 공개 피드에 게시. body: `{ title }`(1~100자). 요청 사용자 소유가 아니면 404 ITINERARY_NOT_FOUND, 이미 게시된 동선이면 409 ALREADY_PUBLISHED. `route_data`에서 호텔 포인트(실제 숙소 주소 FK)를 통째로 제거하고 남은 장소들만 재정렬·leg 재계산한 스냅샷을 `shared_routes`에 저장(`buildPublicRouteSnapshot`, `backend/src/utils/route-snapshot.js`) |
+| GET | `/api/v1/routes/shared` | 선택 (JWT, 미인증도 허용) | FR-21 공개 동선 피드 조회. query: `?limit?`(기본 20, 최대 50). **본인이 게시한 동선도 피드에 그대로 포함**(로그인 사용자면 각 행에 `isOwner` 포함 — 프론트가 이 값으로 본인 카드는 수정/삭제 UI, 남의 카드는 좋아요 UI를 분기). 작성자별 `matchPercent`(요청 사용자 ↔ 작성자의 취향 임베딩 코사인 유사도 — 둘 다 취향 설정이 있을 때만, AI Worker `/embeddings/similarity`로 일괄 계산, 본인 카드는 자기 자신과 비교하지 않으므로 항상 `null`)를 함께 반환. 좋아요 수는 `route_likes` 테이블 COUNT로 항상 실시간 계산(별도 카운터 컬럼 없음) |
+| POST/DELETE | `/api/v1/routes/:id/like` | 필수 (JWT) | FR-21 공개 동선 좋아요/좋아요 취소. 존재하지 않는 동선이면 404 SHARED_ROUTE_NOT_FOUND, 본인이 게시한 동선이면 400 INVALID_REQUEST(좋아요만 해당, 취소는 멱등). **좋아요는 그 동선에 담긴 각 장소(`route_data[].placeId`)에 대해 FR-15 행동 기반 학습(`POST /recommendations/behaviors`)의 `like` 액션을 그대로 재사용해 좋아요 누른 사용자의 취향 임베딩·`tag_scores`를 갱신**(장소마다 `recommendation_behaviors` 행도 함께 남음, `screen: 'shared_route_feed'`) — **좋아요 취소 시 이 취향 갱신도 함께 되돌림**(가장 최근 매칭 행동 로그 행을 삭제한 뒤 같은 유효 가중치를 음수로 다시 적용, `behaviorService.reverseScopedBehavior`) — 단, 정확한 취소를 보장하진 않음(그사이 다른 행동으로 취향 벡터가 또 갱신됐으면 근사치, 임베딩 정규화가 비선형이라 완벽한 역산은 원래 불가능) |
+| PATCH | `/api/v1/routes/:id` | 필수 (JWT) | FR-21 게시한 동선 제목 수정. body: `{ title }`(1~100자). 요청 사용자 소유가 아니면 404 SHARED_ROUTE_NOT_FOUND |
+| DELETE | `/api/v1/routes/:id` | 필수 (JWT) | FR-21 게시 취소(소프트 삭제). 요청 사용자 소유가 아니면 404 SHARED_ROUTE_NOT_FOUND |
+| GET | `/api/v1/trips/:id/share` | 불필요 | FR-20 여행 공유 링크가 여는 공개 조회 페이지. 인증 없이 누구나 열람 가능한 서버 렌더링 HTML(JSON 아님) 반환 — 존재하지 않는 여행이면 404 TRIP_NOT_FOUND(JSON 에러). 날짜별 동선을 순서대로 보여주되 호텔은 **이름만**(주소·좌표 제외) 노출 — 공개 피드(FR-21)보다 좁은 배포 범위(링크를 받은 특정 사람만 앎)라 프라이버시 기준이 다름 |
 | GET | `/api/v1/recommendations/similar-taste` | 필수 (JWT) | 취향이 비슷한 사용자가 북마크한 장소 추천(FR-18). query: `?limit?`(기본 20, 최대 50). 요청 사용자의 `user_preference_embeddings`가 없으면 `{ recommendations: [], hasPreference: false }` 반환(에러 아님 — 프론트가 취향 설정 화면으로 안내). 있으면 다른 모든 사용자의 임베딩을 조회해 AI Worker(`/recommendations/similar-taste-score`)로 전달, 코사인 유사도 0.3 이상인 사용자들의 북마크만 신호로 채택(유사도 합산으로 장소 점수 계산, 여러 유사 사용자가 북마크했을수록 점수↑) — 요청 사용자가 이미 북마크했거나 숨긴 장소는 후보에서 제외 |
 | GET | `/api/v1/places/:id/summary` | 불필요 | 여러 브이로그를 참고한 장소 장단점 한 줄 요약(FR-19). 존재하지 않는 `placeId`면 404 PLACE_NOT_FOUND. 좌표를 반올림(소수점 4자리, ~11m)해 같은 실좌표를 공유하는 다른 영상 유래 `places` 행들(=같은 실제 장소를 언급한 다른 영상)을 모아 `mention_note`가 있는 것만 모으고, 서로 다른 `video_id` 개수가 2 미만이면 `{ available: false, pros: null, cons: null, sourceCount }` 반환(에러 아님 — 아직 비교할 다른 영상이 부족함). 2개 이상이면 캐시(`places.pros_summary`/`cons_summary`/`summary_source_count`) 유효성을 확인(라이브 소스 개수와 캐시된 개수가 다르면 무효화)해, 무효하거나 없으면 AI Worker(`/places/summarize`)로 각 노트를 종합한 장점/단점 한 줄 요약을 생성해 해당 `place_id` 행에 캐싱 후 반환 |
 | POST | `/api/v1/auth/kakao` | 불필요 | Kakao OAuth 로그인 → JWT 발급 |
@@ -121,6 +128,7 @@ GradudtionProject/
 | POST | `/api/v1/auth/signup` | 불필요 | 네이티브 회원가입 3단계: body `{ email, password, nickname }` (`password` 8자 이상). 직전에 verify-otp로 인증된 이메일(15분 이내)이 없으면 400 OTP_NOT_VERIFIED. 성공 시 `users`(`provider='email'`)에 저장, 사용한 인증코드 삭제, JWT 발급(카카오 로그인과 동일 응답 형태: `{ token, user }`) |
 | POST | `/api/v1/auth/login` | 불필요 | 네이티브 이메일/비밀번호 로그인. body `{ email, password }`. 일치하는 계정이 없거나 비밀번호 불일치(카카오 전용 계정 포함, `password_hash`가 없는 경우) 시 401 INVALID_CREDENTIALS |
 | GET | `/api/v1/auth/profile` | 필수 (JWT) | 내 정보 조회 |
+| PATCH | `/api/v1/auth/profile` | 필수 (JWT) | 닉네임 변경. body: `{ nickname }`(1~100자, 공백만은 불가) |
 | DELETE | `/api/v1/auth/profile` | 필수 (JWT) | 회원 탈퇴 (users 소프트 삭제) |
 
 고객센터(FAQ + 문의처 안내) 화면은 정적 안내로만 제공되며 백엔드 API가 없다 — 프론트엔드에 하드코딩된 콘텐츠만 표시.
@@ -129,10 +137,10 @@ GradudtionProject/
 - `400` INVALID_URL / 유효하지 않은 요청 / 장소 2개 미만
 - `401` JWT_INVALID / 미인증
 - `403` JWT_EXPIRED
-- `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행) / FOLDER_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 북마크 폴더) / SAVED_COURSE_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 저장 도보 코스) / PLACE_NOT_FOUND (존재하지 않는 장소)
+- `404` TRIP_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행 — `GET /trips/:id/share`는 소유권과 무관하게 존재 여부만 확인) / FOLDER_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 북마크 폴더) / SAVED_COURSE_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 저장 도보 코스) / ITINERARY_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 여행 동선 — 현재 게시 엔드포인트만 사용) / SHARED_ROUTE_NOT_FOUND (요청 사용자 소유가 아니거나 존재하지 않는 공개 동선) / PLACE_NOT_FOUND (존재하지 않는 장소)
 - `400` OTP_INVALID / OTP_EXPIRED / OTP_NOT_VERIFIED (네이티브 회원가입 이메일 인증 관련)
 - `401` INVALID_CREDENTIALS (네이티브 로그인 이메일/비밀번호 불일치)
-- `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜) / EMAIL_EXISTS (이미 가입된 이메일로 회원가입 시도)
+- `409` BOOKMARK_EXISTS / DAY_EXISTS (해당 여행에 이미 존재하는 날짜) / EMAIL_EXISTS (이미 가입된 이메일로 회원가입 시도) / ALREADY_PUBLISHED (해당 뚜벅이 코스/여행 동선이 이미 공개 피드에 게시돼 있음 — 같은 소스를 다시 게시 시도)
 - `422` TRANSCRIPT_NOT_FOUND (자막 없는 영상)
 - `500` 내부 오류
 - `503` AI_TIMEOUT / AI_PROVIDER_ERROR / GEOCODING_FAILED / YOUTUBE_SEARCH_FAILED (외부 API 실패)
@@ -144,7 +152,7 @@ GradudtionProject/
 - **users**: `user_id(PK)`, `provider`(kakao | email), `provider_id`(UNIQUE — kakao는 카카오 회원번호, email 계정은 `email`과 동일한 값), `email`(nullable — email 계정은 UNIQUE 부분 인덱스로 중복 가입 방지), `password_hash`(nullable — email 계정만 bcrypt 해시 보유, kakao 계정은 null), `nickname`, `profile_image`, `created_at`, `updated_at`
 - **email_otps**: `otp_id(PK)`, `email`, `code_hash`(6자리 코드의 SHA-256 해시, 평문 미저장), `expires_at`(발급 5분 후), `verified_at`(nullable), `attempts`(기본 0, 5회 초과 시 만료 취급), `created_at` — 네이티브 회원가입 이메일 인증용. `POST /auth/signup` 성공 시 해당 이메일의 행을 모두 삭제(소프트 삭제 대상 아님, 단기 토큰성 데이터)
 - **videos**: `video_id(PK)`, `youtube_url`(UNIQUE), `title`, `description`, `thumbnail_url`, `channel_name`, `published_at`, `duration_sec`, `language`, `is_analyzed`, `analysis_version`, `created_at`, `updated_at`
-- **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/hashtags/description/title), `confidence`(0~1), `category`(nullable — LLM이 장소 추출 시점에 함께 추정, cafe/bakery/restaurant 등 자유 텍스트), `business_hours`(JSONB, nullable — LLM이 자막/설명에 명시된 영업시간만 추출, 언급 없으면 null이며 절대 추측하지 않음), `business_hours_is_estimated`(boolean, 기본 false — Kakao Local API는 영업시간을 제공하지 않아 항상 LLM 추정치임을 표시), `tags`(JSONB, nullable — `[{code, confidence}]` 배열, `code`는 `ai-worker/app/constants/tag_catalog.py`의 고정 목록 중 하나만 허용(새 태그마다 컬럼 추가하지 않기 위한 MVP 설계), 취향 설정 화면의 태그 목록과 동일한 어휘를 공유해야 매칭이 성립), `mention_note`(TEXT, nullable — 장소 추출 시점에 LLM이 자막에서 이 장소에 대한 실제 코멘트/반응을 1문장으로 뽑은 것, 의견이 없으면 null이며 절대 지어내지 않음. FR-19 장단점 요약의 원재료), `pros_summary`/`cons_summary`(TEXT, nullable — FR-19 캐시), `summary_source_count`(INTEGER, nullable — 캐시 생성 시점에 반영된 서로 다른 영상 개수, 캐시 무효화 판단에 사용), `summary_generated_at`(TIMESTAMPTZ, nullable), `created_at`, `updated_at`
+- **places**: `place_id(PK)`, `video_id(FK)`, `name`, `address`, `latitude`, `longitude`, `timestamp_sec`, `source`(transcript/on_screen_text/hashtags/description/title), `confidence`(0~1), `category`(nullable — LLM이 장소 추출 시점에 함께 추정, cafe/bakery/restaurant 등 자유 텍스트), `business_hours`(JSONB, nullable — LLM이 자막/설명에 명시된 영업시간만 추출, 언급 없으면 null이며 절대 추측하지 않음), `business_hours_is_estimated`(boolean, 기본 false — Kakao Local API는 영업시간을 제공하지 않아 항상 LLM 추정치임을 표시), `tags`(JSONB, nullable — `[{code, confidence}]` 배열, `code`는 `ai-worker/app/constants/tag_catalog.py`의 고정 목록 중 하나만 허용(새 태그마다 컬럼 추가하지 않기 위한 MVP 설계), 취향 설정 화면의 태그 목록과 동일한 어휘를 공유해야 매칭이 성립), `mention_note`(TEXT, nullable — 장소 추출 시점에 LLM이 자막에서 이 장소에 대한 실제 코멘트/반응을 1문장으로 뽑은 것, 의견이 없으면 null이며 절대 지어내지 않음. FR-19 장단점 요약의 원재료), `pros_summary`/`cons_summary`(TEXT, nullable — FR-19 캐시), `summary_source_count`(INTEGER, nullable — 캐시 생성 시점에 반영된 서로 다른 영상 개수, 캐시 무효화 판단에 사용), `summary_generated_at`(TIMESTAMPTZ, nullable), `created_at`, `updated_at`
 - **hotels**: `hotel_id(PK)`, `user_id(FK)`, `name`, `address`, `latitude`, `longitude`(NOT NULL — Kakao Maps 검색으로만 저장), `created_at`, `updated_at`
 - **bookmarks**: `bookmark_id(PK)`, `user_id(FK)`, `place_id(FK)`, `created_at`, UNIQUE(`user_id`, `place_id`)
 - **bookmark_folders**: `folder_id(PK)`, `user_id(FK)`, `name`, `created_at`, `updated_at`, `deleted_at` — 사용자가 만드는 북마크 폴더
@@ -156,6 +164,8 @@ GradudtionProject/
 - **user_preference_embeddings**: `user_id(PK, FK → users.user_id)`, `embedding`(JSONB), `source_tags`(JSONB — 취향 설문에서 선택한 태그 원본), `source_text`, `model`, `dimensions`, `tag_scores`(JSONB, nullable — `{code: score}` 형태, 설문 선택 시 1.0으로 초기화되고 이후 행동 기록마다 가중치만큼 오르내림, [-2, 2] 클램프), `created_at`, `updated_at` — 사용자당 1행. 설문(`PUT /taste-preferences`) 또는 행동 기록(`POST /recommendations/behaviors`) 어느 쪽이든 최초 1회 생성될 수 있음(설문을 건너뛰어도 행동만으로 임베딩이 생성될 수 있음). 행이 없으면 "취향 미설정"으로 간주해 추천이 임베딩 없이 상황 기반으로만 동작
 - **recommendation_behaviors**: `behavior_id(PK)`, `user_id(FK)`, `place_id(FK)`, `action`(view_detail | map_view | share | bookmark | add_to_itinerary | like | hide | not_interested), `screen`(nullable — 행동이 발생한 화면), `distance_bucket`(nullable — 원본 위/경도 대신 버킷 문자열만 저장, 예: `0-200m`), `model_version`(nullable), `created_at` — FR-15 행동 기반 자동 학습(phase 5)의 원본 로그. 위/경도·이동 경로는 저장하지 않음(개인정보 최소 수집 원칙)
 - **saved_walking_courses**: `saved_course_id(PK)`, `user_id(FK)`, `region`, `route_type`(roundTrip | hotelToHotel), `transport_mode`(car | walk | transit, 기본 walk), `total_distance_m`, `total_duration_sec`, `route_data`(JSONB — 최적화된 경로 스냅샷), `created_at`, `updated_at` — FR-17 도보 코스 저장. `hotels`/`places`에 대한 FK가 없는 독립 스냅샷(Kakao 상권 검색으로 찾은, `places`에 없는 장소도 그대로 저장 가능하기 때문)
+- **shared_routes**: `shared_route_id(PK)`, `user_id(FK)`, `source_type`(saved_walking_course | itinerary — 다형 출처, `source_id`는 표시용 메타일 뿐 FK 아님), `source_id`, `title`(1~100자, 게시 시 사용자가 직접 입력, `PATCH`로 수정 가능), `transport_mode`(car | walk | transit), `total_distance_m`, `total_duration_sec`, `place_count`, `route_data`(JSONB — 공개용으로 정제된 스냅샷: 호텔 포인트 전부 제거, 좌표·hotelId는 제외하지만 `placeId`는 유지하고 `{order, type:'place', placeId, name, legDistanceM, legDurationSec}`만), `created_at`, `updated_at`, `deleted_at` — FR-21 공개 동선 피드. `saved_walking_courses`/`itineraries`의 `route_data`를 그대로 공개하지 않고 게시 시점에 스냅샷을 새로 떠서 저장(원본이 나중에 바뀌거나 삭제돼도 피드에 영향 없음). `placeId`를 남겨두는 이유는 FR-21의 좋아요 → 취향 가중치 반영(FR-15 재사용)에 필요해서
+- **route_likes**: `user_id(FK)`, `shared_route_id(FK → shared_routes.shared_route_id)`, `created_at`, PK(`user_id`, `shared_route_id`) — 좋아요 수는 이 테이블 COUNT로 항상 계산(증감 동기화 버그 방지를 위해 카운터 컬럼을 별도로 두지 않음)
 
 인덱스: `youtube_url`, `provider_id`, `video_id`, `user_id`, `place_id`, `hotel_id`, `start_hotel_id`, `end_hotel_id`, `trip_id`, `bookmark_folders.user_id`, `bookmark_folder_items.bookmark_id`, `places.category`, `created_at`, `saved_walking_courses.user_id` + 복합 인덱스 `(user_id, place_id)`, `(video_id, timestamp_sec)`, `(trip_id, day_number)`, `(recommendation_behaviors.user_id, place_id, action)`.
 
@@ -190,7 +200,8 @@ GradudtionProject/
 - 공급자 모드: `auto`(기본) / `openai` / `claude`. auto는 OpenAI 우선, 재시도 1회 → 실패 시 Claude, 재시도 1회 → 그래도 실패 시 503(AI_PROVIDER_ERROR).
 - LLM 응답은 JSON만 허용 (마크다운/설명/코드블록 금지). 유효하지 않으면 동일 공급자 재시도 1회 → 공급자 전환 → 그래도 실패면 AI_PROVIDER_ERROR.
 - LLM은 절대 좌표를 생성하지 않는다. 좌표는 오직 Kakao Maps 지오코딩 결과만 사용.
-- 장소 추출 우선순위: transcript > hashtags > description > title. transcript 유래는 타임스탬프 포함, 메타데이터 유래는 `timestampSec = null`.
+- 장소 추출 우선순위: transcript > on_screen_text > hashtags > description > title. transcript 유래는 타임스탬프 포함, on_screen_text·메타데이터 유래는 `timestampSec = null`.
+- **화면 속 번인 텍스트 폴백(on_screen_text)**: 공식 자막(transcript)이 없는 영상이면 항상(메타데이터로 장소를 이미 찾았어도) AI Worker가 영상을 저해상도로 내려받아(yt-dlp) 영상 길이 기준 30초에 1장씩(`FRAME_SAMPLING_INTERVAL_SECONDS`, 영상 5%~95% 구간에서 균등 샘플링, 최대 60장 상한 `FRAME_SAMPLING_MAX_FRAMES`)을 프레임 샘플링하고(OpenCV) 비전 LLM(OpenAI→Claude 폴백)으로 화면에 보이는 텍스트(번인 자막/장소명 오버레이)를 읽어 장소 추출 프롬프트에 추가 소스로 재투입한다 — 메타데이터만으로는 화면에만 나오는 장소를 놓칠 수 있기 때문. 실패해도 예외를 던지지 않고 그냥 메타데이터 기반 결과로 진행. `ai-worker/app/services/frame_extraction_service.py`, `llm_service.extract_screen_text()`.
 
 ## 캐싱 전략
 
@@ -218,6 +229,8 @@ GradudtionProject/
 - **FR-17** 지역 기반 도보 코스 자동 생성 및 저장 — 지역 선택 시 (전체 사용자의 북마크된 장소 + Kakao 상권 검색 실시간 데이터) 하이브리드 후보 풀을 FR-15와 동일한 점수화 로직으로 평가하고, 서로 도보 거리(1.2km) 이내인 장소끼리만 그리디 클러스터링해 2~10개를 뽑아 도보 동선을 자동 구성(FR-07의 walk 모드 재사용). 북마크가 없는 지역에서도 Kakao 상권 검색으로 콜드스타트 대응. 생성된 코스는 trip/hotel과 무관한 독립 스냅샷(`saved_walking_courses`)으로 저장 가능
 - **FR-18** 비슷한 취향 추천(협업 필터링) — 내 취향 임베딩과 다른 모든 사용자의 취향 임베딩 간 코사인 유사도를 계산해, 유사도 0.3 이상인 사용자들이 북마크한 장소를 유사도 합산 점수로 정렬해 추천. 여러 유사 사용자가 겹쳐서 북마크한 장소일수록 점수가 높아짐(`contributorCount`로 몇 명이 겹쳤는지 함께 제공). 취향 미설정 사용자에게는 "먼저 취향 설정을 해보세요" 안내(FR-16과 연동), 아직 유사한 취향의 사용자가 없으면 빈 목록 반환(에러 아님)
 - **FR-19** 여러 브이로그 기반 장소 장단점 요약 — 같은 실제 장소가 서로 다른 영상에서 언급될 때(좌표 반올림으로 매칭), 각 영상 추출 시점에 뽑아둔 `mention_note`(그 영상에서 이 장소에 대해 실제로 언급된 코멘트 1문장)를 모아 LLM이 장점/단점을 각각 한 줄로 종합. 최소 2개 영상의 언급이 있어야 생성(그 미만이면 "아직 비교할 다른 영상이 부족함" — 에러 아님). 장소 상세 조회 시점에 지연 생성(lazy) 후 `places` 행에 캐싱, 이후 같은 좌표에 새 영상 언급이 추가될 때만 재생성
+- **FR-20** 여행 공유 링크 — 여행 전체 일정 화면의 "링크 복사"로 `GET /trips/:id/share`(비로그인 공개 조회, 서버 렌더링 HTML) 링크를 생성. 여행 소유자가 받는 사람을 직접 골라 링크를 전달하는 좁은 배포 범위이므로 호텔 **이름**까지는 노출(주소/좌표는 제외) — FR-21의 공개 피드보다 완화된 프라이버시 기준
+- **FR-21** 동선 공유 피드 — 저장한 뚜벅이 코스(FR-17) 또는 여행의 날짜별 동선(FR-07)을 제목을 붙여 공개 피드에 게시(`POST .../publish`), 홈 화면 "다른 유저의 추천 동선"에서 좋아요·취향 일치율(게시자 ↔ 조회자의 취향 임베딩 코사인 유사도, FR-16 설정 필요)과 함께 노출. **본인이 게시한 동선도 같은 피드에 그대로 보이며**(`isOwner`로 구분) 제목 수정(`PATCH`)·게시 취소(`DELETE`)가 가능. 여행 동선을 게시할 때는 `start_hotel_id`/`end_hotel_id`가 가리키는 실제 숙소 정보를 스냅샷에서 통째로 제거하고 중간 장소들의 동선만 남김(FR-20과 달리 전체 앱 사용자에게 공개되는 넓은 배포 범위라 더 엄격한 기준) — 이 무해화 처리 때문에 뚜벅이 코스와 달리 총 이동거리/시간도 게시 시점에 재계산됨. 다만 각 장소의 `placeId`는 스냅샷에 남겨둠(이름 있는 공개 장소라 프라이버시 문제 없음) — 다른 사용자가 이 동선에 좋아요를 누르면 FR-15 행동 기반 학습 파이프라인을 재사용해 그 장소들을 "좋아요"한 것과 동일하게 좋아요 누른 사용자 본인의 취향 임베딩·`tag_scores`에 반영(본인 동선에는 좋아요 불가)
 
 ## 자주 쓰는 명령어
 
