@@ -1,8 +1,14 @@
 from fastapi import APIRouter
 
-from app.schemas.request_schema import EmbeddingRequest, PreferenceUpdateRequest
-from app.schemas.response_schema import EmbeddingResponse, PreferenceUpdateResponse
+from app.schemas.request_schema import EmbeddingRequest, EmbeddingSimilarityRequest, PreferenceUpdateRequest
+from app.schemas.response_schema import (
+    EmbeddingResponse,
+    EmbeddingSimilarityResponse,
+    EmbeddingSimilarityScore,
+    PreferenceUpdateResponse,
+)
 from app.services import embedding_service, preference_vector_service
+from app.utils.vector_math import cosine_similarity
 
 router = APIRouter()
 
@@ -23,3 +29,15 @@ async def update_preference(request: PreferenceUpdateRequest) -> PreferenceUpdat
         request.currentEmbedding, request.placeEmbedding, request.weight
     )
     return PreferenceUpdateResponse(embedding=embedding)
+
+
+@router.post("/embeddings/similarity", response_model=EmbeddingSimilarityResponse)
+async def batch_similarity(request: EmbeddingSimilarityRequest) -> EmbeddingSimilarityResponse:
+    """Generic cosine-similarity batch endpoint -- callers (backend) never
+    compute embedding math themselves, they always hand it to AI Worker (see
+    the FR-18 similar-taste pattern this reuses `cosine_similarity` from)."""
+    similarities = [
+        EmbeddingSimilarityScore(key=target.key, score=cosine_similarity(request.embeddingA, target.embedding))
+        for target in request.embeddingsB
+    ]
+    return EmbeddingSimilarityResponse(similarities=similarities)

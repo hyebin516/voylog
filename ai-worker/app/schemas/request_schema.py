@@ -93,6 +93,16 @@ class GeocodeRequest(BaseModel):
     query: str
 
 
+class PlaceSearchRequest(BaseModel):
+    query: str
+    size: int = 8
+
+
+class ReverseGeocodeRequest(BaseModel):
+    latitude: float
+    longitude: float
+
+
 class WalkingCourseRequest(BaseModel):
     regionName: str
     centerLatitude: float
@@ -102,6 +112,10 @@ class WalkingCourseRequest(BaseModel):
     bookmarkCandidates: List[NearbyPlaceCandidate] = []
     userEmbedding: Optional[List[float]] = None
     userTagScores: Dict[str, float] = {}
+    # FR-17 mood/duration filters (design handoff chips). Both optional --
+    # None means "no preference", matching today's unfiltered behavior.
+    mood: Optional[str] = None
+    walkDuration: Optional[str] = None
 
 
 class SimilarTastePlaceCandidate(BaseModel):
@@ -138,3 +152,13 @@ class PreferenceUpdateRequest(BaseModel):
     currentEmbedding: Optional[List[float]] = None
     placeEmbedding: List[float]
     weight: float
+
+
+class EmbeddingSimilarityTarget(BaseModel):
+    key: str
+    embedding: List[float]
+
+
+class EmbeddingSimilarityRequest(BaseModel):
+    embeddingA: List[float]
+    embeddingsB: List[EmbeddingSimilarityTarget]

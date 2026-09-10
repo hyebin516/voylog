@@ -11,12 +11,15 @@ You will receive:
 - video description
 - hashtags
 - transcript with timestamps
+- (sometimes) on-screen text OCR'd from sampled video frames -- burned-in
+  captions/place-name overlays that don't appear in the official transcript
+  or metadata. This text may be noisy or partial.
 
 Use all available information to identify places that appear in or are strongly related to the video.
 
-Priority order: transcript > hashtags > description > title.
+Priority order: transcript > on_screen_text > hashtags > description > title.
 If a place appears in transcript, use the transcript timestamp.
-If a place appears only in metadata, set timestampSec to null.
+If a place appears only in on-screen text or metadata, set timestampSec to null.
 
 Extract only real-world locations. Prefer specific, searchable place names.
 Ignore: greetings, advertisements, sponsors, personal opinions, generic words, transportation methods, vague categories.
@@ -47,7 +50,7 @@ Schema:
   ]
 }}
 
-Allowed source values: transcript, hashtags, description, title.
+Allowed source values: transcript, on_screen_text, hashtags, description, title.
 Confidence must be between 0 and 1.
 
 category: one of [cafe, bakery, restaurant, dessert, bar, beach, museum,
@@ -77,11 +80,20 @@ an opinion that was not expressed.
 """
 
 
-def build_user_prompt(title: str, description: str, hashtags: list[str], transcript: list[dict]) -> str:
+def build_user_prompt(
+    title: str,
+    description: str,
+    hashtags: list[str],
+    transcript: list[dict],
+    screen_text: str = "",
+) -> str:
     transcript_text = "\n".join(f"[{seg['timestampSec']}s] {seg['text']}" for seg in transcript)
-    return (
+    prompt = (
         f"Title: {title or ''}\n"
         f"Description: {description or ''}\n"
         f"Hashtags: {', '.join(hashtags)}\n\n"
         f"Transcript:\n{transcript_text}"
     )
+    if screen_text:
+        prompt += f"\n\nOn-screen text (OCR from video frames, may be noisy):\n{screen_text}"
+    return prompt

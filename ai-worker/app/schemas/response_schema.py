@@ -46,7 +46,7 @@ class PlaceTag(BaseModel):
 class PlaceCandidate(BaseModel):
     name: str
     timestampSec: Optional[int] = None
-    source: Literal["transcript", "hashtags", "description", "title"]
+    source: Literal["transcript", "on_screen_text", "hashtags", "description", "title"]
     confidence: float
     category: Optional[str] = None
     businessHours: Optional[BusinessHours] = None
@@ -109,6 +109,22 @@ class GeocodeResponse(BaseModel):
     address: Optional[str] = None
 
 
+class PlaceSearchCandidate(BaseModel):
+    placeId: str
+    name: str
+    address: Optional[str] = None
+    latitude: float
+    longitude: float
+
+
+class PlaceSearchResponse(BaseModel):
+    candidates: List[PlaceSearchCandidate] = []
+
+
+class ReverseGeocodeResponse(BaseModel):
+    address: Optional[str] = None
+
+
 class SimilarTasteRecommendation(BaseModel):
     placeId: str
     name: str
@@ -134,6 +150,15 @@ class PreferenceUpdateResponse(BaseModel):
     embedding: List[float]
 
 
+class EmbeddingSimilarityScore(BaseModel):
+    key: str
+    score: Optional[float] = None
+
+
+class EmbeddingSimilarityResponse(BaseModel):
+    similarities: List[EmbeddingSimilarityScore]
+
+
 class RoutePoint(BaseModel):
     order: int
     type: Literal["hotel", "place"]
@@ -142,6 +167,12 @@ class RoutePoint(BaseModel):
     name: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # Distance/duration of the leg arriving at this point from the previous
+    # point in the optimized route -- null for the first point (order 0),
+    # which has no preceding leg. Lets the UI show real per-stop "도보 N분"
+    # rows instead of dividing the aggregate total evenly.
+    legDistanceM: Optional[int] = None
+    legDurationSec: Optional[int] = None
 
 
 class RouteOptimizationResponse(BaseModel):

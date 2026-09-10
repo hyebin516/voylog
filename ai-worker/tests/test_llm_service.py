@@ -124,3 +124,46 @@ def test_summarize_place_auto_mode_raises_when_both_providers_exhaust_retries(mo
 
     with pytest.raises(AiProviderError):
         llm_service.summarize_place("prompt", provider="auto")
+
+
+def test_extract_screen_text_returns_empty_string_immediately_when_no_frames_given():
+    openai_calls = []
+    result = llm_service.extract_screen_text([], provider="auto")
+
+    assert result == ""
+    assert openai_calls == []
+
+
+def test_extract_screen_text_explicit_openai_provider_never_falls_back_to_claude(monkeypatch):
+    openai_calls = []
+    claude_calls = []
+    monkeypatch.setattr(llm_service, "_call_openai_vision", lambda frames: (openai_calls.append(frames), "제주 감성카페")[1])
+    monkeypatch.setattr(llm_service, "_call_claude_vision", lambda frames: (claude_calls.append(frames), "제주 감성카페")[1])
+
+    result = llm_service.extract_screen_text([b"frame1"], provider="openai")
+
+    assert result == "제주 감성카페"
+    assert len(openai_calls) == 1
+    assert len(claude_calls) == 0
+
+
+def test_extract_screen_text_auto_mode_falls_back_to_claude_after_openai_exhausts_retries(monkeypatch):
+    monkeypatch.setattr(llm_service, "_call_openai_vision", lambda frames: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(llm_service, "_call_claude_vision", lambda frames: "해운대 야경 맛집")
+
+    result = llm_service.extract_screen_text([b"frame1"], provider="auto")
+
+    assert result == "해운대 야경 맛집"
+
+
+def test_extract_screen_text_returns_empty_string_instead_of_raising_when_both_providers_fail(monkeypatch):
+    """Unlike extract_places (a hard requirement, raises AiProviderError on
+    total failure), this is a best-effort fallback -- the caller treats an
+    empty string the same as "OCR found nothing useful", so it must never
+    raise and break the place-extraction request it's a fallback for."""
+    monkeypatch.setattr(llm_service, "_call_openai_vision", lambda frames: (_ for _ in ()).throw(RuntimeError("down")))
+    monkeypatch.setattr(llm_service, "_call_claude_vision", lambda frames: (_ for _ in ()).throw(RuntimeError("also down")))
+
+    result = llm_service.extract_screen_text([b"frame1"], provider="auto")
+
+    assert result == ""
