@@ -49,4 +49,25 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { create, list, update, remove };
+async function search(req, res, next) {
+  try {
+    const candidates = await hotelService.searchHotels(req.query.query);
+    return success(res, { candidates });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function reverseGeocode(req, res, next) {
+  try {
+    const address = await hotelService.reverseGeocode(
+      Number(req.query.latitude),
+      Number(req.query.longitude),
+    );
+    return success(res, { address });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, list, update, remove, search, reverseGeocode };

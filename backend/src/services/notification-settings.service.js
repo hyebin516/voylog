@@ -1,6 +1,6 @@
 const notificationSettingsRepository = require('../repositories/notification-settings.repository');
 
-const DEFAULTS = { trip_alerts: true, service_alerts: true, marketing_alerts: false };
+const DEFAULTS = { new_vlog_alerts: true, route_complete_alerts: true, marketing_alerts: false, night_silent: false };
 
 async function getSettings(userId) {
   const settings = await notificationSettingsRepository.find(userId);

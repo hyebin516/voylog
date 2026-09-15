@@ -5,17 +5,18 @@ async function find(userId) {
   return rows[0] || null;
 }
 
-async function upsert(userId, { tripAlerts, serviceAlerts, marketingAlerts }) {
+async function upsert(userId, { newVlogAlerts, routeCompleteAlerts, marketingAlerts, nightSilent }) {
   const { rows } = await pool.query(
-    `INSERT INTO notification_settings (user_id, trip_alerts, service_alerts, marketing_alerts)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO notification_settings (user_id, new_vlog_alerts, route_complete_alerts, marketing_alerts, night_silent)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (user_id) DO UPDATE
-       SET trip_alerts = EXCLUDED.trip_alerts,
-           service_alerts = EXCLUDED.service_alerts,
+       SET new_vlog_alerts = EXCLUDED.new_vlog_alerts,
+           route_complete_alerts = EXCLUDED.route_complete_alerts,
            marketing_alerts = EXCLUDED.marketing_alerts,
+           night_silent = EXCLUDED.night_silent,
            updated_at = now()
      RETURNING *`,
-    [userId, tripAlerts, serviceAlerts, marketingAlerts]
+    [userId, newVlogAlerts, routeCompleteAlerts, marketingAlerts, nightSilent]
   );
   return rows[0];
 }

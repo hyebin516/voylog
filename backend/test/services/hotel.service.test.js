@@ -1,6 +1,8 @@
 jest.mock('../../src/repositories/hotel.repository');
+jest.mock('../../src/services/aiWorkerClient');
 
 const hotelRepository = require('../../src/repositories/hotel.repository');
+const { callAiWorker } = require('../../src/services/aiWorkerClient');
 const hotelService = require('../../src/services/hotel.service');
 
 const USER_ID = 'user-1';
@@ -50,6 +52,44 @@ describe('updateHotel', () => {
       statusCode: 404,
     });
     expect(hotelRepository.update).not.toHaveBeenCalled();
+  });
+});
+
+describe('searchHotels', () => {
+  it('forwards the query to the AI worker and returns its candidates', async () => {
+    callAiWorker.mockResolvedValue({ candidates: [{ placeId: 'kakao:1', name: '제주 게스트하우스' }] });
+
+    const result = await hotelService.searchHotels('제주 게스트하우스');
+
+    expect(callAiWorker).toHaveBeenCalledWith('/geocode/search', { query: '제주 게스트하우스' }, 10000);
+    expect(result).toEqual([{ placeId: 'kakao:1', name: '제주 게스트하우스' }]);
+  });
+
+  it('returns an empty list when the AI worker finds no candidates', async () => {
+    callAiWorker.mockResolvedValue({ candidates: [] });
+
+    const result = await hotelService.searchHotels('존재하지않는숙소이름');
+
+    expect(result).toEqual([]);
+  });
+});
+
+describe('reverseGeocode', () => {
+  it('forwards the coordinates to the AI worker and returns the resolved address', async () => {
+    callAiWorker.mockResolvedValue({ address: '제주특별자치도 제주시' });
+
+    const result = await hotelService.reverseGeocode(33.4996, 126.5312);
+
+    expect(callAiWorker).toHaveBeenCalledWith('/geocode/reverse', { latitude: 33.4996, longitude: 126.5312 }, 10000);
+    expect(result).toBe('제주특별자치도 제주시');
+  });
+
+  it('returns null when the coordinate cannot be resolved', async () => {
+    callAiWorker.mockResolvedValue({ address: null });
+
+    const result = await hotelService.reverseGeocode(0, 0);
+
+    expect(result).toBeNull();
   });
 });
 

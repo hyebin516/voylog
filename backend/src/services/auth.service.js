@@ -28,12 +28,27 @@ function issueJwt(user) {
   return jwt.sign({ userId: user.user_id }, env.jwtSecret, { expiresIn: env.jwtExpiresIn });
 }
 
+// Kakao's own profile nickname isn't guaranteed unique across this app's
+// users, but the one-tap Kakao login flow can't stop and ask the user to
+// pick a different one the way native signup does -- so on a collision we
+// silently append a numeric suffix until it's free.
+async function resolveUniqueNickname(baseNickname) {
+  let candidate = baseNickname;
+  let suffix = 2;
+  while (await userRepository.findByNickname(candidate)) {
+    candidate = `${baseNickname}${suffix}`;
+    suffix += 1;
+  }
+  return candidate;
+}
+
 async function kakaoLogin(kakaoAccessToken) {
   const profile = await fetchKakaoProfile(kakaoAccessToken);
 
   let user = await userRepository.findByProviderId(profile.providerId);
   if (!user) {
-    user = await userRepository.create(profile);
+    const nickname = await resolveUniqueNickname(profile.nickname);
+    user = await userRepository.create({ ...profile, nickname });
   }
 
   const token = issueJwt(user);
@@ -57,7 +72,18 @@ async function updateNickname(userId, nickname) {
   if (!user) {
     throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
   }
+  if (nickname !== user.nickname) {
+    const existing = await userRepository.findByNickname(nickname);
+    if (existing) {
+      throw new AppError(409, 'NICKNAME_EXISTS', 'This nickname is already taken');
+    }
+  }
   return userRepository.updateNickname(userId, nickname);
+}
+
+async function checkNicknameAvailability(nickname) {
+  const existing = await userRepository.findByNickname(nickname);
+  return { available: !existing };
 }
 
 function generateOtpCode() {
@@ -79,7 +105,7 @@ async function requestSignupOtp(email) {
   await emailService.sendOtpEmail(email, code);
 }
 
-async function verifySignupOtp(email, code) {
+async function verifyOtpCode(email, code) {
   const otp = await emailOtpRepository.findLatestUnverifiedByEmail(email);
   if (!otp || otp.expires_at < new Date()) {
     throw new AppError(400, 'OTP_EXPIRED', 'The verification code has expired');
@@ -95,10 +121,53 @@ async function verifySignupOtp(email, code) {
   await emailOtpRepository.markVerified(otp.otp_id);
 }
 
+async function verifySignupOtp(email, code) {
+  return verifyOtpCode(email, code);
+}
+
+async function requestPasswordResetOtp(email) {
+  const user = await userRepository.findByEmail(email);
+  if (!user) {
+    throw new AppError(404, 'EMAIL_NOT_FOUND', 'No account is registered with this email');
+  }
+  if (!user.password_hash) {
+    throw new AppError(400, 'NO_PASSWORD_SET', 'This account has no password to reset (signed up via Kakao)');
+  }
+
+  const code = generateOtpCode();
+  await emailOtpRepository.create(email, hashOtpCode(code));
+  await emailService.sendOtpEmail(email, code);
+}
+
+async function verifyPasswordResetOtp(email, code) {
+  return verifyOtpCode(email, code);
+}
+
+async function resetPassword(email, newPassword) {
+  const user = await userRepository.findByEmail(email);
+  if (!user || !user.password_hash) {
+    throw new AppError(404, 'EMAIL_NOT_FOUND', 'No account is registered with this email');
+  }
+
+  const verifiedOtp = await emailOtpRepository.findLatestVerifiedByEmail(email);
+  if (!verifiedOtp) {
+    throw new AppError(400, 'OTP_NOT_VERIFIED', 'Please verify your email before resetting the password');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await userRepository.updatePasswordHash(user.user_id, passwordHash);
+  await emailOtpRepository.deleteByEmail(email);
+}
+
 async function signup(email, password, nickname) {
   const existingUser = await userRepository.findByEmail(email);
   if (existingUser) {
     throw new AppError(409, 'EMAIL_EXISTS', 'This email is already registered');
+  }
+
+  const existingNickname = await userRepository.findByNickname(nickname);
+  if (existingNickname) {
+    throw new AppError(409, 'NICKNAME_EXISTS', 'This nickname is already taken');
   }
 
   const verifiedOtp = await emailOtpRepository.findLatestVerifiedByEmail(email);
@@ -112,6 +181,22 @@ async function signup(email, password, nickname) {
 
   const token = issueJwt(user);
   return { token, user };
+}
+
+async function changePassword(userId, currentPassword, newPassword) {
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    throw new AppError(404, 'USER_NOT_FOUND', 'User not found');
+  }
+  if (!user.password_hash) {
+    throw new AppError(400, 'NO_PASSWORD_SET', 'This account has no password to change (signed up via Kakao)');
+  }
+  if (!(await bcrypt.compare(currentPassword, user.password_hash))) {
+    throw new AppError(401, 'INVALID_CREDENTIALS', 'Current password is incorrect');
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  return userRepository.updatePasswordHash(userId, passwordHash);
 }
 
 async function login(email, password) {
@@ -129,8 +214,13 @@ module.exports = {
   getProfile,
   deleteAccount,
   updateNickname,
+  checkNicknameAvailability,
   requestSignupOtp,
   verifySignupOtp,
   signup,
   login,
+  changePassword,
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetPassword,
 };

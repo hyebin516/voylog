@@ -13,7 +13,7 @@ const emailService = require('../../src/services/email.service');
 const authService = require('../../src/services/auth.service');
 const AppError = require('../../src/utils/AppError');
 
-afterEach(() => jest.clearAllMocks());
+afterEach(() => jest.resetAllMocks());
 
 describe('kakaoLogin', () => {
   const kakaoProfileResponse = {
@@ -73,6 +73,22 @@ describe('kakaoLogin', () => {
     await expect(authService.kakaoLogin('bad-token')).rejects.toBeInstanceOf(AppError);
     await expect(authService.kakaoLogin('bad-token')).rejects.toMatchObject({ statusCode: 503 });
   });
+
+  it('appends a numeric suffix when the Kakao nickname is already taken', async () => {
+    axios.get.mockResolvedValue(kakaoProfileResponse);
+    userRepository.findByProviderId.mockResolvedValue(null);
+    userRepository.findByNickname
+      .mockResolvedValueOnce({ user_id: 'someone-else' }) // 'Nagyeong' taken
+      .mockResolvedValueOnce({ user_id: 'someone-else' }) // 'Nagyeong2' taken
+      .mockResolvedValueOnce(null); // 'Nagyeong3' free
+    userRepository.create.mockResolvedValue({ user_id: 'new-user', nickname: 'Nagyeong3' });
+
+    await authService.kakaoLogin('kakao-token');
+
+    expect(userRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({ nickname: 'Nagyeong3' })
+    );
+  });
 });
 
 describe('getProfile', () => {
@@ -120,6 +136,41 @@ describe('updateNickname', () => {
       code: 'USER_NOT_FOUND',
     });
     expect(userRepository.updateNickname).not.toHaveBeenCalled();
+  });
+
+  it('throws 409 NICKNAME_EXISTS when another user already has that nickname', async () => {
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', nickname: 'old' });
+    userRepository.findByNickname.mockResolvedValue({ user_id: 'u2', nickname: 'new' });
+
+    await expect(authService.updateNickname('u1', 'new')).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'NICKNAME_EXISTS',
+    });
+    expect(userRepository.updateNickname).not.toHaveBeenCalled();
+  });
+
+  it('does not check availability when the nickname is unchanged', async () => {
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', nickname: 'same' });
+    userRepository.updateNickname.mockResolvedValue({ user_id: 'u1', nickname: 'same' });
+
+    await authService.updateNickname('u1', 'same');
+
+    expect(userRepository.findByNickname).not.toHaveBeenCalled();
+    expect(userRepository.updateNickname).toHaveBeenCalledWith('u1', 'same');
+  });
+});
+
+describe('checkNicknameAvailability', () => {
+  it('returns available: true when no user has the nickname', async () => {
+    userRepository.findByNickname.mockResolvedValue(null);
+
+    await expect(authService.checkNicknameAvailability('새닉네임')).resolves.toEqual({ available: true });
+  });
+
+  it('returns available: false when the nickname is taken', async () => {
+    userRepository.findByNickname.mockResolvedValue({ user_id: 'u1' });
+
+    await expect(authService.checkNicknameAvailability('taken')).resolves.toEqual({ available: false });
   });
 });
 
@@ -214,6 +265,17 @@ describe('signup', () => {
     });
   });
 
+  it('throws 409 NICKNAME_EXISTS when the nickname is already taken', async () => {
+    userRepository.findByEmail.mockResolvedValue(null);
+    userRepository.findByNickname.mockResolvedValue({ user_id: 'u2' });
+
+    await expect(authService.signup('a@b.com', 'password123', 'Nagyeong')).rejects.toMatchObject({
+      statusCode: 409,
+      code: 'NICKNAME_EXISTS',
+    });
+    expect(userRepository.createEmailUser).not.toHaveBeenCalled();
+  });
+
   it('throws 400 OTP_NOT_VERIFIED when the email was never verified', async () => {
     userRepository.findByEmail.mockResolvedValue(null);
     emailOtpRepository.findLatestVerifiedByEmail.mockResolvedValue(null);
@@ -279,5 +341,154 @@ describe('login', () => {
       statusCode: 401,
       code: 'INVALID_CREDENTIALS',
     });
+  });
+});
+
+describe('changePassword', () => {
+  it('updates the password when the current password matches', async () => {
+    const passwordHash = await bcrypt.hash('old-password', 10);
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', password_hash: passwordHash });
+    userRepository.updatePasswordHash.mockResolvedValue({ user_id: 'u1' });
+
+    await authService.changePassword('u1', 'old-password', 'new-password123');
+
+    expect(userRepository.updatePasswordHash).toHaveBeenCalledWith('u1', expect.any(String));
+    const newHash = userRepository.updatePasswordHash.mock.calls[0][1];
+    expect(await bcrypt.compare('new-password123', newHash)).toBe(true);
+  });
+
+  it('throws 404 USER_NOT_FOUND when the user does not exist', async () => {
+    userRepository.findById.mockResolvedValue(null);
+
+    await expect(authService.changePassword('u1', 'old-password', 'new-password123')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'USER_NOT_FOUND',
+    });
+    expect(userRepository.updatePasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('throws 400 NO_PASSWORD_SET for a Kakao-only account', async () => {
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', password_hash: null });
+
+    await expect(authService.changePassword('u1', 'old-password', 'new-password123')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'NO_PASSWORD_SET',
+    });
+    expect(userRepository.updatePasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('throws 401 INVALID_CREDENTIALS when the current password does not match', async () => {
+    const passwordHash = await bcrypt.hash('old-password', 10);
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', password_hash: passwordHash });
+
+    await expect(authService.changePassword('u1', 'wrong-password', 'new-password123')).rejects.toMatchObject({
+      statusCode: 401,
+      code: 'INVALID_CREDENTIALS',
+    });
+    expect(userRepository.updatePasswordHash).not.toHaveBeenCalled();
+  });
+});
+
+describe('requestPasswordResetOtp', () => {
+  it('throws 404 EMAIL_NOT_FOUND when no account exists for the email', async () => {
+    userRepository.findByEmail.mockResolvedValue(null);
+
+    await expect(authService.requestPasswordResetOtp('a@b.com')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'EMAIL_NOT_FOUND',
+    });
+    expect(emailOtpRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('throws 400 NO_PASSWORD_SET for a Kakao-only account', async () => {
+    userRepository.findByEmail.mockResolvedValue({ user_id: 'u1', password_hash: null });
+
+    await expect(authService.requestPasswordResetOtp('a@b.com')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'NO_PASSWORD_SET',
+    });
+    expect(emailOtpRepository.create).not.toHaveBeenCalled();
+  });
+
+  it('creates an OTP row and emails the 6-digit code', async () => {
+    userRepository.findByEmail.mockResolvedValue({ user_id: 'u1', password_hash: 'hash' });
+
+    await authService.requestPasswordResetOtp('a@b.com');
+
+    expect(emailOtpRepository.create).toHaveBeenCalledWith('a@b.com', expect.any(String));
+    expect(emailService.sendOtpEmail).toHaveBeenCalledWith('a@b.com', expect.stringMatching(/^\d{6}$/));
+  });
+});
+
+describe('verifyPasswordResetOtp', () => {
+  it('marks the OTP verified when the code matches', async () => {
+    const codeHash = crypto.createHash('sha256').update('123456').digest('hex');
+    emailOtpRepository.findLatestUnverifiedByEmail.mockResolvedValue({
+      otp_id: 'otp1',
+      code_hash: codeHash,
+      expires_at: new Date(Date.now() + 60_000),
+      attempts: 0,
+    });
+
+    await authService.verifyPasswordResetOtp('a@b.com', '123456');
+
+    expect(emailOtpRepository.markVerified).toHaveBeenCalledWith('otp1');
+  });
+
+  it('throws 400 OTP_INVALID when the code is wrong', async () => {
+    emailOtpRepository.findLatestUnverifiedByEmail.mockResolvedValue({
+      otp_id: 'otp1',
+      code_hash: 'not-matching',
+      expires_at: new Date(Date.now() + 60_000),
+      attempts: 0,
+    });
+
+    await expect(authService.verifyPasswordResetOtp('a@b.com', '000000')).rejects.toMatchObject({
+      code: 'OTP_INVALID',
+    });
+  });
+});
+
+describe('resetPassword', () => {
+  it('throws 404 EMAIL_NOT_FOUND when no account exists for the email', async () => {
+    userRepository.findByEmail.mockResolvedValue(null);
+
+    await expect(authService.resetPassword('a@b.com', 'new-password123')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'EMAIL_NOT_FOUND',
+    });
+  });
+
+  it('throws 404 EMAIL_NOT_FOUND for a Kakao-only account', async () => {
+    userRepository.findByEmail.mockResolvedValue({ user_id: 'u1', password_hash: null });
+
+    await expect(authService.resetPassword('a@b.com', 'new-password123')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'EMAIL_NOT_FOUND',
+    });
+  });
+
+  it('throws 400 OTP_NOT_VERIFIED when the email was never verified', async () => {
+    userRepository.findByEmail.mockResolvedValue({ user_id: 'u1', password_hash: 'hash' });
+    emailOtpRepository.findLatestVerifiedByEmail.mockResolvedValue(null);
+
+    await expect(authService.resetPassword('a@b.com', 'new-password123')).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'OTP_NOT_VERIFIED',
+    });
+    expect(userRepository.updatePasswordHash).not.toHaveBeenCalled();
+  });
+
+  it('updates the password and consumes the OTP', async () => {
+    userRepository.findByEmail.mockResolvedValue({ user_id: 'u1', password_hash: 'old-hash' });
+    emailOtpRepository.findLatestVerifiedByEmail.mockResolvedValue({ otp_id: 'otp1' });
+    userRepository.updatePasswordHash.mockResolvedValue({ user_id: 'u1' });
+
+    await authService.resetPassword('a@b.com', 'new-password123');
+
+    expect(userRepository.updatePasswordHash).toHaveBeenCalledWith('u1', expect.any(String));
+    const newHash = userRepository.updatePasswordHash.mock.calls[0][1];
+    expect(await bcrypt.compare('new-password123', newHash)).toBe(true);
+    expect(emailOtpRepository.deleteByEmail).toHaveBeenCalledWith('a@b.com');
   });
 });

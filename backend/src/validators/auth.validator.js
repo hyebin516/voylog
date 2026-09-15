@@ -65,6 +65,36 @@ function validateUpdateNickname(req, res, next) {
   return next();
 }
 
+function validateCheckNickname(req, res, next) {
+  const { nickname } = req.query;
+  if (typeof nickname !== 'string' || !nickname.trim() || nickname.length > 100) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A non-empty nickname query parameter of at most 100 characters is required'));
+  }
+  return next();
+}
+
+function validateChangePassword(req, res, next) {
+  const { currentPassword, newPassword } = req.body;
+  if (typeof currentPassword !== 'string' || !currentPassword) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'Current password is required'));
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'New password must be at least 8 characters'));
+  }
+  return next();
+}
+
+function validateResetPassword(req, res, next) {
+  const { email, newPassword } = req.body;
+  if (!isValidEmail(email)) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'A valid email is required'));
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 8) {
+    return next(new AppError(400, 'INVALID_REQUEST', 'New password must be at least 8 characters'));
+  }
+  return next();
+}
+
 module.exports = {
   validateKakaoLogin,
   validateRequestOtp,
@@ -72,4 +102,7 @@ module.exports = {
   validateSignup,
   validateLogin,
   validateUpdateNickname,
+  validateCheckNickname,
+  validateChangePassword,
+  validateResetPassword,
 };

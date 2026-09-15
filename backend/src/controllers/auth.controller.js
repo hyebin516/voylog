@@ -7,6 +7,7 @@ function toUserResponse(user) {
     email: user.email,
     nickname: user.nickname,
     profileImage: user.profile_image,
+    provider: user.provider,
   };
 }
 
@@ -41,6 +42,15 @@ async function updateProfile(req, res, next) {
   try {
     const user = await authService.updateNickname(req.user.userId, req.body.nickname);
     return success(res, toUserResponse(user));
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function checkNickname(req, res, next) {
+  try {
+    const result = await authService.checkNicknameAvailability(req.query.nickname);
+    return success(res, result);
   } catch (err) {
     return next(err);
   }
@@ -82,4 +92,54 @@ async function login(req, res, next) {
   }
 }
 
-module.exports = { kakaoLogin, profile, deleteAccount, updateProfile, requestOtp, verifyOtp, signup, login };
+async function changePassword(req, res, next) {
+  try {
+    await authService.changePassword(req.user.userId, req.body.currentPassword, req.body.newPassword);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function requestPasswordResetOtp(req, res, next) {
+  try {
+    await authService.requestPasswordResetOtp(req.body.email);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function verifyPasswordResetOtp(req, res, next) {
+  try {
+    await authService.verifyPasswordResetOtp(req.body.email, req.body.code);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    await authService.resetPassword(req.body.email, req.body.newPassword);
+    return success(res, {});
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = {
+  kakaoLogin,
+  profile,
+  deleteAccount,
+  updateProfile,
+  checkNickname,
+  requestOtp,
+  verifyOtp,
+  signup,
+  login,
+  changePassword,
+  requestPasswordResetOtp,
+  verifyPasswordResetOtp,
+  resetPassword,
+};

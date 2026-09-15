@@ -3,9 +3,10 @@ const { success } = require('../utils/response');
 
 function toResponse(settings) {
   return {
-    tripAlerts: settings.trip_alerts,
-    serviceAlerts: settings.service_alerts,
+    newVlogAlerts: settings.new_vlog_alerts,
+    routeCompleteAlerts: settings.route_complete_alerts,
     marketingAlerts: settings.marketing_alerts,
+    nightSilent: settings.night_silent,
   };
 }
 
@@ -20,11 +21,12 @@ async function get(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { tripAlerts, serviceAlerts, marketingAlerts } = req.body;
+    const { newVlogAlerts, routeCompleteAlerts, marketingAlerts, nightSilent } = req.body;
     const settings = await notificationSettingsService.updateSettings(req.user.userId, {
-      tripAlerts,
-      serviceAlerts,
+      newVlogAlerts,
+      routeCompleteAlerts,
       marketingAlerts,
+      nightSilent,
     });
     return success(res, toResponse(settings));
   } catch (err) {

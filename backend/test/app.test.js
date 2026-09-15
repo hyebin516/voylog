@@ -50,6 +50,7 @@ describe('protected routes require a Bearer token', () => {
     ['POST', '/api/v1/trips'],
     ['GET', '/api/v1/trips'],
     ['GET', '/api/v1/trips/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
+    ['PATCH', '/api/v1/trips/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
     ['DELETE', '/api/v1/trips/5ad1f447-a1e2-46a0-8093-0d007ff3071d'],
     ['POST', '/api/v1/bookmark-folders'],
     ['GET', '/api/v1/bookmark-folders'],

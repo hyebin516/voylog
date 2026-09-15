@@ -2,27 +2,26 @@ const { validateUpdateNotificationSettings } = require('../../src/validators/not
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
+const VALID_BODY = { newVlogAlerts: true, routeCompleteAlerts: false, marketingAlerts: true, nightSilent: false };
+
 describe('validateUpdateNotificationSettings', () => {
-  it('passes when all three fields are booleans', () => {
+  it('passes when all four fields are booleans', () => {
     const next = jest.fn();
-    validateUpdateNotificationSettings(
-      mockReq({ body: { tripAlerts: true, serviceAlerts: false, marketingAlerts: true } }),
-      mockRes(),
-      next
-    );
+    validateUpdateNotificationSettings(mockReq({ body: VALID_BODY }), mockRes(), next);
     expect(next).toHaveBeenCalledWith();
   });
 
   it('rejects when a field is missing', () => {
     const next = jest.fn();
-    validateUpdateNotificationSettings(mockReq({ body: { tripAlerts: true, serviceAlerts: false } }), mockRes(), next);
+    const { nightSilent, ...withoutNightSilent } = VALID_BODY;
+    validateUpdateNotificationSettings(mockReq({ body: withoutNightSilent }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 
   it('rejects when a field is not a boolean', () => {
     const next = jest.fn();
     validateUpdateNotificationSettings(
-      mockReq({ body: { tripAlerts: 'yes', serviceAlerts: false, marketingAlerts: true } }),
+      mockReq({ body: { ...VALID_BODY, newVlogAlerts: 'yes' } }),
       mockRes(),
       next
     );

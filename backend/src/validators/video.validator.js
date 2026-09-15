@@ -22,7 +22,7 @@ function validateSearchRequest(req, res, next) {
   return next();
 }
 
-const VALID_DURATIONS = ['당일치기', '1박2일', '2박3일', '3박4일', '4박5일이상'];
+const VALID_DURATIONS = ['당일치기', '1박 2일', '2박 3일', '3박 4일', '4박 5일 이상'];
 
 function isNonEmptyStringArray(value) {
   return Array.isArray(value) && value.length > 0 && value.every((v) => typeof v === 'string' && v.trim());

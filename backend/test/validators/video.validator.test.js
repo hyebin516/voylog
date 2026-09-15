@@ -62,7 +62,7 @@ describe('validateSearchRequest', () => {
 });
 
 describe('validateRecommendationRequest', () => {
-  const VALID_BODY = { regions: ['제주'], themes: ['자연'], duration: '1박2일' };
+  const VALID_BODY = { regions: ['제주'], themes: ['자연'], duration: '1박 2일' };
 
   it('passes for a valid regions/themes/duration combination', () => {
     const next = jest.fn();

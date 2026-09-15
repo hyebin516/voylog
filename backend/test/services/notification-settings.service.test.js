@@ -11,18 +11,20 @@ describe('getSettings', () => {
   it('returns the saved settings when they exist', async () => {
     notificationSettingsRepository.find.mockResolvedValue({
       user_id: USER_ID,
-      trip_alerts: false,
-      service_alerts: true,
+      new_vlog_alerts: false,
+      route_complete_alerts: true,
       marketing_alerts: true,
+      night_silent: true,
     });
 
     const settings = await notificationSettingsService.getSettings(USER_ID);
 
     expect(settings).toEqual({
       user_id: USER_ID,
-      trip_alerts: false,
-      service_alerts: true,
+      new_vlog_alerts: false,
+      route_complete_alerts: true,
       marketing_alerts: true,
+      night_silent: true,
     });
   });
 
@@ -33,16 +35,17 @@ describe('getSettings', () => {
 
     expect(settings).toEqual({
       user_id: USER_ID,
-      trip_alerts: true,
-      service_alerts: true,
+      new_vlog_alerts: true,
+      route_complete_alerts: true,
       marketing_alerts: false,
+      night_silent: false,
     });
   });
 });
 
 describe('updateSettings', () => {
   it('upserts the given settings for the user', async () => {
-    const input = { tripAlerts: false, serviceAlerts: false, marketingAlerts: true };
+    const input = { newVlogAlerts: false, routeCompleteAlerts: false, marketingAlerts: true, nightSilent: true };
     notificationSettingsRepository.upsert.mockResolvedValue({ user_id: USER_ID, ...input });
 
     await notificationSettingsService.updateSettings(USER_ID, input);

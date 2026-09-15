@@ -27,6 +27,10 @@ function mockDbClient() {
 beforeEach(() => {
   redis.get = jest.fn().mockResolvedValue(null);
   redis.set = jest.fn().mockResolvedValue('OK');
+  redis.del = jest.fn().mockResolvedValue(1);
+  // The background enrichment job is fire-and-forget, so give its
+  // repository calls sane defaults instead of letting them reject.
+  videoRepository.setEnrichmentStatus.mockResolvedValue(undefined);
 });
 
 afterEach(() => jest.clearAllMocks());
@@ -43,7 +47,13 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
   });
 
   it('returns an already-analyzed DB row as isCached:true and warms the Redis cache', async () => {
-    videoRepository.findByUrl.mockResolvedValue({ video_id: 'v1', title: 'Existing', is_analyzed: true });
+    videoRepository.findByUrl.mockResolvedValue({
+      video_id: 'v1',
+      youtube_url: YOUTUBE_URL,
+      title: 'Existing',
+      is_analyzed: true,
+      enrichment_status: 'done',
+    });
     videoRepository.findPlacesByVideoId.mockResolvedValue([]);
 
     const result = await analyzeVideo(YOUTUBE_URL);
@@ -64,7 +74,7 @@ describe('analyzeVideo caching (video:{youtubeVideoId} in Redis, DB as source of
       if (sql === 'BEGIN' || sql === 'COMMIT') return Promise.resolve();
       return Promise.resolve({ rows: [{ video_id: 'new-id', title: 'New video' }] });
     });
-    videoRepository.createVideo.mockResolvedValue({ video_id: 'new-id', title: 'New video' });
+    videoRepository.createVideo.mockResolvedValue({ video_id: 'new-id', youtube_url: YOUTUBE_URL, title: 'New video' });
     videoRepository.createPlaces.mockResolvedValue([
       {
         place_id: 'p1',
@@ -169,11 +179,11 @@ describe('getRecommendations', () => {
   it('composes regions + themes + duration into a single query and forwards it to the AI worker', async () => {
     callAiWorker.mockResolvedValue({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
 
-    const result = await getRecommendations(['제주', '부산'], ['자연', '먹방'], '1박2일');
+    const result = await getRecommendations(['제주', '부산'], ['자연', '먹방'], '1박 2일');
 
     expect(callAiWorker).toHaveBeenCalledWith(
       '/search-videos',
-      { query: '제주 부산 자연 먹방 1박2일 브이로그' },
+      { query: '제주 부산 자연 먹방 1박 2일 브이로그' },
       10000
     );
     expect(result).toEqual({ videos: [{ videoId: 'v1', youtubeUrl: 'https://youtu.be/v1', title: 't' }] });
@@ -187,5 +197,124 @@ describe('getRecommendations', () => {
       statusCode: 503,
       code: 'AI_PROVIDER_ERROR',
     });
+  });
+});
+
+describe('background screen-text enrichment', () => {
+  function mockFreshAnalysis(placeCount) {
+    const places = Array.from({ length: placeCount }, (_, i) => ({ name: `장소${i}` }));
+    videoRepository.findByUrl.mockResolvedValue(null);
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/extract-transcript') {
+        return Promise.resolve({ title: 't', description: 'd', hashtags: [], segments: [{ text: 'hi' }] });
+      }
+      if (path === '/extract-places') return Promise.resolve({ places });
+      return Promise.resolve({});
+    });
+    videoRepository.createVideo.mockResolvedValue({
+      video_id: 'v1',
+      youtube_url: YOUTUBE_URL,
+      title: 't',
+    });
+    videoRepository.createPlaces.mockResolvedValue(
+      places.map((p, i) => ({ place_id: `p${i}`, name: p.name, confidence: 0.8 }))
+    );
+    mockDbClient();
+    return places;
+  }
+
+  it('reports enrichmentPending and starts the job when the text pass found few places', async () => {
+    mockFreshAnalysis(2);
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(result.enrichmentPending).toBe(true);
+    expect(videoRepository.setEnrichmentStatus).toHaveBeenCalledWith('v1', 'pending');
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/extract-places',
+      expect.objectContaining({ forceScreenText: true }),
+      expect.any(Number)
+    );
+  });
+
+  it('enriches even when the text pass already found plenty of places', async () => {
+    // A transcript can yield 10 places while more only appear as on-screen
+    // overlays -- users reported missing places on exactly those videos.
+    mockFreshAnalysis(12);
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(result.enrichmentPending).toBe(true);
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/extract-places',
+      expect.objectContaining({ forceScreenText: true }),
+      expect.any(Number)
+    );
+  });
+
+  it('catches up an older, never-enriched video when it is opened again', async () => {
+    videoRepository.findByUrl.mockResolvedValue({
+      video_id: 'old',
+      youtube_url: YOUTUBE_URL,
+      title: 'Older video',
+      is_analyzed: true,
+      enrichment_status: null,
+    });
+    videoRepository.findPlacesByVideoId.mockResolvedValue([{ place_id: 'p1', name: '장소', confidence: 0.8 }]);
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/extract-transcript') {
+        return Promise.resolve({ title: 't', description: 'd', hashtags: [], segments: [] });
+      }
+      return new Promise(() => {}); // the enrichment is still running
+    });
+
+    const result = await analyzeVideo(YOUTUBE_URL);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(result.isCached).toBe(true);
+    expect(result.enrichmentPending).toBe(true);
+    expect(videoRepository.setEnrichmentStatus).toHaveBeenCalledWith('old', 'pending');
+    expect(callAiWorker).toHaveBeenCalledWith('/extract-transcript', expect.anything(), expect.any(Number));
+    // Caching now would pin enrichmentPending=true after the job finishes.
+    expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('does not re-enrich a video whose enrichment already ran', async () => {
+    videoRepository.findByUrl.mockResolvedValue({
+      video_id: 'v1',
+      youtube_url: YOUTUBE_URL,
+      title: 't',
+      is_analyzed: true,
+      enrichment_status: 'failed',
+    });
+    videoRepository.findPlacesByVideoId.mockResolvedValue([]);
+
+    await analyzeVideo(YOUTUBE_URL);
+
+    expect(callAiWorker).not.toHaveBeenCalled();
+    expect(videoRepository.setEnrichmentStatus).not.toHaveBeenCalled();
+  });
+
+  it('never makes the user wait on the enrichment call', async () => {
+    mockFreshAnalysis(2);
+    let resolveEnrichment;
+    callAiWorker.mockImplementation((path, payload) => {
+      if (path === '/extract-transcript') {
+        return Promise.resolve({ title: 't', description: 'd', hashtags: [], segments: [{ text: 'hi' }] });
+      }
+      if (path === '/extract-places' && payload.forceScreenText) {
+        return new Promise((resolve) => {
+          resolveEnrichment = resolve;
+        });
+      }
+      if (path === '/extract-places') return Promise.resolve({ places: [{ name: '장소0' }, { name: '장소1' }] });
+      return Promise.resolve({});
+    });
+
+    // Resolves even though the enrichment promise is still pending.
+    const result = await analyzeVideo(YOUTUBE_URL);
+
+    expect(result.places).toHaveLength(2);
+    expect(resolveEnrichment).toBeDefined();
   });
 });

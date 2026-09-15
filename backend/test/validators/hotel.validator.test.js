@@ -1,4 +1,9 @@
-const { validateCreateHotel, validateHotelId } = require('../../src/validators/hotel.validator');
+const {
+  validateCreateHotel,
+  validateHotelId,
+  validateHotelSearchQuery,
+  validateReverseGeocodeQuery,
+} = require('../../src/validators/hotel.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
@@ -37,6 +42,46 @@ describe('validateHotelId', () => {
   it('rejects a non-uuid param', () => {
     const next = jest.fn();
     validateHotelId(mockReq({ params: { id: 'nope' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateHotelSearchQuery', () => {
+  it('passes for a non-empty query', () => {
+    const next = jest.fn();
+    validateHotelSearchQuery(mockReq({ query: { query: '제주 호텔' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing query', () => {
+    const next = jest.fn();
+    validateHotelSearchQuery(mockReq({ query: {} }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a blank/whitespace-only query', () => {
+    const next = jest.fn();
+    validateHotelSearchQuery(mockReq({ query: { query: '   ' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateReverseGeocodeQuery', () => {
+  it('passes for numeric latitude/longitude query params', () => {
+    const next = jest.fn();
+    validateReverseGeocodeQuery(mockReq({ query: { latitude: '37.5', longitude: '127.0' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing latitude/longitude', () => {
+    const next = jest.fn();
+    validateReverseGeocodeQuery(mockReq({ query: {} }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a non-numeric latitude', () => {
+    const next = jest.fn();
+    validateReverseGeocodeQuery(mockReq({ query: { latitude: 'abc', longitude: '127.0' } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

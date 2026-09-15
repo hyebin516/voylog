@@ -1,5 +1,6 @@
 const hotelRepository = require('../repositories/hotel.repository');
 const AppError = require('../utils/AppError');
+const { callAiWorker } = require('./aiWorkerClient');
 
 async function getOwnedHotel(userId, hotelId) {
   const hotel = await hotelRepository.findById(hotelId);
@@ -27,4 +28,22 @@ async function deleteHotel(userId, hotelId) {
   await hotelRepository.softDelete(hotelId);
 }
 
-module.exports = { createHotel, listHotels, updateHotel, deleteHotel, getOwnedHotel };
+async function searchHotels(query) {
+  const result = await callAiWorker('/geocode/search', { query }, 10000);
+  return result.candidates || [];
+}
+
+async function reverseGeocode(latitude, longitude) {
+  const result = await callAiWorker('/geocode/reverse', { latitude, longitude }, 10000);
+  return result.address || null;
+}
+
+module.exports = {
+  createHotel,
+  listHotels,
+  updateHotel,
+  deleteHotel,
+  getOwnedHotel,
+  searchHotels,
+  reverseGeocode,
+};

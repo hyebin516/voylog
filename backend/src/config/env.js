@@ -15,4 +15,5 @@ module.exports = {
   smtpUser: process.env.SMTP_USER,
   smtpPassword: process.env.SMTP_PASSWORD,
   smtpFrom: process.env.SMTP_FROM || 'Voylog <no-reply@voylog.app>',
+  tourApiKey: process.env.TOUR_API_KEY,
 };

@@ -5,6 +5,9 @@ const {
   validateSignup,
   validateLogin,
   validateUpdateNickname,
+  validateCheckNickname,
+  validateChangePassword,
+  validateResetPassword,
 } = require('../../src/validators/auth.validator');
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
@@ -119,6 +122,74 @@ describe('validateUpdateNickname', () => {
   it('rejects a nickname longer than 100 characters', () => {
     const next = jest.fn();
     validateUpdateNickname(mockReq({ body: { nickname: 'a'.repeat(101) } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateCheckNickname', () => {
+  it('passes for a non-empty nickname query param', () => {
+    const next = jest.fn();
+    validateCheckNickname(mockReq({ query: { nickname: '새 닉네임' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing nickname query param', () => {
+    const next = jest.fn();
+    validateCheckNickname(mockReq({ query: {} }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a blank/whitespace-only nickname', () => {
+    const next = jest.fn();
+    validateCheckNickname(mockReq({ query: { nickname: '   ' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateChangePassword', () => {
+  it('passes for a valid current/new password pair', () => {
+    const next = jest.fn();
+    validateChangePassword(
+      mockReq({ body: { currentPassword: 'old-password', newPassword: 'new-password123' } }),
+      mockRes(),
+      next
+    );
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a missing currentPassword', () => {
+    const next = jest.fn();
+    validateChangePassword(mockReq({ body: { newPassword: 'new-password123' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a newPassword shorter than 8 characters', () => {
+    const next = jest.fn();
+    validateChangePassword(
+      mockReq({ body: { currentPassword: 'old-password', newPassword: 'short' } }),
+      mockRes(),
+      next
+    );
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+});
+
+describe('validateResetPassword', () => {
+  it('passes for a valid email and 8+ char newPassword', () => {
+    const next = jest.fn();
+    validateResetPassword(mockReq({ body: { email: 'a@b.com', newPassword: 'new-password123' } }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
+  it('rejects a malformed email', () => {
+    const next = jest.fn();
+    validateResetPassword(mockReq({ body: { email: 'nope', newPassword: 'new-password123' } }), mockRes(), next);
+    expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
+  });
+
+  it('rejects a newPassword shorter than 8 characters', () => {
+    const next = jest.fn();
+    validateResetPassword(mockReq({ body: { email: 'a@b.com', newPassword: 'short' } }), mockRes(), next);
     expect(next.mock.calls[0][0]).toBeInstanceOf(AppError);
   });
 });

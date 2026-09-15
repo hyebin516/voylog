@@ -58,4 +58,23 @@ async function createPlaces(client, videoId, places) {
   return inserted;
 }
 
-module.exports = { findByUrl, findPlacesByVideoId, createVideo, createPlaces };
+async function setEnrichmentStatus(videoId, status) {
+  await pool.query('UPDATE videos SET enrichment_status = $1, updated_at = now() WHERE video_id = $2', [
+    status,
+    videoId,
+  ]);
+}
+
+async function findById(videoId) {
+  const { rows } = await pool.query('SELECT * FROM videos WHERE video_id = $1', [videoId]);
+  return rows[0] || null;
+}
+
+module.exports = {
+  findByUrl,
+  findById,
+  findPlacesByVideoId,
+  createVideo,
+  createPlaces,
+  setEnrichmentStatus,
+};

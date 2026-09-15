@@ -3,7 +3,7 @@ const { success } = require('../utils/response');
 
 async function nearby(req, res, next) {
   try {
-    const { latitude, longitude, localTime, radiusMeters, limit } = req.body;
+    const { latitude, longitude, localTime, radiusMeters, limit, categoryGroup } = req.body;
     const result = await recommendationService.getNearbyRecommendations({
       userId: req.user ? req.user.userId : null,
       latitude,
@@ -11,6 +11,7 @@ async function nearby(req, res, next) {
       localTime,
       radiusMeters,
       limit,
+      categoryGroup,
     });
     return success(res, result);
   } catch (err) {
@@ -20,11 +21,18 @@ async function nearby(req, res, next) {
 
 async function walkingCourse(req, res, next) {
   try {
-    const { region, localTime } = req.body;
+    const { region, localTime, mood, walkDuration, startLatitude, startLongitude, startName, avoidPlaceIds } =
+      req.body;
     const result = await recommendationService.getWalkingCourse({
       userId: req.user ? req.user.userId : null,
       region,
       localTime,
+      mood,
+      walkDuration,
+      startLatitude,
+      startLongitude,
+      startName,
+      avoidPlaceIds,
     });
     return success(res, result);
   } catch (err) {

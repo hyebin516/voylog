@@ -40,6 +40,19 @@ async function findByEmail(email) {
   return rows[0] || null;
 }
 
+async function findByNickname(nickname) {
+  const { rows } = await pool.query('SELECT * FROM users WHERE nickname = $1 AND deleted_at IS NULL', [nickname]);
+  return rows[0] || null;
+}
+
+async function updatePasswordHash(userId, passwordHash) {
+  const { rows } = await pool.query(
+    'UPDATE users SET password_hash = $1, updated_at = now() WHERE user_id = $2 AND deleted_at IS NULL RETURNING *',
+    [passwordHash, userId]
+  );
+  return rows[0];
+}
+
 async function createEmailUser({ email, passwordHash, nickname }) {
   const { rows } = await pool.query(
     `INSERT INTO users (provider, provider_id, email, nickname, password_hash)
@@ -50,4 +63,14 @@ async function createEmailUser({ email, passwordHash, nickname }) {
   return rows[0];
 }
 
-module.exports = { findByProviderId, findById, create, softDelete, findByEmail, createEmailUser, updateNickname };
+module.exports = {
+  findByProviderId,
+  findById,
+  create,
+  softDelete,
+  findByEmail,
+  findByNickname,
+  createEmailUser,
+  updateNickname,
+  updatePasswordHash,
+};

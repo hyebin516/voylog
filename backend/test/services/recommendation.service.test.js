@@ -3,12 +3,14 @@ jest.mock('../../src/repositories/taste-preference.repository');
 jest.mock('../../src/repositories/behavior.repository');
 jest.mock('../../src/repositories/bookmark.repository');
 jest.mock('../../src/services/aiWorkerClient');
+jest.mock('../../src/services/place-embedding.service');
 
 const recommendationRepository = require('../../src/repositories/recommendation.repository');
 const tastePreferenceRepository = require('../../src/repositories/taste-preference.repository');
 const behaviorRepository = require('../../src/repositories/behavior.repository');
 const bookmarkRepository = require('../../src/repositories/bookmark.repository');
 const { callAiWorker } = require('../../src/services/aiWorkerClient');
+const { ensurePlaceEmbeddings } = require('../../src/services/place-embedding.service');
 const {
   getNearbyRecommendations,
   getWalkingCourse,
@@ -17,6 +19,7 @@ const {
 
 beforeEach(() => {
   behaviorRepository.findHiddenPlaceIds.mockResolvedValue([]);
+  ensurePlaceEmbeddings.mockImplementation(async (places) => places);
 });
 
 afterEach(() => jest.clearAllMocks());
@@ -83,7 +86,7 @@ describe('getNearbyRecommendations', () => {
       limit: 999,
     });
 
-    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 5000, 100, []);
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 5000, 100, [], false, null);
   });
 
   it('applies default radius/limit when not provided', async () => {
@@ -91,7 +94,7 @@ describe('getNearbyRecommendations', () => {
 
     await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
 
-    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, []);
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, [], false, null);
   });
 
   it('passes candidate embeddings through to the AI worker', async () => {
@@ -137,6 +140,30 @@ describe('getNearbyRecommendations', () => {
       expect.objectContaining({ userEmbedding: [0.9, 0.1] }),
       10000
     );
+  });
+
+  it('embeds candidates missing an embedding when the user has a taste embedding', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    tastePreferenceRepository.find.mockResolvedValue({ user_id: 'u1', embedding: [0.9, 0.1], source_tags: [], tag_scores: {} });
+    ensurePlaceEmbeddings.mockImplementation(async (places) => places.map((p) => ({ ...p, embedding: [0.3, 0.7] })));
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ userId: 'u1', latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/nearby-score',
+      expect.objectContaining({ candidates: [expect.objectContaining({ placeId: 'p1', embedding: [0.3, 0.7] })] }),
+      10000
+    );
+  });
+
+  it('does not embed candidates for a guest, who has nothing to compare them with', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([{ place_id: 'p1', name: 'Place 1', latitude: '37.5', longitude: '127.0' }]);
+    callAiWorker.mockResolvedValue({ recommendations: [] });
+
+    await getNearbyRecommendations({ latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
+
+    expect(ensurePlaceEmbeddings).not.toHaveBeenCalled();
   });
 
   it('leaves userEmbedding null when the logged-in user has not set preferences yet', async () => {
@@ -221,6 +248,19 @@ describe('getNearbyRecommendations', () => {
     );
   });
 
+  it('narrows candidates to the requested category group before scoring', async () => {
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getNearbyRecommendations({
+      latitude: 37.5,
+      longitude: 127.0,
+      localTime: '2026-08-10T20:30:00',
+      categoryGroup: 'cafe',
+    });
+
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, [], false, ['cafe', 'bakery']);
+  });
+
   it('excludes places the user hid or marked not-interested from the candidate query', async () => {
     behaviorRepository.findHiddenPlaceIds.mockResolvedValue(['p2', 'p3']);
     recommendationRepository.findNearby.mockResolvedValue([]);
@@ -228,7 +268,7 @@ describe('getNearbyRecommendations', () => {
     await getNearbyRecommendations({ userId: 'u1', latitude: 37.5, longitude: 127.0, localTime: '2026-08-10T12:00:00' });
 
     expect(behaviorRepository.findHiddenPlaceIds).toHaveBeenCalledWith('u1');
-    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, ['p2', 'p3']);
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(37.5, 127.0, 2000, 100, ['p2', 'p3'], false, null);
   });
 });
 
@@ -246,6 +286,7 @@ describe('getWalkingCourse', () => {
 
     expect(callAiWorker).toHaveBeenCalledWith('/geocode', { query: '제주' }, 10000);
     expect(recommendationRepository.findNearby).toHaveBeenCalledWith(33.4996, 126.5312, 3000, 60, [], true);
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(33.4996, 126.5312, 3000, 150, [], false);
     expect(callAiWorker).toHaveBeenCalledWith(
       '/recommendations/walking-course',
       expect.objectContaining({
@@ -258,6 +299,143 @@ describe('getWalkingCourse', () => {
           expect.objectContaining({ placeId: 'p1', name: '북마크장소', latitude: 33.5, longitude: 126.53, category: 'cafe' }),
         ],
       }),
+      15000
+    );
+  });
+
+  it('also forwards nearby stored places, minus the ones already sent as bookmarks', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockImplementation((lat, lng, radius, limit, exclude, bookmarkedOnly) =>
+      Promise.resolve(
+        bookmarkedOnly
+          ? [{ place_id: 'p1', name: '북마크장소', latitude: '33.5', longitude: '126.5' }]
+          : [
+              { place_id: 'p1', name: '북마크장소', latitude: '33.5', longitude: '126.5' },
+              { place_id: 'p2', name: '경복궁', latitude: '33.5', longitude: '126.5', category: 'attraction' },
+            ]
+      )
+    );
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ placeCandidates: [expect.objectContaining({ placeId: 'p2', name: '경복궁' })] }),
+      15000
+    );
+  });
+
+  it('forwards a user-chosen start point as the course start/end', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({
+      userId: 'u1',
+      region: '제주',
+      localTime: '2026-08-10T12:00:00',
+      startLatitude: 33.51,
+      startLongitude: 126.52,
+      startName: '제주공항 앞',
+    });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({
+        startPoint: {
+          pointId: 'start-point',
+          name: '제주공항 앞',
+          latitude: 33.51,
+          longitude: 126.52,
+        },
+      }),
+      15000
+    );
+  });
+
+  it('searches for places around the start point instead of the region center', async () => {
+    callAiWorker.mockResolvedValue({ course: null, recommendations: [] });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({
+      region: '제주',
+      localTime: '2026-08-10T12:00:00',
+      startLatitude: 33.51,
+      startLongitude: 126.52,
+    });
+
+    // Geocoding the region would recenter the search and make the start
+    // point change nothing but the route's endpoints.
+    expect(callAiWorker).not.toHaveBeenCalledWith('/geocode', expect.anything(), expect.anything());
+    expect(recommendationRepository.findNearby).toHaveBeenCalledWith(
+      33.51,
+      126.52,
+      expect.any(Number),
+      expect.any(Number),
+      expect.any(Array),
+      true
+    );
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ centerLatitude: 33.51, centerLongitude: 126.52 }),
+      15000
+    );
+  });
+
+  it('forwards the previous course places to avoid when regenerating', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00', avoidPlaceIds: ['p1', 'kakao:9'] });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ avoidPlaceIds: ['p1', 'kakao:9'] }),
+      15000
+    );
+  });
+
+  it('names an unnamed start point rather than sending it blank', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({
+      region: '제주',
+      localTime: '2026-08-10T12:00:00',
+      startLatitude: 33.51,
+      startLongitude: 126.52,
+    });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ startPoint: expect.objectContaining({ name: '출발 지점' }) }),
+      15000
+    );
+  });
+
+  it('sends a null startPoint when the user did not choose one', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ startPoint: null }),
       15000
     );
   });
@@ -308,6 +486,22 @@ describe('getWalkingCourse', () => {
     expect(callAiWorker).toHaveBeenCalledWith(
       '/recommendations/walking-course',
       expect.objectContaining({ userEmbedding: null, userTagScores: {} }),
+      15000
+    );
+  });
+
+  it('forwards mood and walkDuration to the AI worker when provided', async () => {
+    callAiWorker.mockImplementation((path) => {
+      if (path === '/geocode') return Promise.resolve({ latitude: 33.5, longitude: 126.5 });
+      return Promise.resolve({ course: null, recommendations: [] });
+    });
+    recommendationRepository.findNearby.mockResolvedValue([]);
+
+    await getWalkingCourse({ region: '제주', localTime: '2026-08-10T12:00:00', mood: '힙한', walkDuration: '2~3시간' });
+
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/recommendations/walking-course',
+      expect.objectContaining({ mood: '힙한', walkDuration: '2~3시간' }),
       15000
     );
   });
