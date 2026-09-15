@@ -2,3 +2,7 @@
 Thumbs.db
 .vscode/
 .idea/
+
+# Bulk public place datasets (SEMAS 상가정보 zip/CSV, TourAPI dumps) -- too large
+# for git and subject to each dataset's license terms; kept locally only.
+database/seed-data/
