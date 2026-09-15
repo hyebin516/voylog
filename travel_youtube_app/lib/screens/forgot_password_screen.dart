@@ -11,14 +11,16 @@ import '../widgets/inline_field_error.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 
-class SignupEmailScreen extends StatefulWidget {
-  const SignupEmailScreen({super.key});
+/// Step 1 of the forgot-password flow: enter the account email to receive
+/// a 6-digit OTP (reuses the same email OTP infrastructure as signup).
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<SignupEmailScreen> createState() => _SignupEmailScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _SignupEmailScreenState extends State<SignupEmailScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final TextEditingController _emailController = TextEditingController();
   String? _inputError;
 
@@ -28,7 +30,7 @@ class _SignupEmailScreenState extends State<SignupEmailScreen> {
     super.dispose();
   }
 
-  Future<void> _onRequestOtpPressed(AuthProvider authProvider) async {
+  Future<void> _onSendCodePressed(AuthProvider authProvider) async {
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       setState(() => _inputError = '이메일을 입력해 주세요.');
@@ -36,11 +38,13 @@ class _SignupEmailScreenState extends State<SignupEmailScreen> {
     }
     setState(() => _inputError = null);
 
-    final success = await authProvider.requestSignupOtp(email);
-    if (!mounted) return;
-    if (success) {
-      Navigator.pushNamed(context, AppRoutes.signupOtp, arguments: email);
-    }
+    final success = await authProvider.requestPasswordResetOtp(email);
+    if (!mounted || !success) return;
+
+    final verified = await Navigator.pushNamed<bool>(context, AppRoutes.passwordResetOtp, arguments: email);
+    if (!mounted || verified != true) return;
+
+    Navigator.pushReplacementNamed(context, AppRoutes.resetPassword, arguments: email);
   }
 
   @override
@@ -61,36 +65,36 @@ class _SignupEmailScreenState extends State<SignupEmailScreen> {
                     children: [
                       const AuthBackButton(),
                       const SizedBox(width: AppSpacing.sm),
-                      Text('회원가입', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
+                      Text('비밀번호 찾기', style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700)),
                     ],
                   ),
-                  const SizedBox(height: 34),
-                  Text('이메일로 시작해볼까요?', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
+                  const SizedBox(height: AppSpacing.lg),
+                  Text('가입한 이메일을 입력해 주세요', style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
                   const SizedBox(height: 6),
                   Text(
-                    '입력하신 이메일로 인증번호를 보내드려요',
+                    '인증코드를 보내드릴게요',
                     style: textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   TextField(
-                    key: const Key('signupEmailField'),
+                    key: const Key('forgotPasswordEmailField'),
                     controller: _emailController,
                     keyboardType: TextInputType.emailAddress,
                     decoration: const InputDecoration(
-                      hintText: 'example@voylog.app',
+                      hintText: '이메일',
                       prefixIcon: Icon(Icons.mail_outline_rounded),
                     ),
                   ),
                   if (_inputError != null) InlineFieldError(message: _inputError!),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.md),
                   PrimaryButton(
-                    label: '인증번호 받기',
+                    label: '인증코드 받기',
                     isLoading: authProvider.isLoading,
-                    onPressed: () => _onRequestOtpPressed(authProvider),
+                    onPressed: () => _onSendCodePressed(authProvider),
                   ),
                   if (authProvider.state == ViewState.error) ...[
                     const SizedBox(height: AppSpacing.md),
-                    ErrorView(message: authProvider.errorMessage ?? '인증번호 발송에 실패했습니다.'),
+                    ErrorView(message: authProvider.errorMessage ?? '요청에 실패했습니다.'),
                   ],
                 ],
               ),

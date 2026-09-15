@@ -6,9 +6,10 @@ import 'package:travel_youtube_app/repositories/notification_settings_repository
 import 'package:travel_youtube_app/utils/view_state.dart';
 
 const NotificationSettingsModel _defaults = NotificationSettingsModel(
-  tripAlerts: true,
-  serviceAlerts: true,
+  newVlogAlerts: true,
+  routeCompleteAlerts: true,
   marketingAlerts: false,
+  nightSilent: false,
 );
 
 class FakeNotificationSettingsRepository extends NotificationSettingsRepository {
@@ -52,7 +53,7 @@ void main() {
       await provider.loadSettings();
 
       expect(provider.state, ViewState.success);
-      expect(provider.settings?.tripAlerts, isTrue);
+      expect(provider.settings?.newVlogAlerts, isTrue);
     });
 
     test('transitions to error on failure', () async {
@@ -65,7 +66,7 @@ void main() {
     });
   });
 
-  group('updateTripAlerts / updateServiceAlerts / updateMarketingAlerts', () {
+  group('individual toggle updates', () {
     test('optimistically flips the toggle and persists it', () async {
       await provider.loadSettings();
 
@@ -80,17 +81,47 @@ void main() {
       await provider.loadSettings();
       repository.updateError = const ApiException(code: 'INTERNAL_ERROR', message: 'boom');
 
-      await provider.updateTripAlerts(false);
+      await provider.updateNewVlogAlerts(false);
 
-      expect(provider.settings?.tripAlerts, isTrue);
+      expect(provider.settings?.newVlogAlerts, isTrue);
       expect(provider.errorMessage, isNotNull);
     });
 
     test('does nothing when settings have not loaded yet', () async {
-      await provider.updateTripAlerts(false);
+      await provider.updateNewVlogAlerts(false);
 
       expect(provider.settings, isNull);
       expect(repository.lastUpdate, isNull);
+    });
+  });
+
+  group('updateAll (master toggle)', () {
+    test('turning it on enables every alert and clears night-silent', () async {
+      repository.settingsToReturn = const NotificationSettingsModel(
+        newVlogAlerts: false,
+        routeCompleteAlerts: false,
+        marketingAlerts: false,
+        nightSilent: true,
+      );
+      await provider.loadSettings();
+
+      await provider.updateAll(true);
+
+      expect(provider.settings?.newVlogAlerts, isTrue);
+      expect(provider.settings?.routeCompleteAlerts, isTrue);
+      expect(provider.settings?.marketingAlerts, isTrue);
+      expect(provider.settings?.nightSilent, isFalse);
+    });
+
+    test('turning it off disables every alert and sets night-silent', () async {
+      await provider.loadSettings();
+
+      await provider.updateAll(false);
+
+      expect(provider.settings?.newVlogAlerts, isFalse);
+      expect(provider.settings?.routeCompleteAlerts, isFalse);
+      expect(provider.settings?.marketingAlerts, isFalse);
+      expect(provider.settings?.nightSilent, isTrue);
     });
   });
 }

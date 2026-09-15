@@ -26,6 +26,34 @@ void main() {
       expect(hotelPoint.isHotel, isTrue);
       expect(placePoint.isHotel, isFalse);
     });
+
+    test('parses legDistanceM/legDurationSec when present, and leaves them null when missing', () {
+      final withLeg = RoutePointModel.fromJson({
+        'order': 1,
+        'type': 'place',
+        'hotelId': null,
+        'placeId': 'p1',
+        'name': 'Place',
+        'latitude': 37.51,
+        'longitude': 127.01,
+        'legDistanceM': 350,
+        'legDurationSec': 480,
+      });
+      final withoutLeg = RoutePointModel.fromJson({
+        'order': 0,
+        'type': 'hotel',
+        'hotelId': 'h1',
+        'placeId': null,
+        'name': 'Hotel',
+        'latitude': 37.5,
+        'longitude': 127.0,
+      });
+
+      expect(withLeg.legDistanceM, 350);
+      expect(withLeg.legDurationSec, 480);
+      expect(withoutLeg.legDistanceM, isNull);
+      expect(withoutLeg.legDurationSec, isNull);
+    });
   });
 
   group('ItineraryModel.fromJson', () {

@@ -24,8 +24,13 @@ class RecommendationThemeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '관심 있는 테마를 선택하세요 (복수 선택 가능)',
-                style: Theme.of(context).textTheme.titleMedium,
+                '어떤 느낌이 좋으세요?',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '원하는 여행 테마를 골라주세요',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(

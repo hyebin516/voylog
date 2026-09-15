@@ -1,4 +1,6 @@
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:travel_youtube_app/models/place_model.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/models/video_search_result_model.dart';
@@ -19,6 +21,10 @@ class FakeVideoRepository extends VideoRepository {
   VideoModel? videoToReturn;
   ApiException? error;
   String? lastUrl;
+  int analyzeCalls = 0;
+  /// Successive responses for the enrichment-polling tests; falls back to
+  /// [videoToReturn] once exhausted.
+  List<VideoModel> analyzeQueue = [];
 
   List<VideoSearchResultModel> searchResultsToReturn = [];
   ApiException? searchError;
@@ -31,7 +37,9 @@ class FakeVideoRepository extends VideoRepository {
   @override
   Future<VideoModel> analyze(String youtubeUrl) async {
     lastUrl = youtubeUrl;
+    analyzeCalls++;
     if (error != null) throw error!;
+    if (analyzeQueue.isNotEmpty) return analyzeQueue.removeAt(0);
     return videoToReturn!;
   }
 
@@ -57,6 +65,7 @@ class FakeVideoRepository extends VideoRepository {
 }
 
 void main() {
+  group('enrichment polling', _enrichmentTests);
   late FakeVideoRepository repository;
   late VideoProvider provider;
 
@@ -72,7 +81,7 @@ void main() {
 
   group('analyze', () {
     test('transitions to success and stores the analyzed video', () async {
-      repository.videoToReturn = const VideoModel(videoId: 'v1', title: 'Trip', isCached: false, places: []);
+      repository.videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 'Trip', isCached: false, places: []);
 
       await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
 
@@ -93,7 +102,7 @@ void main() {
   });
 
   test('reset clears the current video, error, and returns to idle', () async {
-    repository.videoToReturn = const VideoModel(videoId: 'v1', title: 'Trip', isCached: false, places: []);
+    repository.videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 'Trip', isCached: false, places: []);
     await provider.analyze('https://youtu.be/dQw4w9WgXcQ');
 
     provider.reset();
@@ -130,7 +139,7 @@ void main() {
     });
 
     test('does not affect the separate analyze/currentVideo state', () async {
-      repository.videoToReturn = const VideoModel(videoId: 'v1', title: 'Trip', isCached: false, places: []);
+      repository.videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 'Trip', isCached: false, places: []);
       await provider.analyze('https://youtu.be/dQw4w9WgXcQ');
 
       repository.searchResultsToReturn = [_searchResult];
@@ -146,11 +155,11 @@ void main() {
     test('transitions to success and stores the results', () async {
       repository.searchResultsToReturn = [_searchResult];
 
-      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박 2일');
 
       expect(repository.lastRegions, ['제주']);
       expect(repository.lastThemes, ['자연']);
-      expect(repository.lastDuration, '1박2일');
+      expect(repository.lastDuration, '1박 2일');
       expect(provider.searchState, ViewState.success);
       expect(provider.searchResults, [_searchResult]);
     });
@@ -158,7 +167,7 @@ void main() {
     test('transitions to error with a friendly message on failure', () async {
       repository.searchError = const ApiException(code: 'YOUTUBE_SEARCH_FAILED', message: 'boom');
 
-      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+      await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박 2일');
 
       expect(provider.searchState, ViewState.error);
       expect(provider.searchErrorMessage, isNotNull);
@@ -175,5 +184,91 @@ void main() {
     expect(provider.searchState, ViewState.idle);
     expect(provider.searchResults, isEmpty);
     expect(provider.searchErrorMessage, isNull);
+  });
+}
+
+VideoModel _video({required int placeCount, required bool enrichmentPending}) {
+  return VideoModel(
+    videoId: 'v1',
+    youtubeVideoId: 'abc',
+    title: 't',
+    isCached: false,
+    enrichmentPending: enrichmentPending,
+    places: List.generate(
+      placeCount,
+      (i) => PlaceModel(
+        placeId: 'p$i',
+        name: '장소$i',
+        timestampSec: null,
+        latitude: null,
+        longitude: null,
+        address: null,
+        source: 'transcript',
+        confidence: 0.8,
+      ),
+    ),
+  );
+}
+
+void _enrichmentTests() {
+  test('does not poll when the backend reports no pending enrichment', () {
+    fakeAsync((async) {
+      final repository = FakeVideoRepository()
+        ..videoToReturn = _video(placeCount: 6, enrichmentPending: false);
+      final provider = VideoProvider(repository: repository);
+
+      provider.analyze('https://youtu.be/abc');
+      async.flushMicrotasks();
+      async.elapse(const Duration(minutes: 5));
+
+      expect(repository.analyzeCalls, 1);
+    });
+  });
+
+  test('polls while enrichment is pending and adopts the extra places', () {
+    fakeAsync((async) {
+      final repository = FakeVideoRepository()
+        ..analyzeQueue = [
+          _video(placeCount: 2, enrichmentPending: true),
+          _video(placeCount: 2, enrichmentPending: true),
+          _video(placeCount: 7, enrichmentPending: false),
+        ]
+        ..videoToReturn = _video(placeCount: 7, enrichmentPending: false);
+      final provider = VideoProvider(repository: repository);
+
+      provider.analyze('https://youtu.be/abc');
+      async.flushMicrotasks();
+      expect(provider.currentVideo!.places, hasLength(2));
+
+      async.elapse(const Duration(seconds: 25));
+      async.flushMicrotasks();
+      expect(provider.currentVideo!.places, hasLength(2)); // nothing new yet
+
+      async.elapse(const Duration(seconds: 25));
+      async.flushMicrotasks();
+      expect(provider.currentVideo!.places, hasLength(7));
+
+      // Enrichment reported done, so polling stops.
+      final callsAfterDone = repository.analyzeCalls;
+      async.elapse(const Duration(minutes: 5));
+      expect(repository.analyzeCalls, callsAfterDone);
+    });
+  });
+
+  test('stops polling when the analysis is reset', () {
+    fakeAsync((async) {
+      final repository = FakeVideoRepository()
+        ..videoToReturn = _video(placeCount: 2, enrichmentPending: true);
+      final provider = VideoProvider(repository: repository);
+
+      provider.analyze('https://youtu.be/abc');
+      async.flushMicrotasks();
+      provider.reset();
+
+      final callsAtReset = repository.analyzeCalls;
+      async.elapse(const Duration(minutes: 5));
+
+      expect(repository.analyzeCalls, callsAtReset);
+    });
   });
 }

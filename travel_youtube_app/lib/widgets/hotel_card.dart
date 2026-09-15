@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/hotel_model.dart';
-import 'app_card.dart';
 
 class HotelCard extends StatelessWidget {
   final HotelModel hotel;
@@ -20,39 +19,57 @@ class HotelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return AppCard(
+    return InkWell(
       onTap: onTap,
-      color: selected ? AppColors.surfaceSoft : null,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Row(
-        children: [
-          Icon(Icons.hotel_rounded, color: colorScheme.primary),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(hotel.name, style: textTheme.titleMedium),
-                Text(
-                  hotel.address,
-                  style: textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+      borderRadius: BorderRadius.circular(18),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.surfaceTint3 : AppColors.surfaceTint1,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: selected ? AppColors.selectedBorder : Colors.transparent, width: 2),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+              child: Icon(Icons.hotel_rounded, size: 18, color: AppColors.primary),
             ),
-          ),
-          if (selected) Icon(Icons.check_circle_rounded, color: colorScheme.primary),
-          if (onDelete != null)
-            IconButton(
-              onPressed: onDelete,
-              icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error),
-              tooltip: '삭제',
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(hotel.name, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                  const SizedBox(height: 3),
+                  Text(
+                    hotel.address,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
             ),
-        ],
+            if (selected)
+              Container(
+                width: 22,
+                height: 22,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(color: AppColors.primary, shape: BoxShape.circle),
+                child: const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+              ),
+            if (onDelete != null)
+              IconButton(
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                tooltip: '삭제',
+              ),
+          ],
+        ),
       ),
     );
   }

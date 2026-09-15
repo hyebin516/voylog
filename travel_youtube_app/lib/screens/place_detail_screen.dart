@@ -5,12 +5,15 @@ import '../core/theme/app_theme.dart';
 import '../models/map_view_types.dart';
 import '../models/place_model.dart';
 import '../providers/place_summary_provider.dart';
+import '../repositories/behavior_repository.dart';
 import '../repositories/map_repository.dart';
+import '../services/place_share_service.dart';
 import '../utils/timestamp_format.dart';
 import '../utils/view_state.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/tag_chip.dart';
+import '../utils/place_category_label.dart';
 
 class PlaceDetailScreen extends StatefulWidget {
   final PlaceModel place;
@@ -19,11 +22,23 @@ class PlaceDetailScreen extends StatefulWidget {
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
-  const PlaceDetailScreen({
+  /// Defaults to the real OS share sheet. Widget tests inject a fake so
+  /// `flutter test` never touches the real `share_plus` platform channel.
+  final PlaceShareService shareService;
+
+  /// Best-effort FR-15 behavior logging (see [RecommendationProvider] for
+  /// the same pattern) -- a screen-level repository call rather than a
+  /// dedicated provider, since this screen is reached from many different
+  /// origins and the signal applies regardless of which one.
+  final BehaviorRepository behaviorRepository;
+
+  PlaceDetailScreen({
     super.key,
     required this.place,
     this.mapRepository = const KakaoMapRepository(),
-  });
+    this.shareService = const PlaceShareService(),
+    BehaviorRepository? behaviorRepository,
+  }) : behaviorRepository = behaviorRepository ?? BehaviorRepository();
 
   @override
   State<PlaceDetailScreen> createState() => _PlaceDetailScreenState();
@@ -38,106 +53,214 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
     });
   }
 
+  Future<void> _onSharePressed() async {
+    final place = widget.place;
+    if (!place.hasCoordinates) return;
+
+    await widget.shareService.shareMapLink(
+      placeName: place.name,
+      latitude: place.latitude!,
+      longitude: place.longitude!,
+    );
+
+    try {
+      await widget.behaviorRepository.record(placeId: place.placeId, action: 'share', screen: 'place_detail');
+    } catch (_) {
+      // best-effort: a failed behavior log must never surface to the user
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final place = widget.place;
     final mapRepository = widget.mapRepository;
-    final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(place.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-        actions: [BookmarkButton(placeId: place.placeId)],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.md),
+      backgroundColor: Colors.white,
+      body: Column(
         children: [
           SizedBox(
             height: 220,
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(20),
-              child: place.hasCoordinates
-                  ? mapRepository.buildMap(
-                      initialLatitude: place.latitude!,
-                      initialLongitude: place.longitude!,
-                      markers: [
-                        MapMarkerData(
-                          id: place.placeId,
-                          title: place.name,
-                          latitude: place.latitude!,
-                          longitude: place.longitude!,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                place.hasCoordinates
+                    ? mapRepository.buildMap(
+                        initialLatitude: place.latitude!,
+                        initialLongitude: place.longitude!,
+                        markers: [
+                          MapMarkerData(
+                            id: place.placeId,
+                            title: place.name,
+                            latitude: place.latitude!,
+                            longitude: place.longitude!,
+                          ),
+                        ],
+                      )
+                    : const ColoredBox(
+                        color: AppColors.surfaceTint3,
+                        child: Center(child: Text('위치 정보가 없습니다.')),
+                      ),
+                Positioned(
+                  top: 8,
+                  left: 20,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _HeroIconButton(
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onTap: () => Navigator.of(context).maybePop(),
+                    ),
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 20,
+                  child: SafeArea(
+                    bottom: false,
+                    child: _HeroBookmarkButton(placeId: place.placeId),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [
+                Text(
+                  place.name,
+                  style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ink),
+                ),
+                if (place.address != null && place.address!.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(place.address!, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                ],
+                if (placeCategoryLabel(place.category) != null || place.tags.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      if (placeCategoryLabel(place.category) != null)
+                        TagChip(label: placeCategoryLabel(place.category)!),
+                      for (final tag in place.tags) TagChip(label: tag),
+                    ],
+                  ),
+                ],
+                if (place.timestampSec != null) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Icon(Icons.schedule_outlined, size: 16, color: AppColors.textTertiary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '영상 ${formatTimestamp(place.timestampSec!)} 지점에 등장',
+                        style: const TextStyle(fontSize: 13, color: AppColors.ink),
+                      ),
+                    ],
+                  ),
+                ],
+                if (place.businessHours != null && place.businessHours!.isNotEmpty) ...[
+                  const SizedBox(height: 10),
+                  _BusinessHoursSection(
+                    businessHours: place.businessHours!,
+                    isEstimated: place.businessHoursIsEstimated,
+                  ),
+                ],
+                if (place.mentionNote != null && place.mentionNote!.isNotEmpty) ...[
+                  const SizedBox(height: AppSpacing.md),
+                  _MentionNoteSection(note: place.mentionNote!),
+                ],
+                const SizedBox(height: AppSpacing.md),
+                const _PlaceSummarySection(),
+                const SizedBox(height: AppSpacing.lg),
+                if (place.hasCoordinates)
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 2,
+                        child: OutlinedButton.icon(
+                          onPressed: _onSharePressed,
+                          icon: const Icon(Icons.ios_share_rounded, size: 18),
+                          label: const Text('공유하기'),
+                          style: OutlinedButton.styleFrom(minimumSize: const Size(0, 48)),
+                        ),
+                      ),
+                      if (place.timestampSec != null) ...[
+                        const SizedBox(width: 10),
+                        // Half the row can't fit "영상에서 이 장면 보기" plus its
+                        // icon on a ~360dp phone -- it overflowed on device --
+                        // so this side gets more room and a shorter label.
+                        Expanded(
+                          flex: 3,
+                          child: PrimaryButton(
+                            label: '영상에서 보기',
+                            icon: Icons.play_circle_outline_rounded,
+                            onPressed: () => Navigator.pop(context, place.timestampSec),
+                          ),
                         ),
                       ],
-                    )
-                  : const ColoredBox(
-                      color: AppColors.surfaceTint,
-                      child: Center(child: Text('위치 정보가 없습니다.')),
-                    ),
+                    ],
+                  )
+                else if (place.timestampSec != null)
+                  PrimaryButton(
+                    label: '영상에서 이 장면 보기',
+                    icon: Icons.play_circle_outline_rounded,
+                    onPressed: () => Navigator.pop(context, place.timestampSec),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(place.name, style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700)),
-              ),
-              if (place.category != null) ...[
-                const SizedBox(width: AppSpacing.sm),
-                TagChip(label: place.category!),
-              ],
-            ],
-          ),
-          if (place.address != null && place.address!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const Icon(Icons.place_outlined, size: 18, color: AppColors.primary),
-                const SizedBox(width: AppSpacing.xs),
-                Expanded(child: Text(place.address!, style: textTheme.bodyMedium)),
-              ],
-            ),
-          ],
-          if (place.timestampSec != null) ...[
-            const SizedBox(height: AppSpacing.sm),
-            Row(
-              children: [
-                const Icon(Icons.schedule_outlined, size: 18, color: AppColors.primary),
-                const SizedBox(width: AppSpacing.xs),
-                Text('영상 ${formatTimestamp(place.timestampSec!)} 지점에 등장', style: textTheme.bodyMedium),
-              ],
-            ),
-          ],
-          if (place.businessHours != null && place.businessHours!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _BusinessHoursSection(
-              businessHours: place.businessHours!,
-              isEstimated: place.businessHoursIsEstimated,
-            ),
-          ],
-          if (place.tags.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.xs,
-              runSpacing: AppSpacing.xs,
-              children: [for (final tag in place.tags) TagChip(label: tag)],
-            ),
-          ],
-          if (place.mentionNote != null && place.mentionNote!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _MentionNoteSection(note: place.mentionNote!),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          const _PlaceSummarySection(),
-          const SizedBox(height: AppSpacing.lg),
-          if (place.timestampSec != null)
-            PrimaryButton(
-              label: '영상에서 이 장면 보기',
-              icon: Icons.play_circle_outline_rounded,
-              onPressed: () => Navigator.pop(context, place.timestampSec),
-            ),
         ],
       ),
+    );
+  }
+}
+
+class _HeroIconButton extends StatelessWidget {
+  const _HeroIconButton({required this.icon, required this.onTap});
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 12, offset: Offset(0, 4))],
+        ),
+        child: Icon(icon, size: 17, color: AppColors.textSecondary),
+      ),
+    );
+  }
+}
+
+/// Same 36px floating-pill treatment as [_HeroIconButton], wrapping the
+/// shared [BookmarkButton] so its filled/outline toggle logic stays
+/// centralized while matching the hero overlay style.
+class _HeroBookmarkButton extends StatelessWidget {
+  const _HeroBookmarkButton({required this.placeId});
+
+  final String placeId;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 12, offset: Offset(0, 4))],
+      ),
+      child: BookmarkButton(placeId: placeId),
     );
   }
 }
@@ -154,36 +277,31 @@ class _BusinessHoursSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceTint,
-        borderRadius: BorderRadius.circular(16),
-      ),
+      decoration: BoxDecoration(color: AppColors.surfaceTint1, borderRadius: BorderRadius.circular(16)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               const Icon(Icons.access_time_rounded, size: 16, color: AppColors.primary),
-              const SizedBox(width: AppSpacing.xs),
-              Text('영업시간', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(width: 8),
+              const Text('영업시간', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 8),
           for (final entry in businessHours.entries)
             Padding(
               padding: const EdgeInsets.only(top: 2),
-              child: Text('${entry.key}: ${entry.value}', style: textTheme.bodyMedium),
+              child: Text('${entry.key}: ${entry.value}', style: const TextStyle(fontSize: 12.5, color: AppColors.ink)),
             ),
           if (isEstimated) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               '* 영업시간은 영상 정보 기반 추정치예요',
-              style: textTheme.bodySmall?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
+              style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
             ),
           ],
         ],
@@ -206,9 +324,9 @@ class _MentionNoteSection extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
       decoration: BoxDecoration(
-        color: AppColors.surfaceTint,
+        color: AppColors.surfaceTint1,
         borderRadius: BorderRadius.circular(16),
-        border: Border(left: BorderSide(color: AppColors.accentCyan, width: 3)),
+        border: const Border(left: BorderSide(color: AppColors.accentCyan, width: 3)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -216,10 +334,7 @@ class _MentionNoteSection extends StatelessWidget {
           const Icon(Icons.format_quote_rounded, size: 18, color: AppColors.accentCyan),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Text(
-              note,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontStyle: FontStyle.italic),
-            ),
+            child: Text(note, style: const TextStyle(fontSize: 13, color: AppColors.ink, fontStyle: FontStyle.italic, height: 1.5)),
           ),
         ],
       ),
@@ -228,17 +343,18 @@ class _MentionNoteSection extends StatelessWidget {
 }
 
 /// Shows a "여러 영상 속 방문자 의견" card once a summary is generated from
-/// other videos that mention this same place. Renders nothing while
-/// loading, on error, or when fewer than 2 videos mention the place --
-/// this is a supplementary panel, not core page content, so its absence
-/// should never read as broken.
+/// other videos that mention this same place (FR-19). Renders nothing
+/// while loading, on error, or when fewer than 2 videos mention the place
+/// -- this is a supplementary panel, not core page content, so its
+/// absence should never read as broken. Our backend only ever produces
+/// ONE consolidated sentence each for pros/cons, so this stays a single
+/// line per card rather than the bulleted lists shown in the design
+/// mockup's separate summary page.
 class _PlaceSummarySection extends StatelessWidget {
   const _PlaceSummarySection();
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Consumer<PlaceSummaryProvider>(
       builder: (context, provider, _) {
         if (provider.state == ViewState.loading) {
@@ -259,46 +375,86 @@ class _PlaceSummarySection extends StatelessWidget {
           return const SizedBox.shrink();
         }
 
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceTint,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('여러 영상 속 방문자 의견', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-              const SizedBox(height: AppSpacing.sm),
-              if (summary.pros != null) _SummaryLine(icon: Icons.thumb_up_outlined, text: summary.pros!),
-              if (summary.cons != null) ...[
-                const SizedBox(height: AppSpacing.xs),
-                _SummaryLine(icon: Icons.thumb_down_outlined, text: summary.cons!),
-              ],
-            ],
-          ),
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('여러 영상 속 방문자 의견', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
+            const SizedBox(height: AppSpacing.sm),
+            if (summary.pros != null)
+              _SummaryOpinionCard(
+                icon: Icons.check_circle_rounded,
+                iconColor: const Color(0xFF5FC2A0),
+                bg: const Color(0xFFF0FAF5),
+                border: const Color(0xFFD5F0E4),
+                titleColor: const Color(0xFF2F8B6A),
+                title: '이런 점이 좋아요',
+                text: summary.pros!,
+                textColor: const Color(0xFF3D6B58),
+              ),
+            if (summary.pros != null && summary.cons != null) const SizedBox(height: AppSpacing.sm),
+            if (summary.cons != null)
+              _SummaryOpinionCard(
+                icon: Icons.error_rounded,
+                iconColor: AppColors.danger,
+                bg: const Color(0xFFFDF5F4),
+                border: const Color(0xFFF7DEDC),
+                titleColor: const Color(0xFFB8443F),
+                title: '이런 점은 참고하세요',
+                text: summary.cons!,
+                textColor: const Color(0xFF8A5450),
+              ),
+          ],
         );
       },
     );
   }
 }
 
-class _SummaryLine extends StatelessWidget {
-  final IconData icon;
-  final String text;
+class _SummaryOpinionCard extends StatelessWidget {
+  const _SummaryOpinionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.bg,
+    required this.border,
+    required this.titleColor,
+    required this.title,
+    required this.text,
+    required this.textColor,
+  });
 
-  const _SummaryLine({required this.icon, required this.text});
+  final IconData icon;
+  final Color iconColor;
+  final Color bg;
+  final Color border;
+  final Color titleColor;
+  final String title;
+  final String text;
+  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 16, color: AppColors.primary),
-        const SizedBox(width: AppSpacing.xs),
-        Expanded(child: Text(text, style: Theme.of(context).textTheme.bodyMedium)),
-      ],
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border.all(color: border, width: 1.5),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 18, color: iconColor),
+              const SizedBox(width: 8),
+              Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: titleColor)),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(text, style: TextStyle(fontSize: 12.5, color: textColor, height: 1.5)),
+        ],
+      ),
     );
   }
 }

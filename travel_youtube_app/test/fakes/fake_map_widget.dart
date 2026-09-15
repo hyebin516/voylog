@@ -11,6 +11,7 @@ class FakeMapWidget extends StatelessWidget {
   final List<MapMarkerData> markers;
   final ValueChanged<MapCenter>? onCenterChanged;
   final ValueChanged<String>? onMarkerTap;
+  final String? focusedMarkerId;
 
   const FakeMapWidget({
     super.key,
@@ -19,6 +20,7 @@ class FakeMapWidget extends StatelessWidget {
     this.markers = const [],
     this.onCenterChanged,
     this.onMarkerTap,
+    this.focusedMarkerId,
   });
 
   @override
@@ -27,15 +29,21 @@ class FakeMapWidget extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Text('fake-map center=$initialLatitude,$initialLongitude'),
+        if (focusedMarkerId != null) Text('focused:$focusedMarkerId'),
         for (final marker in markers)
           TextButton(
-            onPressed: onMarkerTap == null ? null : () => onMarkerTap!(marker.id),
+            onPressed: onMarkerTap == null
+                ? null
+                : () => onMarkerTap!(marker.id),
             child: Text('marker:${marker.title}'),
           ),
         if (onCenterChanged != null)
           ElevatedButton(
             onPressed: () => onCenterChanged!(
-              MapCenter(latitude: initialLatitude + 0.001, longitude: initialLongitude + 0.001),
+              MapCenter(
+                latitude: initialLatitude + 0.001,
+                longitude: initialLongitude + 0.001,
+              ),
             ),
             child: const Text('simulate-drag'),
           ),
@@ -57,6 +65,7 @@ class FakeMapRepository extends MapRepository {
     bool drawRoutePolyline = false,
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
+    String? focusedMarkerId,
   }) {
     return FakeMapWidget(
       initialLatitude: initialLatitude,
@@ -64,6 +73,7 @@ class FakeMapRepository extends MapRepository {
       markers: markers,
       onCenterChanged: onCenterChanged,
       onMarkerTap: onMarkerTap,
+      focusedMarkerId: focusedMarkerId,
     );
   }
 }

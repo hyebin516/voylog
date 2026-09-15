@@ -4,10 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/bookmark_model.dart';
 import 'package:travel_youtube_app/models/similar_taste_recommendation_model.dart';
+import 'package:travel_youtube_app/models/taste_preference_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/similar_taste_provider.dart';
+import 'package:travel_youtube_app/providers/taste_preference_provider.dart';
 import 'package:travel_youtube_app/repositories/bookmark_repository.dart';
 import 'package:travel_youtube_app/repositories/similar_taste_repository.dart';
+import 'package:travel_youtube_app/repositories/taste_preference_repository.dart';
 import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/similar_taste_recommendations_screen.dart';
 
@@ -44,11 +47,19 @@ class FakeBookmarkRepository extends BookmarkRepository {
   Future<void> removeBookmark(String bookmarkId) async {}
 }
 
+class FakeTastePreferenceRepository extends TastePreferenceRepository {
+  @override
+  Future<TastePreferenceModel> getPreferences() async => const TastePreferenceModel(tags: []);
+}
+
 Widget _wrap(SimilarTasteProvider provider) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: provider),
       ChangeNotifierProvider(create: (_) => BookmarkProvider(repository: FakeBookmarkRepository())),
+      ChangeNotifierProvider(
+        create: (_) => TastePreferenceProvider(repository: FakeTastePreferenceRepository()),
+      ),
     ],
     child: MaterialApp(
       home: const SimilarTasteRecommendationsScreen(),

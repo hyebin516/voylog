@@ -32,6 +32,13 @@ class RouteSummaryCard extends StatelessWidget {
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
+  /// When set, tapping a stop calls this with its [RoutePointModel.markerId]
+  /// instead of just opening the per-stop map bottom sheet -- lets a parent
+  /// screen drive a shared map's `focusedMarkerId`. Optional so existing
+  /// callers (trip overview, route planner) keep their current behavior.
+  final ValueChanged<String>? onPointTap;
+  final String? selectedPointId;
+
   const RouteSummaryCard({
     super.key,
     required this.isRoundTrip,
@@ -40,6 +47,8 @@ class RouteSummaryCard extends StatelessWidget {
     required this.totalDistanceM,
     required this.routeData,
     this.mapRepository = const KakaoMapRepository(),
+    this.onPointTap,
+    this.selectedPointId,
   });
 
   IconData get _transportModeIcon {
@@ -56,7 +65,9 @@ class RouteSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     var placeCounter = 0;
-    final placeNumbers = routeData.map((p) => p.isHotel ? null : ++placeCounter).toList();
+    final placeNumbers = routeData
+        .map((p) => p.isHotel ? null : ++placeCounter)
+        .toList();
 
     return AppCard(
       child: Column(
@@ -119,11 +130,19 @@ class RouteSummaryCard extends StatelessWidget {
           const SizedBox(height: 14),
           for (var i = 0; i < routeData.length; i++)
             Padding(
-              padding: EdgeInsets.only(bottom: i == routeData.length - 1 ? 0 : 10),
+              padding: EdgeInsets.only(
+                bottom: i == routeData.length - 1 ? 0 : 10,
+              ),
               child: _RoutePointCard(
                 point: routeData[i],
                 placeNumber: placeNumbers[i],
                 mapRepository: mapRepository,
+                isSelected:
+                    onPointTap != null &&
+                    selectedPointId == routeData[i].markerId,
+                onTap: onPointTap == null
+                    ? null
+                    : () => onPointTap!(routeData[i].markerId),
               ),
             ),
         ],
@@ -133,11 +152,19 @@ class RouteSummaryCard extends StatelessWidget {
 }
 
 class _RoutePointCard extends StatelessWidget {
-  const _RoutePointCard({required this.point, required this.placeNumber, required this.mapRepository});
+  const _RoutePointCard({
+    required this.point,
+    required this.placeNumber,
+    required this.mapRepository,
+    this.isSelected = false,
+    this.onTap,
+  });
 
   final RoutePointModel point;
   final int? placeNumber;
   final MapRepository mapRepository;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   void _showOnMap(BuildContext context) {
     if (point.latitude == null || point.longitude == null) return;
@@ -182,73 +209,127 @@ class _RoutePointCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isHotel = point.isHotel;
     final hasCoordinates = point.latitude != null && point.longitude != null;
-    final legLabel = (point.legDistanceM != null && point.legDurationSec != null)
+    final legLabel =
+        (point.legDistanceM != null && point.legDurationSec != null)
         ? '${formatRouteDistance(point.legDistanceM)} · ${formatRouteDuration(point.legDurationSec)}'
         : null;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surfaceTint1, borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            margin: const EdgeInsets.only(top: 3),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: isHotel ? AppColors.danger : AppColors.accentCyan,
-              shape: BoxShape.circle,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceTint1,
+          borderRadius: BorderRadius.circular(20),
+          border: isSelected
+              ? Border.all(color: AppColors.selectedBorder, width: 2)
+              : null,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              margin: const EdgeInsets.only(top: 3),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: point.isUserStartPoint
+                    ? AppColors.ink
+                    : (isHotel ? AppColors.danger : AppColors.accentCyan),
+                shape: BoxShape.circle,
+              ),
+              // A walking course's start point isn't accommodation, so it
+              // gets a flag rather than the house icon trip hotels use --
+              // the house read as "a hotel called 성수역".
+              child: isHotel
+                  ? Icon(
+                      point.isUserStartPoint
+                          ? Icons.flag_rounded
+                          : Icons.home_rounded,
+                      size: 14,
+                      color: Colors.white,
+                    )
+                  : Text(
+                      '$placeNumber',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
             ),
-            child: isHotel
-                ? const Icon(Icons.home_rounded, size: 14, color: Colors.white)
-                : Text(
-                    '$placeNumber',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
-                  ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  point.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink),
-                ),
-                if (legLabel != null) ...[
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-                    decoration: BoxDecoration(color: AppColors.surfaceTint3Alt, borderRadius: BorderRadius.circular(999)),
-                    child: Text(
-                      legLabel,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    point.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.ink,
                     ),
                   ),
+                  if (point.isUserStartPoint) ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      '출발 · 도착 지점',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ],
+                  if (legLabel != null) ...[
+                    const SizedBox(height: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 9,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceTint3Alt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        legLabel,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
+              ),
+            ),
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  onPressed: hasCoordinates ? () => _showOnMap(context) : null,
+                  icon: MapPinGlyphIcon(
+                    size: 20,
+                    color: hasCoordinates
+                        ? AppColors.textTertiary
+                        : AppColors.textMuted2,
+                  ),
+                  tooltip: '지도 보기',
+                  visualDensity: VisualDensity.compact,
+                ),
+                if (!isHotel && point.placeId != null)
+                  BookmarkButton(placeId: point.placeId!),
               ],
             ),
-          ),
-          Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: hasCoordinates ? () => _showOnMap(context) : null,
-                icon: MapPinGlyphIcon(
-                  size: 20,
-                  color: hasCoordinates ? AppColors.textTertiary : AppColors.textMuted2,
-                ),
-                tooltip: '지도 보기',
-                visualDensity: VisualDensity.compact,
-              ),
-              if (!isHotel && point.placeId != null) BookmarkButton(placeId: point.placeId!),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -16,6 +16,10 @@ abstract class MapRepository {
     bool drawRoutePolyline,
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
+    // When set to a marker id from `markers`, pans the camera to that
+    // marker -- lets a screen focus the map on whichever place the user
+    // just selected (e.g. tapped a stop in a list).
+    String? focusedMarkerId,
   });
 }
 
@@ -31,6 +35,7 @@ class KakaoMapRepository extends MapRepository {
     bool drawRoutePolyline = false,
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
+    String? focusedMarkerId,
   }) {
     return KakaoMapWidget(
       initialLatitude: initialLatitude,
@@ -39,6 +44,7 @@ class KakaoMapRepository extends MapRepository {
       drawRoutePolyline: drawRoutePolyline,
       onCenterChanged: onCenterChanged,
       onMarkerTap: onMarkerTap,
+      focusedMarkerId: focusedMarkerId,
     );
   }
 }

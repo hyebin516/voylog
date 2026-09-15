@@ -1,79 +1,126 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:travel_youtube_app/models/shared_route_model.dart';
+import 'package:travel_youtube_app/models/similar_taste_recommendation_model.dart';
+import 'package:travel_youtube_app/models/video_model.dart';
+import 'package:travel_youtube_app/models/video_search_result_model.dart';
 import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
+import 'package:travel_youtube_app/providers/shared_route_provider.dart';
+import 'package:travel_youtube_app/providers/similar_taste_provider.dart';
 import 'package:travel_youtube_app/providers/video_provider.dart';
+import 'package:travel_youtube_app/repositories/shared_route_repository.dart';
+import 'package:travel_youtube_app/repositories/similar_taste_repository.dart';
+import 'package:travel_youtube_app/repositories/video_repository.dart';
+import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/home_screen.dart';
-import 'package:travel_youtube_app/utils/view_state.dart';
 
-Widget _wrapWithWizard() {
+import 'helpers/phone_viewport.dart';
+
+class FakeVideoRepository extends VideoRepository {
+  String? lastUrl;
+  String? lastHashtag;
+
+  @override
+  Future<VideoModel> analyze(String youtubeUrl) async {
+    lastUrl = youtubeUrl;
+    return const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 't', isCached: false, places: []);
+  }
+
+  @override
+  Future<List<VideoSearchResultModel>> searchByHashtag(String hashtag) async {
+    lastHashtag = hashtag;
+    return [];
+  }
+}
+
+// HomeScreen loads the similar-taste and shared-route feeds on open; these
+// keep that off the network.
+class FakeSimilarTasteRepository extends SimilarTasteRepository {
+  @override
+  Future<SimilarTasteResultModel> getRecommendations({int? limit}) async =>
+      const SimilarTasteResultModel(hasPreference: false, recommendations: []);
+}
+
+class FakeSharedRouteRepository extends SharedRouteRepository {
+  @override
+  Future<List<SharedRouteModel>> getFeed({int? limit}) async => [];
+}
+
+Widget _wrap({required FakeVideoRepository videoRepository, RecommendationWizardProvider? wizard}) {
   return MultiProvider(
     providers: [
-      ChangeNotifierProvider(create: (_) => VideoProvider()),
-      ChangeNotifierProvider(create: (_) => RecommendationWizardProvider()),
+      ChangeNotifierProvider(create: (_) => VideoProvider(repository: videoRepository)),
+      ChangeNotifierProvider.value(value: wizard ?? RecommendationWizardProvider()),
+      ChangeNotifierProvider(create: (_) => SimilarTasteProvider(repository: FakeSimilarTasteRepository())),
+      ChangeNotifierProvider(create: (_) => SharedRouteProvider(repository: FakeSharedRouteRepository())),
     ],
     child: MaterialApp(
       home: const HomeScreen(),
-      onGenerateRoute: (settings) => MaterialPageRoute(builder: (_) => const Scaffold(body: Text('region screen'))),
+      onGenerateRoute: (settings) =>
+          MaterialPageRoute(builder: (_) => Scaffold(body: Text('route:${settings.name}')), settings: settings),
     ),
   );
 }
 
 void main() {
-  testWidgets('HomeScreen shows the URL input and analyze button', (tester) async {
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => VideoProvider(),
-        child: const MaterialApp(home: HomeScreen()),
-      ),
-    );
+  testWidgets('shows the URL input and warns when analyzing an empty URL', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
+    await tester.pumpAndSettle();
 
-    expect(find.text('분석할 유튜브 영상 URL을 입력하세요'), findsOneWidget);
     expect(find.byKey(const Key('urlField')), findsOneWidget);
-    expect(find.text('분석하기'), findsOneWidget);
+    expect(find.text('브이로그 URL을 붙여넣으세요'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('urlField')), '');
-    await tester.tap(find.text('분석하기'));
+    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
     await tester.pump();
 
     expect(find.text('URL을 먼저 입력해 주세요.'), findsOneWidget);
+    expect(videoRepository.lastUrl, isNull);
   });
 
-  testWidgets('HomeScreen shows the hashtag search bar', (tester) async {
-    await tester.pumpWidget(
-      ChangeNotifierProvider(
-        create: (_) => VideoProvider(),
-        child: const MaterialApp(home: HomeScreen()),
-      ),
-    );
-
-    expect(find.text('해시태그로 브이로그 탐색'), findsOneWidget);
-    expect(find.text('탐색하기'), findsOneWidget);
-    expect(find.byIcon(Icons.tag_rounded), findsOneWidget);
-  });
-
-  testWidgets('tapping search with an empty hashtag does nothing (no loading state)', (tester) async {
-    final videoProvider = VideoProvider();
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: videoProvider,
-        child: const MaterialApp(home: HomeScreen()),
-      ),
-    );
-
-    await tester.tap(find.text('탐색하기'));
-    await tester.pump();
-
-    expect(videoProvider.searchState, ViewState.idle);
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-  });
-
-  testWidgets('tapping the recommendation wizard button resets wizard state and navigates', (tester) async {
-    await tester.pumpWidget(_wrapWithWizard());
-
-    await tester.tap(find.byKey(const Key('recommendationWizardButton')));
+  testWidgets('analyzing a URL opens the analysis screen', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
     await tester.pumpAndSettle();
 
-    expect(find.text('region screen'), findsOneWidget);
+    await tester.enterText(find.byKey(const Key('urlField')), 'https://youtu.be/v1');
+    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(videoRepository.lastUrl, 'https://youtu.be/v1');
+    expect(find.text('route:${AppRoutes.videoAnalysis}'), findsOneWidget);
+  });
+
+  testWidgets('tapping a hashtag chip searches for it and opens the results', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
+    await tester.pumpAndSettle();
+
+    expect(find.text('해시태그로 브이로그 찾아보기'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('#부산여행'));
+    await tester.tap(find.text('#부산여행'));
+    await tester.pumpAndSettle();
+
+    expect(videoRepository.lastHashtag, '부산여행');
+    expect(find.text('route:${AppRoutes.recommendationResults}'), findsOneWidget);
+  });
+
+  testWidgets('더보기 resets the recommendation wizard and opens its first step', (tester) async {
+    usePhoneViewport(tester);
+    final wizard = RecommendationWizardProvider()..toggleRegion('제주');
+    await tester.pumpWidget(_wrap(videoRepository: FakeVideoRepository(), wizard: wizard));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('더보기'));
+    await tester.tap(find.text('더보기'));
+    await tester.pumpAndSettle();
+
+    expect(wizard.selectedRegions, isEmpty);
+    expect(find.text('route:${AppRoutes.recommendationRegion}'), findsOneWidget);
   });
 }

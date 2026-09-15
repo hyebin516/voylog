@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
 import 'package:travel_youtube_app/screens/recommendation_theme_screen.dart';
+import 'package:travel_youtube_app/widgets/primary_button.dart';
 
 Widget _wrap(RecommendationWizardProvider provider) {
   return ChangeNotifierProvider.value(
@@ -21,7 +22,7 @@ void main() {
 
     expect(find.text('다음 (0개 선택됨)'), findsOneWidget);
 
-    final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    final button = tester.widget<PrimaryButton>(find.byType(PrimaryButton));
     expect(button.onPressed, isNull);
   });
 

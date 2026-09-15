@@ -8,9 +8,10 @@ import 'package:travel_youtube_app/repositories/notification_settings_repository
 import 'package:travel_youtube_app/screens/notification_settings_screen.dart';
 
 const NotificationSettingsModel _defaults = NotificationSettingsModel(
-  tripAlerts: true,
-  serviceAlerts: true,
+  newVlogAlerts: true,
+  routeCompleteAlerts: true,
   marketingAlerts: false,
+  nightSilent: false,
 );
 
 class FakeNotificationSettingsRepository extends NotificationSettingsRepository {
@@ -39,19 +40,43 @@ Widget _wrap(NotificationSettingsProvider provider) {
 }
 
 void main() {
-  testWidgets('shows the three toggles with their loaded values', (tester) async {
+  testWidgets('shows every toggle with its loaded value', (tester) async {
     final repository = FakeNotificationSettingsRepository()
-      ..settingsToReturn = const NotificationSettingsModel(tripAlerts: true, serviceAlerts: false, marketingAlerts: true);
+      ..settingsToReturn = const NotificationSettingsModel(
+        newVlogAlerts: true,
+        routeCompleteAlerts: false,
+        marketingAlerts: true,
+        nightSilent: false,
+      );
     await tester.pumpWidget(_wrap(NotificationSettingsProvider(repository: repository)));
     await tester.pumpAndSettle();
 
-    final tripSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('tripAlertsSwitch')));
-    final serviceSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('serviceAlertsSwitch')));
+    final newVlogSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('newVlogAlertsSwitch')));
+    final routeCompleteSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('routeCompleteAlertsSwitch')));
     final marketingSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('marketingAlertsSwitch')));
+    final nightSilentSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('nightSilentSwitch')));
 
-    expect(tripSwitch.value, isTrue);
-    expect(serviceSwitch.value, isFalse);
+    expect(newVlogSwitch.value, isTrue);
+    expect(routeCompleteSwitch.value, isFalse);
     expect(marketingSwitch.value, isTrue);
+    expect(nightSilentSwitch.value, isFalse);
+  });
+
+  testWidgets('the master toggle reflects allEnabled and fans out when tapped', (tester) async {
+    final repository = FakeNotificationSettingsRepository();
+    await tester.pumpWidget(_wrap(NotificationSettingsProvider(repository: repository)));
+    await tester.pumpAndSettle();
+
+    final allSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('allAlertsSwitch')));
+    expect(allSwitch.value, isFalse); // marketingAlerts is false by default
+
+    await tester.tap(find.byKey(const Key('allAlertsSwitch')));
+    await tester.pumpAndSettle();
+
+    expect(repository.lastUpdate?.newVlogAlerts, isTrue);
+    expect(repository.lastUpdate?.routeCompleteAlerts, isTrue);
+    expect(repository.lastUpdate?.marketingAlerts, isTrue);
+    expect(repository.lastUpdate?.nightSilent, isFalse);
   });
 
   testWidgets('toggling a switch persists the change through the repository', (tester) async {

@@ -5,8 +5,10 @@ import 'package:travel_youtube_app/models/place_model.dart';
 import 'package:travel_youtube_app/models/place_summary_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/place_summary_provider.dart';
+import 'package:travel_youtube_app/repositories/behavior_repository.dart';
 import 'package:travel_youtube_app/repositories/place_summary_repository.dart';
 import 'package:travel_youtube_app/screens/place_detail_screen.dart';
+import 'package:travel_youtube_app/services/place_share_service.dart';
 
 import 'fakes/fake_map_widget.dart';
 
@@ -16,6 +18,33 @@ class FakePlaceSummaryRepository extends PlaceSummaryRepository {
   @override
   Future<PlaceSummaryModel> getSummary(String placeId) async {
     return resultToReturn ?? const PlaceSummaryModel(available: false, pros: null, cons: null, sourceCount: 0);
+  }
+}
+
+class FakePlaceShareService extends PlaceShareService {
+  String? lastPlaceName;
+
+  @override
+  Future<void> shareMapLink({required String placeName, required double latitude, required double longitude}) async {
+    lastPlaceName = placeName;
+  }
+}
+
+class FakeBehaviorRepository extends BehaviorRepository {
+  final List<String> recordedActions = [];
+  String? lastPlaceId;
+  String? lastScreen;
+
+  @override
+  Future<void> record({
+    required String placeId,
+    required String action,
+    String? screen,
+    int? distanceMeters,
+  }) async {
+    recordedActions.add(action);
+    lastPlaceId = placeId;
+    lastScreen = screen;
   }
 }
 
@@ -56,27 +85,29 @@ Widget _wrap(Widget child, {PlaceSummaryRepository? summaryRepository}) {
 void main() {
   testWidgets('shows the place name, address, timestamp, and a map marker', (tester) async {
     await tester.pumpWidget(
-      _wrap(const PlaceDetailScreen(place: _geocodedPlace, mapRepository: FakeMapRepository())),
+      _wrap(PlaceDetailScreen(place: _geocodedPlace, mapRepository: const FakeMapRepository())),
     );
 
     expect(find.text('해운대해수욕장'), findsWidgets);
     expect(find.text('부산 해운대구'), findsOneWidget);
     expect(find.textContaining('02:05'), findsOneWidget);
     expect(find.text('marker:해운대해수욕장'), findsOneWidget);
-    expect(find.text('영상에서 이 장면 보기'), findsOneWidget);
+    // Shown next to 공유하기 here, so it uses the shorter label that fits.
+    expect(find.text('영상에서 보기'), findsOneWidget);
   });
 
   testWidgets('shows a placeholder instead of a map when the place has no coordinates', (tester) async {
     await tester.pumpWidget(
-      _wrap(const PlaceDetailScreen(place: _ungeocodedPlace, mapRepository: FakeMapRepository())),
+      _wrap(PlaceDetailScreen(place: _ungeocodedPlace, mapRepository: const FakeMapRepository())),
     );
 
     expect(find.text('위치 정보가 없습니다.'), findsOneWidget);
     expect(find.textContaining('fake-map'), findsNothing);
-    expect(find.text('영상에서 이 장면 보기'), findsNothing); // no timestamp either
+    expect(find.text('영상에서 보기'), findsNothing); // no timestamp either
+    expect(find.text('영상에서 이 장면 보기'), findsNothing);
   });
 
-  testWidgets('tapping "영상에서 이 장면 보기" pops with the timestamp', (tester) async {
+  testWidgets('tapping "영상에서 보기" pops with the timestamp', (tester) async {
     int? poppedResult;
 
     await tester.pumpWidget(
@@ -88,7 +119,7 @@ void main() {
               poppedResult = await Navigator.push<int>(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const PlaceDetailScreen(place: _geocodedPlace, mapRepository: FakeMapRepository()),
+                  builder: (_) => PlaceDetailScreen(place: _geocodedPlace, mapRepository: const FakeMapRepository()),
                 ),
               );
             },
@@ -100,7 +131,7 @@ void main() {
     await tester.tap(find.text('open'));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('영상에서 이 장면 보기'));
+    await tester.tap(find.text('영상에서 보기'));
     await tester.pumpAndSettle();
 
     expect(poppedResult, 125);
@@ -117,7 +148,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        const PlaceDetailScreen(place: _geocodedPlace, mapRepository: FakeMapRepository()),
+        PlaceDetailScreen(place: _geocodedPlace, mapRepository: const FakeMapRepository()),
         summaryRepository: repository,
       ),
     );
@@ -128,9 +159,41 @@ void main() {
     expect(find.text('웨이팅이 길다는 평이 많아요.'), findsOneWidget);
   });
 
+  testWidgets('tapping "공유하기" shares the map link and records a share behavior', (tester) async {
+    final shareService = FakePlaceShareService();
+    final behaviorRepository = FakeBehaviorRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        PlaceDetailScreen(
+          place: _geocodedPlace,
+          mapRepository: const FakeMapRepository(),
+          shareService: shareService,
+          behaviorRepository: behaviorRepository,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('공유하기'));
+    await tester.pumpAndSettle();
+
+    expect(shareService.lastPlaceName, '해운대해수욕장');
+    expect(behaviorRepository.recordedActions, contains('share'));
+    expect(behaviorRepository.lastPlaceId, 'p1');
+    expect(behaviorRepository.lastScreen, 'place_detail');
+  });
+
+  testWidgets('hides "공유하기" when the place has no coordinates', (tester) async {
+    await tester.pumpWidget(
+      _wrap(PlaceDetailScreen(place: _ungeocodedPlace, mapRepository: const FakeMapRepository())),
+    );
+
+    expect(find.text('공유하기'), findsNothing);
+  });
+
   testWidgets('shows nothing when fewer than 2 videos mention the place', (tester) async {
     await tester.pumpWidget(
-      _wrap(const PlaceDetailScreen(place: _geocodedPlace, mapRepository: FakeMapRepository())),
+      _wrap(PlaceDetailScreen(place: _geocodedPlace, mapRepository: const FakeMapRepository())),
     );
     await tester.pumpAndSettle();
 

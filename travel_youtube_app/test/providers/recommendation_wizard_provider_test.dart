@@ -41,8 +41,8 @@ void main() {
     provider.selectDuration('당일치기');
     expect(provider.selectedDuration, '당일치기');
 
-    provider.selectDuration('1박2일');
-    expect(provider.selectedDuration, '1박2일');
+    provider.selectDuration('1박 2일');
+    expect(provider.selectedDuration, '1박 2일');
   });
 
   test('canSearch is true only once a region, theme, and duration are all chosen', () {
@@ -52,14 +52,14 @@ void main() {
     provider.toggleTheme('자연');
     expect(provider.canSearch, isFalse);
 
-    provider.selectDuration('1박2일');
+    provider.selectDuration('1박 2일');
     expect(provider.canSearch, isTrue);
   });
 
   test('reset clears all selections', () {
     provider.toggleRegion('제주');
     provider.toggleTheme('자연');
-    provider.selectDuration('1박2일');
+    provider.selectDuration('1박 2일');
 
     provider.reset();
 

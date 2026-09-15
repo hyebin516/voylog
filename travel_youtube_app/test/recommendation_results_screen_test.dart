@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/models/video_search_result_model.dart';
+import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
 import 'package:travel_youtube_app/providers/video_provider.dart';
 import 'package:travel_youtube_app/repositories/video_repository.dart';
 import 'package:travel_youtube_app/screens/recommendation_results_screen.dart';
@@ -27,8 +28,11 @@ class FakeVideoRepository extends VideoRepository {
 }
 
 Widget _wrap(VideoProvider provider) {
-  return ChangeNotifierProvider.value(
-    value: provider,
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: provider),
+      ChangeNotifierProvider(create: (_) => RecommendationWizardProvider()),
+    ],
     child: MaterialApp(
       home: const RecommendationResultsScreen(),
       onGenerateRoute: (settings) => MaterialPageRoute(builder: (_) => const Scaffold(body: Text('video analysis screen'))),
@@ -39,7 +43,7 @@ Widget _wrap(VideoProvider provider) {
 void main() {
   testWidgets('shows an empty message when there are no recommendations', (tester) async {
     final provider = VideoProvider(repository: FakeVideoRepository());
-    await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+    await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박 2일');
 
     await tester.pumpWidget(_wrap(provider));
 
@@ -48,7 +52,7 @@ void main() {
 
   testWidgets('lists recommended videos and navigates on tap', (tester) async {
     final repository = FakeVideoRepository()
-      ..videoToReturn = const VideoModel(videoId: 'v1', title: 'Trip', isCached: false, places: [])
+      ..videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 'Trip', isCached: false, places: [])
       ..recommendationsToReturn = [
         const VideoSearchResultModel(
           videoId: 'v1',
@@ -60,7 +64,7 @@ void main() {
         ),
       ];
     final provider = VideoProvider(repository: repository);
-    await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박2일');
+    await provider.searchByRecommendation(regions: ['제주'], themes: ['자연'], duration: '1박 2일');
 
     await tester.pumpWidget(_wrap(provider));
     expect(find.text('title'), findsOneWidget);

@@ -22,6 +22,10 @@ class ApiException implements Exception {
         return '선택한 호텔을 찾을 수 없습니다.';
       case 'EMAIL_EXISTS':
         return '이미 가입된 이메일입니다.';
+      case 'EMAIL_NOT_FOUND':
+        return '등록되지 않은 이메일이에요.';
+      case 'NICKNAME_EXISTS':
+        return '이미 사용 중인 닉네임입니다.';
       case 'OTP_INVALID':
         return '인증번호가 올바르지 않습니다.';
       case 'OTP_EXPIRED':
@@ -30,6 +34,8 @@ class ApiException implements Exception {
         return '이메일 인증을 먼저 완료해 주세요.';
       case 'INVALID_CREDENTIALS':
         return '이메일 또는 비밀번호가 올바르지 않습니다.';
+      case 'NO_PASSWORD_SET':
+        return '카카오 계정은 비밀번호가 없어 변경/재설정할 수 없어요.';
       case 'INVALID_REQUEST':
         return '입력한 내용을 다시 확인해 주세요.';
       case 'ALREADY_PUBLISHED':

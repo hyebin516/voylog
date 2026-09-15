@@ -89,10 +89,13 @@ keytool -exportcert -alias <release-key-alias> -keystore <release-keystore-경�
 
 ## 5. JavaScript 키 등록 (지도용, 필수)
 
-경로: 앱 설정 → 플랫폼 → **Web 플랫폼**도 함께 등록해야 JavaScript 키의 도메인 검증이
-동작합니다 (`kakao_map_plugin`이 내부적으로 WebView에 로컬 HTML을 로드하는 방식이라
-실제 브라우저 도메인 검증과는 다르게 동작할 수 있습니다 — 문제가 생기면 아래 "문제 해결"
-참고).
+경로(2026년 개편된 콘솔 기준): 앱 > **플랫폼 키** 페이지에서 JavaScript 키 항목을
+찾으면 그 안에 **"JavaScript SDK 도메인"** 입력란이 바로 있습니다(예전 "앱 설정 →
+플랫폼 → Web 플랫폼 등록"이라는 별도 메뉴가 아니라, 플랫폼 키 페이지 자체에 통합되어
+있음 — "제품 링크 관리 → 웹 도메인"은 카카오 로그인/공유용이라 다른 메뉴이니 헷갈리지
+말 것). 여기에 도메인을 등록해야 JavaScript 키의 도메인 검증이 동작합니다
+(`kakao_map_plugin`이 내부적으로 WebView에 로컬 HTML을 로드하는 방식이라 실제 브라우저
+도메인 검증과는 다르게 동작할 수 있습니다 — 문제가 생기면 아래 "문제 해결" 참고).
 
 - [ ] `travel_youtube_app/.env.example`을 복사해 `travel_youtube_app/.env`를 만들고
       (한 번만), `KAKAO_JAVASCRIPT_KEY=`에 발급받은 JavaScript 키를 채워 넣습니다:
@@ -112,12 +115,17 @@ keytool -exportcert -alias <release-key-alias> -keystore <release-keystore-경�
 ### 문제 해결: 지도가 안 뜨는 경우
 
 `kakao_map_plugin`은 `AuthRepository.initialize(appKey: ..., baseUrl: ...)`의 `baseUrl`을
-WebView의 origin으로 사용합니다. JavaScript 키에 도메인 제한이 걸려 있어 지도가 안 뜨면:
+WebView의 origin으로 사용합니다. **`MapService.initialize()`가 `baseUrl`을 아예 안
+넘기면 WebView가 `about:blank` origin으로 SDK를 요청하게 되어, Kakao 쪽에서 출처
+불명으로 거부해 `"kakao is not defined"` 콘솔 에러가 남습니다** — 2026-09-08에 실기기
+테스트로 이 증상을 확인하고 고침. JavaScript 키에 도메인 제한이 걸려 있어 지도가 안 뜨면:
 
-1. Kakao Developers → 앱 설정 → 플랫폼 → Web에서 사이트 도메인 제한을 해제하거나
-   `http://localhost` 등 개발용 도메인을 등록
-2. 필요 시 `MapService.initialize()`([lib/services/map_service.dart](../lib/services/map_service.dart))에
-   `baseUrl` 파라미터를 추가해 등록한 도메인과 일치시킴
+1. Kakao Developers → 앱 > 플랫폼 키 > JavaScript 키의 "JavaScript SDK 도메인"에
+   `http://localhost:5000`처럼 실제 사용할 개발용 도메인을 등록(포트까지 정확히 일치해야 함)
+2. `MapService.initialize()`([lib/services/map_service.dart](../lib/services/map_service.dart))의
+   `baseUrl` 파라미터를 1번에서 등록한 도메인과 정확히 일치시킴 — 현재 코드는
+   `http://localhost:5000`으로 맞춰져 있음(콘솔에 이미 이 도메인이 등록되어 있었음).
+   다른 도메인으로 바꿔 등록했다면 이 값도 같이 바꿔야 함.
 
 ## 6. Native 앱 키 (카카오 로그인용)
 

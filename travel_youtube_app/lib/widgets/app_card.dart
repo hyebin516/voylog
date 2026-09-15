@@ -29,7 +29,7 @@ class AppCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color ?? Colors.white,
         borderRadius: radius,
-        boxShadow: AppColors.softShadow(),
+        boxShadow: AppColors.cardShadow(),
       ),
       clipBehavior: Clip.antiAlias,
       child: Material(

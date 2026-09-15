@@ -46,10 +46,18 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       kakaoAccessToken = await KakaoAuthService.login(context);
     } on KakaoClientException catch (e) {
+      // TEMP DEBUG (remove once the real login failure is diagnosed):
+      debugPrint('KAKAO_DEBUG KakaoClientException reason=${e.reason} msg=${e.msg}');
       if (e.reason == ClientErrorCause.cancelled) return; // user dismissed the chooser
       if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
       return;
-    } catch (_) {
+    } on KakaoAuthException catch (e) {
+      debugPrint('KAKAO_DEBUG KakaoAuthException error=${e.error} msg=${e.message}');
+      if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
+      return;
+    } catch (e, st) {
+      debugPrint('KAKAO_DEBUG unknown exception: $e');
+      debugPrint('KAKAO_DEBUG stack: $st');
       if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
       return;
     }
@@ -72,12 +80,16 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       body: AuthBackdrop(
         child: SafeArea(
-          child: SingleChildScrollView(
-            child: ResponsiveCenter(
-              padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 48, AppSpacing.lg, AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: ResponsiveCenter(
+                    padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 48, AppSpacing.lg, AppSpacing.lg),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                   const Row(
                     children: [
                       VoylogLogoMark(),
@@ -109,9 +121,18 @@ class _LoginScreenState extends State<LoginScreen> {
                       prefixIcon: Icon(Icons.lock_outline_rounded),
                     ),
                   ),
-                  const SizedBox(height: AppSpacing.lg),
+                  const SizedBox(height: AppSpacing.sm),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      onPressed: () => Navigator.pushNamed(context, AppRoutes.forgotPassword),
+                      style: TextButton.styleFrom(foregroundColor: AppColors.textMuted, padding: EdgeInsets.zero),
+                      child: const Text('비밀번호를 잊으셨나요?'),
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   PrimaryButton(
-                    label: '이메일로 로그인',
+                    label: '로그인',
                     isLoading: authProvider.isLoading,
                     onPressed: () => _onEmailLoginPressed(authProvider),
                   ),
@@ -121,7 +142,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     child: OutlinedButton.icon(
                       onPressed: authProvider.isLoading ? null : () => _onKakaoLoginPressed(context),
                       icon: const Icon(Icons.chat_bubble_rounded, size: 18),
-                      label: const Text('카카오로 로그인'),
+                      label: const Text('카카오로 3초만에 로그인'),
                       style: OutlinedButton.styleFrom(
                         backgroundColor: const Color(0xFFFEE500),
                         foregroundColor: const Color(0xFF3A2B1A),
@@ -130,18 +151,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
-                  TextButton(
-                    onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false),
-                    child: const Text('비회원으로 둘러보기'),
+                  SizedBox(
+                    height: 52,
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.textSecondary,
+                        side: const BorderSide(color: AppColors.dividerStrong),
+                        shape: const StadiumBorder(),
+                      ),
+                      child: const Text('비회원으로 둘러보기'),
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.sm),
+                  const Spacer(),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('Voylog가 처음이신가요?', style: textTheme.bodySmall?.copyWith(color: AppColors.primary.withValues(alpha: 0.45))),
                       TextButton(
-                        onPressed: () => Navigator.pushNamed(context, AppRoutes.signupEmail),
-                        child: const Text('이메일로 회원가입'),
+                        onPressed: () => Navigator.pushNamed(context, AppRoutes.signup),
+                        child: const Text('회원가입'),
                       ),
                     ],
                   ),
@@ -149,7 +178,10 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: AppSpacing.sm),
                     ErrorView(message: authProvider.errorMessage ?? '로그인에 실패했습니다.'),
                   ],
-                ],
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
 import '../utils/timestamp_format.dart';
 import 'app_card.dart';
 import 'bookmark_button.dart';
+import 'nav_icons.dart';
 
 class PlaceCard extends StatelessWidget {
   final String placeId;
@@ -79,7 +81,10 @@ class PlaceCard extends StatelessWidget {
           ),
           IconButton(
             onPressed: onMapTap,
-            icon: const Icon(Icons.map_outlined),
+            icon: MapPinGlyphIcon(
+              size: 20,
+              color: onMapTap != null ? AppColors.textTertiary : AppColors.textMuted2,
+            ),
             tooltip: '지도 보기',
           ),
           if (showBookmarkButton) BookmarkButton(placeId: placeId),

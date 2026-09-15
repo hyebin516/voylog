@@ -8,18 +8,36 @@ import '../utils/view_state.dart';
 class TripProvider extends ChangeNotifier {
   final TripRepository _repository;
 
-  TripProvider({TripRepository? repository}) : _repository = repository ?? TripRepository();
+  TripProvider({TripRepository? repository})
+    : _repository = repository ?? TripRepository();
 
   ViewState _state = ViewState.idle;
   List<TripModel> _trips = [];
   TripDetailModel? _currentTrip;
   String? _errorMessage;
 
-  /// Set while the user is inside the "add a day" flow (BookmarkScreen ->
-  /// RoutePlannerScreen) so RoutePlannerScreen knows which trip/day the
+  /// Set while the user is inside the "add a day" flow (DayFolderSelectScreen
+  /// -> RoutePlannerScreen) so RoutePlannerScreen knows which trip/day the
   /// itinerary it optimizes should be saved under.
   String? activeTripId;
   int? activeDayNumber;
+
+  /// Set when the user starts the "add a day" flow from a specific bookmark
+  /// folder (e.g. a "동선 생성" shortcut on that folder's screen) instead of
+  /// from [TripDetailScreen]'s generic "날짜 추가" -- lets DayFolderSelectScreen
+  /// pre-select that folder instead of making the user find it again.
+  /// Consumed (read once, then cleared) by [takePendingFolderId].
+  String? _pendingFolderId;
+
+  void setPendingFolderId(String folderId) {
+    _pendingFolderId = folderId;
+  }
+
+  String? takePendingFolderId() {
+    final id = _pendingFolderId;
+    _pendingFolderId = null;
+    return id;
+  }
 
   ViewState get state => _state;
   List<TripModel> get trips => _trips;
@@ -56,9 +74,17 @@ class TripProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<TripModel?> createTrip(String name) async {
+  Future<TripModel?> createTrip(
+    String name, {
+    DateTime? startDate,
+    DateTime? endDate,
+  }) async {
     try {
-      final trip = await _repository.createTrip(name);
+      final trip = await _repository.createTrip(
+        name,
+        startDate: startDate,
+        endDate: endDate,
+      );
       _trips = [trip, ..._trips];
       notifyListeners();
       return trip;
@@ -103,5 +129,26 @@ class TripProvider extends ChangeNotifier {
   void clearCurrentTrip() {
     _currentTrip = null;
     notifyListeners();
+  }
+
+  Future<bool> updateTripDates(
+    String tripId, {
+    required DateTime startDate,
+    required DateTime endDate,
+  }) async {
+    try {
+      await _repository.updateTripDates(
+        tripId,
+        startDate: startDate,
+        endDate: endDate,
+      );
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    await loadTrip(tripId);
+    return true;
   }
 }

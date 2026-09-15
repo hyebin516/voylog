@@ -19,9 +19,10 @@ class NotificationSettingsRepository {
   Future<NotificationSettingsModel> updateSettings(NotificationSettingsModel settings) async {
     try {
       final response = await _dio.put('/notification-settings', data: {
-        'tripAlerts': settings.tripAlerts,
-        'serviceAlerts': settings.serviceAlerts,
+        'newVlogAlerts': settings.newVlogAlerts,
+        'routeCompleteAlerts': settings.routeCompleteAlerts,
         'marketingAlerts': settings.marketingAlerts,
+        'nightSilent': settings.nightSilent,
       });
       return NotificationSettingsModel.fromJson(response.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {

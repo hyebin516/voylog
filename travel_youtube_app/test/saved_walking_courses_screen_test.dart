@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
+import 'package:travel_youtube_app/models/itinerary_model.dart';
 import 'package:travel_youtube_app/models/saved_walking_course_model.dart';
 import 'package:travel_youtube_app/providers/saved_walking_course_provider.dart';
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
@@ -15,7 +16,11 @@ SavedWalkingCourseModel _course(String id, String region, {int? totalDistanceM, 
     transportMode: 'walk',
     totalDistanceM: totalDistanceM,
     totalDurationSec: totalDurationSec,
-    routeData: const [],
+    routeData: const [
+      RoutePointModel(order: 0, type: 'hotel', hotelId: 'region-center', placeId: null, name: '제주', latitude: 33.5, longitude: 126.5),
+      RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'p1', name: 'A', latitude: 33.51, longitude: 126.5),
+      RoutePointModel(order: 2, type: 'place', hotelId: null, placeId: 'p2', name: 'B', latitude: 33.52, longitude: 126.5),
+    ],
     createdAt: DateTime(2026, 8, 28),
   );
 }
@@ -50,15 +55,14 @@ void main() {
     expect(find.text('저장된 코스가 없습니다.'), findsOneWidget);
   });
 
-  testWidgets('lists saved courses with their region and distance/duration', (tester) async {
+  testWidgets('lists saved courses with their region and place count', (tester) async {
     final repository = FakeSavedWalkingCourseRepository()
       ..coursesToReturn = [_course('sc1', '제주', totalDistanceM: 2119, totalDurationSec: 1897)];
     await tester.pumpWidget(_wrap(SavedWalkingCourseProvider(repository: repository)));
     await tester.pumpAndSettle();
 
     expect(find.text('제주'), findsOneWidget);
-    expect(find.textContaining('2.1km'), findsOneWidget);
-    expect(find.textContaining('31분'), findsOneWidget);
+    expect(find.text('장소 2곳'), findsOneWidget);
   });
 
   testWidgets('shows an error view with a retry option when loading fails', (tester) async {

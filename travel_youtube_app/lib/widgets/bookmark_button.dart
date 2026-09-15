@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/bookmark_provider.dart';
+import 'bookmark_folder_sheet.dart';
 
 class BookmarkButton extends StatelessWidget {
   final String placeId;
@@ -21,10 +22,16 @@ class BookmarkButton extends StatelessWidget {
         final colorScheme = Theme.of(context).colorScheme;
 
         return IconButton(
-          onPressed: () {
+          onPressed: () async {
             final wasBookmarked = bookmarked;
-            bookmarkProvider.toggleBookmark(placeId);
-            if (!wasBookmarked) onBookmarked?.call();
+            await bookmarkProvider.toggleBookmark(placeId);
+            if (wasBookmarked) return;
+
+            onBookmarked?.call();
+            if (!context.mounted) return;
+            final matches = bookmarkProvider.bookmarks.where((b) => b.placeId == placeId);
+            if (matches.isEmpty) return;
+            await showBookmarkFolderSheet(context, bookmarkId: matches.first.bookmarkId);
           },
           icon: Icon(
             bookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,

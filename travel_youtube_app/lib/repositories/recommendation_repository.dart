@@ -13,6 +13,7 @@ class RecommendationRepository {
     required DateTime localTime,
     int? radiusMeters,
     int? limit,
+    String? categoryGroup,
   }) async {
     try {
       final response = await _dio.post('/recommendations/nearby', data: {
@@ -21,6 +22,7 @@ class RecommendationRepository {
         'localTime': localTime.toIso8601String(),
         'radiusMeters': ?radiusMeters,
         'limit': ?limit,
+        'categoryGroup': ?categoryGroup,
       });
       final list = response.data['data']['recommendations'] as List<dynamic>;
       return list.map((e) => NearbyRecommendationModel.fromJson(e as Map<String, dynamic>)).toList();

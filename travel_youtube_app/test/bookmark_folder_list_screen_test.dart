@@ -54,7 +54,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('제주 맛집'), findsOneWidget);
-    expect(find.text('3개 저장됨'), findsOneWidget);
+    expect(find.text('장소 3곳'), findsOneWidget);
   });
 
   testWidgets('creating a folder navigates to its detail screen', (tester) async {

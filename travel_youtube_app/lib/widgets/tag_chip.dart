@@ -18,17 +18,17 @@ class TagChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary : AppColors.surfaceTint,
+        color: selected ? AppColors.primary : AppColors.surfaceTint3Alt,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
         style: TextStyle(
-          color: selected ? Colors.white : AppColors.ink,
+          color: selected ? Colors.white : AppColors.primaryStrong,
           fontWeight: FontWeight.w600,
-          fontSize: 13,
+          fontSize: 11.5,
         ),
       ),
     );

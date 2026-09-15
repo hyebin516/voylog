@@ -43,74 +43,103 @@ class _TastePreferenceScreenState extends State<TastePreferenceScreen> {
     final provider = context.watch<TastePreferenceProvider>();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('취향 설정'),
-        actions: [
-          TextButton(
-            key: const Key('tastePreferenceResetButton'),
-            onPressed: provider.isSaving ? null : () => _onResetPressed(provider),
-            child: const Text('초기화'),
-          ),
-        ],
-      ),
-      body: Builder(
-        builder: (context) {
-          if (provider.isLoading) {
-            return const LoadingIndicator();
-          }
-          if (provider.state == ViewState.error && provider.selectedTags.isEmpty) {
-            return ErrorView(
-              message: provider.errorMessage ?? '취향 정보를 불러오지 못했습니다.',
-              onRetry: () => provider.loadPreferences(),
-            );
-          }
-
-          return SingleChildScrollView(
-            child: ResponsiveCenter(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Row(
                 children: [
-                  Text('취향에 맞는 태그를 선택해 주세요', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    '선택한 취향을 바탕으로 내 주변 추천 결과가 더 정확해져요. 건너뛰어도 추천은 계속 이용할 수 있어요.',
-                    style: Theme.of(context).textTheme.bodyMedium,
+                  InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: AppColors.surfaceTint2, borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, size: 17, color: AppColors.textSecondary),
+                    ),
                   ),
-                  const SizedBox(height: AppSpacing.md),
-                  Wrap(
-                    spacing: AppSpacing.sm,
-                    runSpacing: AppSpacing.sm,
-                    children: [
-                      for (final tag in TastePreferenceOptions.tags)
-                        FilterChip(
-                          key: Key('tastePreference_$tag'),
-                          label: Text(
-                            tag,
-                            style: TextStyle(
-                              color: provider.selectedTags.contains(tag) ? Colors.white : AppColors.ink,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          selected: provider.selectedTags.contains(tag),
-                          selectedColor: AppColors.primary,
-                          checkmarkColor: Colors.white,
-                          onSelected: (_) => provider.toggleTag(tag),
-                        ),
-                    ],
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text('취향 설정', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
                   ),
-                  const SizedBox(height: AppSpacing.xl),
-                  PrimaryButton(
-                    key: const Key('tastePreferenceSaveButton'),
-                    label: '저장하기 (${provider.selectedTags.length}개 선택됨)',
-                    isLoading: provider.isSaving,
-                    onPressed: provider.selectedTags.isEmpty ? null : () => _onSavePressed(provider),
+                  TextButton(
+                    key: const Key('tastePreferenceResetButton'),
+                    onPressed: provider.isSaving ? null : () => _onResetPressed(provider),
+                    child: const Text('초기화', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
                   ),
                 ],
               ),
             ),
-          );
-        },
+            Expanded(
+              child: Builder(
+                builder: (context) {
+                  if (provider.isLoading) {
+                    return const LoadingIndicator();
+                  }
+                  if (provider.state == ViewState.error && provider.selectedTags.isEmpty) {
+                    return ErrorView(
+                      message: provider.errorMessage ?? '취향 정보를 불러오지 못했습니다.',
+                      onRetry: () => provider.loadPreferences(),
+                    );
+                  }
+
+                  return SingleChildScrollView(
+                    child: ResponsiveCenter(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const Text('취향에 맞는 태그를 선택해 주세요', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                          const SizedBox(height: 6),
+                          const Text(
+                            '선택한 취향을 바탕으로 내 주변 추천 결과가 더 정확해져요. 건너뛰어도 추천은 계속 이용할 수 있어요.',
+                            style: TextStyle(fontSize: 13.5, color: AppColors.textSecondary, height: 1.4),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final tag in TastePreferenceOptions.tags)
+                                FilterChip(
+                                  key: Key('tastePreference_$tag'),
+                                  label: Text(tag),
+                                  selected: provider.selectedTags.contains(tag),
+                                  onSelected: (_) => provider.toggleTag(tag),
+                                  selectedColor: AppColors.primary,
+                                  backgroundColor: AppColors.surfaceTint3,
+                                  showCheckmark: false,
+                                  side: BorderSide.none,
+                                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                  labelStyle: TextStyle(
+                                    fontSize: 13.5,
+                                    fontWeight: provider.selectedTags.contains(tag) ? FontWeight.w700 : FontWeight.w600,
+                                    color: provider.selectedTags.contains(tag) ? Colors.white : AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.xl),
+                          PrimaryButton(
+                            key: const Key('tastePreferenceSaveButton'),
+                            label: '저장하기 (${provider.selectedTags.length}개 선택됨)',
+                            isLoading: provider.isSaving,
+                            onPressed: provider.selectedTags.isEmpty ? null : () => _onSavePressed(provider),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

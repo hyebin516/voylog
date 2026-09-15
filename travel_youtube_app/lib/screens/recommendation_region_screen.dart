@@ -24,8 +24,13 @@ class RecommendationRegionScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '가고 싶은 지역을 선택하세요 (복수 선택 가능)',
-                style: Theme.of(context).textTheme.titleMedium,
+                '어디가 궁금하세요?',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '관심있는 지역을 선택하면 관련 브이로그를 보여드려요',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(

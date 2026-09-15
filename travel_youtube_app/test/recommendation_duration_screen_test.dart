@@ -8,6 +8,7 @@ import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart
 import 'package:travel_youtube_app/providers/video_provider.dart';
 import 'package:travel_youtube_app/repositories/video_repository.dart';
 import 'package:travel_youtube_app/screens/recommendation_duration_screen.dart';
+import 'package:travel_youtube_app/widgets/primary_button.dart';
 
 class FakeVideoRepository extends VideoRepository {
   List<VideoSearchResultModel> resultsToReturn = [];
@@ -56,7 +57,7 @@ void main() {
       ..toggleTheme('자연');
     await tester.pumpWidget(_wrap(wizardProvider, VideoProvider(repository: FakeVideoRepository())));
 
-    final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    final button = tester.widget<PrimaryButton>(find.byType(PrimaryButton));
     expect(button.onPressed, isNull);
   });
 
@@ -77,7 +78,7 @@ void main() {
       ];
     await tester.pumpWidget(_wrap(wizardProvider, VideoProvider(repository: repository)));
 
-    await tester.tap(find.byKey(const Key('duration_1박2일')));
+    await tester.tap(find.byKey(const Key('duration_1박 2일')));
     await tester.pump();
 
     await tester.tap(find.byKey(const Key('durationSearchButton')));
@@ -85,7 +86,7 @@ void main() {
 
     expect(repository.lastRegions, ['제주']);
     expect(repository.lastThemes, ['자연']);
-    expect(repository.lastDuration, '1박2일');
+    expect(repository.lastDuration, '1박 2일');
     expect(find.text('results screen'), findsOneWidget);
   });
 }

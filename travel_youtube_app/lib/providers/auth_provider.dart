@@ -90,6 +90,16 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool?> checkNicknameAvailable(String nickname) async {
+    try {
+      return await _repository.checkNicknameAvailable(nickname);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return null;
+    }
+  }
+
   Future<bool> signup({required String email, required String password, required String nickname}) async {
     _state = ViewState.loading;
     _errorMessage = null;
@@ -157,6 +167,73 @@ class AuthProvider extends ChangeNotifier {
 
     notifyListeners();
     return true;
+  }
+
+  Future<bool> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      await _repository.changePassword(currentPassword: currentPassword, newPassword: newPassword);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> requestPasswordResetOtp(String email) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.requestPasswordResetOtp(email);
+      _state = ViewState.idle;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> verifyPasswordResetOtp(String email, String code) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.verifyPasswordResetOtp(email, code);
+      _state = ViewState.idle;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> resetPassword({required String email, required String newPassword}) async {
+    _state = ViewState.loading;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.resetPassword(email: email, newPassword: newPassword);
+      _state = ViewState.idle;
+      notifyListeners();
+      return true;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
   }
 
   void _handleUnauthorized() {

@@ -42,8 +42,15 @@ class FakeTripRepository extends TripRepository {
     return tripsToReturn;
   }
 
+  String? lastCreateName;
+  DateTime? lastCreateStartDate;
+  DateTime? lastCreateEndDate;
+
   @override
-  Future<TripModel> createTrip(String name) async {
+  Future<TripModel> createTrip(String name, {DateTime? startDate, DateTime? endDate}) async {
+    lastCreateName = name;
+    lastCreateStartDate = startDate;
+    lastCreateEndDate = endDate;
     if (createError != null) throw createError!;
     return createdTrip!;
   }
@@ -109,6 +116,15 @@ void main() {
 
       expect(result, isNull);
       expect(provider.errorMessage, isNotNull);
+    });
+
+    test('passes an optional date range through to the repository', () async {
+      repository.createdTrip = _trip('t2');
+
+      await provider.createTrip('Trip t2', startDate: DateTime(2026, 9, 12), endDate: DateTime(2026, 9, 14));
+
+      expect(repository.lastCreateStartDate, DateTime(2026, 9, 12));
+      expect(repository.lastCreateEndDate, DateTime(2026, 9, 14));
     });
   });
 

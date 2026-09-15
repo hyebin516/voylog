@@ -4,10 +4,13 @@ import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/itinerary_model.dart';
 import 'package:travel_youtube_app/models/trip_model.dart';
+import 'package:travel_youtube_app/models/bookmark_folder_model.dart';
+import 'package:travel_youtube_app/providers/bookmark_folder_provider.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/hotel_provider.dart';
 import 'package:travel_youtube_app/providers/itinerary_provider.dart';
 import 'package:travel_youtube_app/providers/trip_provider.dart';
+import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/repositories/trip_repository.dart';
 import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/trip_detail_screen.dart';
@@ -45,6 +48,11 @@ class FakeTripRepository extends TripRepository {
   }
 }
 
+class _NoFoldersRepository extends BookmarkFolderRepository {
+  @override
+  Future<List<BookmarkFolderModel>> listFolders() async => [];
+}
+
 Widget _wrap(TripProvider tripProvider) {
   return MultiProvider(
     providers: [
@@ -52,6 +60,8 @@ Widget _wrap(TripProvider tripProvider) {
       ChangeNotifierProvider(create: (_) => HotelProvider()),
       ChangeNotifierProvider(create: (_) => ItineraryProvider()),
       ChangeNotifierProvider(create: (_) => BookmarkProvider()),
+      // "날짜 추가" opens the day/folder picker, which lists bookmark folders.
+      ChangeNotifierProvider(create: (_) => BookmarkFolderProvider(repository: _NoFoldersRepository())),
     ],
     child: MaterialApp(
       // `home:` builds the initial screen directly (AppRoutes.tripDetail
@@ -67,7 +77,7 @@ Widget _wrap(TripProvider tripProvider) {
 void main() {
   setUpAll(installMockSecureStorageChannel);
 
-  testWidgets('shows an empty state and an "1일차 추가" button when the trip has no days yet', (tester) async {
+  testWidgets('shows an empty state and a "날짜 추가" button when the trip has no days yet', (tester) async {
     final repository = FakeTripRepository()
       ..tripDetailToReturn = TripDetailModel(tripId: 't1', name: '제주도 여행', createdAt: DateTime(2026, 1, 1), days: []);
     await tester.pumpWidget(_wrap(TripProvider(repository: repository)));
@@ -75,7 +85,7 @@ void main() {
 
     expect(find.text('제주도 여행'), findsOneWidget);
     expect(find.text('아직 저장된 일차가 없습니다.'), findsOneWidget);
-    expect(find.text('1일차 추가'), findsOneWidget);
+    expect(find.text('날짜 추가'), findsOneWidget);
   });
 
   testWidgets('shows each saved day and offers to add the next one', (tester) async {
@@ -91,60 +101,43 @@ void main() {
 
     expect(find.text('1일차'), findsOneWidget);
     expect(find.text('2일차'), findsOneWidget);
-    expect(find.text('3일차 추가'), findsOneWidget);
+    expect(find.text('날짜 추가'), findsOneWidget);
   });
 
-  testWidgets('tapping "N일차 추가" records the active trip/day on TripProvider', (tester) async {
+  testWidgets('tapping "날짜 추가" records the active trip/day on TripProvider', (tester) async {
     final repository = FakeTripRepository()
       ..tripDetailToReturn = TripDetailModel(tripId: 't1', name: '제주도 여행', createdAt: DateTime(2026, 1, 1), days: [_day(1)]);
     final tripProvider = TripProvider(repository: repository);
     await tester.pumpWidget(_wrap(tripProvider));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('2일차 추가'));
+    await tester.tap(find.text('날짜 추가'));
     await tester.pumpAndSettle();
 
     expect(tripProvider.activeTripId, 't1');
     expect(tripProvider.activeDayNumber, 2);
   });
 
-  testWidgets('deleting the trip pops back to the previous screen on success', (tester) async {
+  testWidgets('shows "전체 일정" even when the trip has no days yet', (tester) async {
     final repository = FakeTripRepository()
       ..tripDetailToReturn = TripDetailModel(tripId: 't1', name: '제주도 여행', createdAt: DateTime(2026, 1, 1), days: []);
-    final tripProvider = TripProvider(repository: repository);
-
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider.value(value: tripProvider),
-          ChangeNotifierProvider(create: (_) => HotelProvider()),
-          ChangeNotifierProvider(create: (_) => ItineraryProvider()),
-        ],
-        child: MaterialApp(
-          home: Builder(
-            builder: (context) => ElevatedButton(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TripDetailScreen(tripId: 't1')),
-              ),
-              child: const Text('open trip list'),
-            ),
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.text('open trip list'));
-    await tester.pumpAndSettle();
-    expect(find.text('제주도 여행'), findsOneWidget);
-
-    await tester.tap(find.byIcon(Icons.delete_outline_rounded));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('삭제'));
+    await tester.pumpWidget(_wrap(TripProvider(repository: repository)));
     await tester.pumpAndSettle();
 
-    expect(repository.deleteCalls, ['t1']);
-    expect(find.text('open trip list'), findsOneWidget);
-    expect(find.text('제주도 여행'), findsNothing);
+    expect(find.text('전체 일정'), findsOneWidget);
+  });
+
+  testWidgets('does not show a standalone "이미지로 공유" button (that lives on 전체 일정 now)', (tester) async {
+    final repository = FakeTripRepository()
+      ..tripDetailToReturn = TripDetailModel(
+        tripId: 't1',
+        name: '제주도 여행',
+        createdAt: DateTime(2026, 1, 1),
+        days: [_day(1)],
+      );
+    await tester.pumpWidget(_wrap(TripProvider(repository: repository)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이미지로 공유'), findsNothing);
   });
 }

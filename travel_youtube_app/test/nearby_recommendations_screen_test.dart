@@ -15,6 +15,7 @@ import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/nearby_recommendations_screen.dart';
 
 import 'fakes/fake_location_repository.dart';
+import 'fakes/fake_map_widget.dart';
 
 const LocationResult _location = LocationResult(latitude: 37.5, longitude: 127.0);
 
@@ -43,6 +44,7 @@ class FakeRecommendationRepository extends RecommendationRepository {
     required DateTime localTime,
     int? radiusMeters,
     int? limit,
+    String? categoryGroup,
   }) async {
     if (error != null) throw error!;
     return resultsToReturn;
@@ -99,7 +101,7 @@ Widget _wrap(
       ChangeNotifierProvider.value(value: bookmarkProvider ?? BookmarkProvider(repository: FakeBookmarkRepository())),
     ],
     child: MaterialApp(
-      home: const NearbyRecommendationsScreen(),
+      home: const NearbyRecommendationsScreen(mapRepository: FakeMapRepository()),
       onGenerateRoute: AppRoutes.onGenerateRoute,
       navigatorObservers: [?navigatorObserver],
     ),
@@ -210,6 +212,26 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(behaviorRepository.recordedActions, contains('bookmark'));
+  });
+
+  testWidgets('tapping the map icon opens a map sheet and records map_view', (tester) async {
+    final locationRepository = FakeLocationRepository()
+      ..permissionToReturn = LocationPermissionState.granted
+      ..locationToReturn = _location;
+    final recommendationRepository = FakeRecommendationRepository()..resultsToReturn = [_rec];
+    final behaviorRepository = FakeBehaviorRepository();
+
+    await tester.pumpWidget(_wrap(
+      LocationProvider(repository: locationRepository),
+      RecommendationProvider(repository: recommendationRepository, behaviorRepository: behaviorRepository),
+    ));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('지도 보기'));
+    await tester.pumpAndSettle();
+
+    expect(behaviorRepository.recordedActions, contains('map_view'));
+    expect(find.text('예시 베이커리 카페'), findsWidgets);
   });
 
   testWidgets('marking a card as not interested removes it and records not_interested', (tester) async {

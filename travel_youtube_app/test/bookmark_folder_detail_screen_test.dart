@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/bookmark_folder_model.dart';
 import 'package:travel_youtube_app/models/bookmark_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_folder_provider.dart';
+import 'package:travel_youtube_app/providers/trip_provider.dart';
 import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/screens/bookmark_folder_detail_screen.dart';
 
@@ -28,48 +29,72 @@ class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
   final List<String> removeCalls = [];
 
   @override
-  Future<List<BookmarkModel>> listBookmarksInFolder(String folderId) async => bookmarksToReturn;
+  Future<List<BookmarkModel>> listBookmarksInFolder(String folderId) async =>
+      bookmarksToReturn;
 
   @override
-  Future<void> removeBookmarkFromFolder(String folderId, String bookmarkId) async {
+  Future<void> removeBookmarkFromFolder(
+    String folderId,
+    String bookmarkId,
+  ) async {
     removeCalls.add(bookmarkId);
-    bookmarksToReturn = bookmarksToReturn.where((b) => b.bookmarkId != bookmarkId).toList();
+    bookmarksToReturn = bookmarksToReturn
+        .where((b) => b.bookmarkId != bookmarkId)
+        .toList();
   }
 
   @override
   Future<List<BookmarkFolderModel>> listFolders() async => [];
 }
 
-Widget _wrap(BookmarkFolderProvider provider) {
-  return ChangeNotifierProvider.value(
-    value: provider,
+Widget _wrap(BookmarkFolderProvider provider, {TripProvider? tripProvider}) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: provider),
+      ChangeNotifierProvider.value(value: tripProvider ?? TripProvider()),
+    ],
     child: MaterialApp(
       home: const BookmarkFolderDetailScreen(folderId: 'f1'),
-      onGenerateRoute: (settings) => MaterialPageRoute(builder: (_) => const Scaffold(body: Text('picker'))),
+      routes: {'/trips': (_) => const Scaffold(body: Text('trip list'))},
+      onGenerateRoute: (settings) => MaterialPageRoute(
+        builder: (_) => const Scaffold(body: Text('picker')),
+      ),
     ),
   );
 }
 
 void main() {
-  testWidgets('shows an empty state when the folder has no bookmarks yet', (tester) async {
+  testWidgets('shows an empty state when the folder has no bookmarks yet', (
+    tester,
+  ) async {
     final repository = FakeBookmarkFolderRepository();
-    await tester.pumpWidget(_wrap(BookmarkFolderProvider(repository: repository)));
+    await tester.pumpWidget(
+      _wrap(BookmarkFolderProvider(repository: repository)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('이 폴더에 담긴 북마크가 없습니다.'), findsOneWidget);
   });
 
   testWidgets('lists the bookmarks currently in the folder', (tester) async {
-    final repository = FakeBookmarkFolderRepository()..bookmarksToReturn = [_bookmark('b1', '해운대해수욕장')];
-    await tester.pumpWidget(_wrap(BookmarkFolderProvider(repository: repository)));
+    final repository = FakeBookmarkFolderRepository()
+      ..bookmarksToReturn = [_bookmark('b1', '해운대해수욕장')];
+    await tester.pumpWidget(
+      _wrap(BookmarkFolderProvider(repository: repository)),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('해운대해수욕장'), findsOneWidget);
   });
 
-  testWidgets('tapping the remove icon takes the bookmark out of the folder', (tester) async {
-    final repository = FakeBookmarkFolderRepository()..bookmarksToReturn = [_bookmark('b1', '해운대해수욕장')];
-    await tester.pumpWidget(_wrap(BookmarkFolderProvider(repository: repository)));
+  testWidgets('tapping the remove icon takes the bookmark out of the folder', (
+    tester,
+  ) async {
+    final repository = FakeBookmarkFolderRepository()
+      ..bookmarksToReturn = [_bookmark('b1', '해운대해수욕장')];
+    await tester.pumpWidget(
+      _wrap(BookmarkFolderProvider(repository: repository)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.close_rounded));
@@ -79,9 +104,13 @@ void main() {
     expect(find.text('해운대해수욕장'), findsNothing);
   });
 
-  testWidgets('tapping the add button navigates to the picker screen', (tester) async {
+  testWidgets('tapping the add button navigates to the picker screen', (
+    tester,
+  ) async {
     final repository = FakeBookmarkFolderRepository();
-    await tester.pumpWidget(_wrap(BookmarkFolderProvider(repository: repository)));
+    await tester.pumpWidget(
+      _wrap(BookmarkFolderProvider(repository: repository)),
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.byIcon(Icons.add_rounded));
@@ -89,4 +118,49 @@ void main() {
 
     expect(find.text('picker'), findsOneWidget);
   });
+
+  testWidgets(
+    '"AI 동선 생성하기" is shown but disabled when the folder has fewer than 2 bookmarks',
+    (tester) async {
+      final repository = FakeBookmarkFolderRepository()
+        ..bookmarksToReturn = [_bookmark('b1', '해운대해수욕장')];
+      await tester.pumpWidget(
+        _wrap(BookmarkFolderProvider(repository: repository)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('AI 동선 생성하기'), findsOneWidget);
+      await tester.tap(find.text('AI 동선 생성하기'));
+      await tester.pumpAndSettle();
+      // Disabled -- tapping it does nothing (no navigation).
+      expect(find.text('trip list'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'tapping "AI 동선 생성하기" stashes the folder id on TripProvider and navigates to the trip list',
+    (tester) async {
+      final repository = FakeBookmarkFolderRepository()
+        ..bookmarksToReturn = [
+          _bookmark('b1', '해운대해수욕장'),
+          _bookmark('b2', '스타벅스'),
+        ];
+      final tripProvider = TripProvider();
+      await tester.pumpWidget(
+        _wrap(
+          BookmarkFolderProvider(repository: repository),
+          tripProvider: tripProvider,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('AI 동선 생성하기'), findsOneWidget);
+
+      await tester.tap(find.text('AI 동선 생성하기'));
+      await tester.pumpAndSettle();
+
+      expect(tripProvider.takePendingFolderId(), 'f1');
+      expect(find.text('trip list'), findsOneWidget);
+    },
+  );
 }

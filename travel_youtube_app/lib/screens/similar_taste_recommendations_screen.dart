@@ -5,6 +5,7 @@ import '../core/theme/app_theme.dart';
 import '../models/place_model.dart';
 import '../models/similar_taste_recommendation_model.dart';
 import '../providers/similar_taste_provider.dart';
+import '../providers/taste_preference_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
@@ -39,6 +40,7 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SimilarTasteProvider>().load();
+      context.read<TastePreferenceProvider>().loadPreferences();
     });
   }
 
@@ -47,8 +49,32 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
     final provider = context.watch<SimilarTasteProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('비슷한 취향 추천')),
-      body: Builder(
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
+              child: Row(
+                children: [
+                  InkWell(
+                    onTap: () => Navigator.of(context).maybePop(),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(color: AppColors.surfaceTint2, borderRadius: BorderRadius.circular(12)),
+                      child: const Icon(Icons.arrow_back_ios_new_rounded, size: 17, color: AppColors.textSecondary),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Text('취향 맞춤 추천', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Builder(
         builder: (context) {
           if (provider.isLoading && provider.result == null) {
             return const LoadingIndicator();
@@ -89,11 +115,45 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
             return const Center(child: Text('아직 비슷한 취향의 사용자가 없어요.'));
           }
 
+          final myTags = context.watch<TastePreferenceProvider>().selectedTags;
+
           return ListView.builder(
             padding: const EdgeInsets.all(AppSpacing.md),
-            itemCount: result.recommendations.length,
+            itemCount: result.recommendations.length + 1,
             itemBuilder: (context, index) {
-              final SimilarTasteRecommendationModel rec = result.recommendations[index];
+              if (index == 0) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '비슷한 취향의 여행자들이\n많이 저장한 곳이에요',
+                        style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800, color: AppColors.ink, height: 1.3),
+                      ),
+                      if (myTags.isNotEmpty) ...[
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: [
+                            for (final tag in myTags)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                decoration: BoxDecoration(color: AppColors.surfaceTint2, borderRadius: BorderRadius.circular(999)),
+                                child: Text(
+                                  tag,
+                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }
+              final SimilarTasteRecommendationModel rec = result.recommendations[index - 1];
               return Padding(
                 padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: AppCard(
@@ -107,7 +167,7 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceTint,
+                              color: AppColors.surfaceTint2,
                               borderRadius: BorderRadius.circular(999),
                             ),
                             child: Row(
@@ -134,6 +194,10 @@ class _SimilarTasteRecommendationsScreenState extends State<SimilarTasteRecommen
             },
           );
         },
+      ),
+            ),
+          ],
+        ),
       ),
     );
   }

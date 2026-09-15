@@ -29,7 +29,7 @@ class RecommendationDurationScreen extends StatelessWidget {
     final wizard = context.watch<RecommendationWizardProvider>();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('기간 선택')),
+      appBar: AppBar(title: const Text('일정 선택')),
       body: SingleChildScrollView(
         child: ResponsiveCenter(
           padding: const EdgeInsets.all(AppSpacing.lg),
@@ -37,8 +37,13 @@ class RecommendationDurationScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                '여행 기간을 선택하세요',
-                style: Theme.of(context).textTheme.titleMedium,
+                '며칠 동안 여행하세요?',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '브이로그를 추천해 드려요!',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
               ),
               const SizedBox(height: AppSpacing.md),
               Wrap(
@@ -64,7 +69,7 @@ class RecommendationDurationScreen extends StatelessWidget {
               const SizedBox(height: AppSpacing.xl),
               PrimaryButton(
                 key: const Key('durationSearchButton'),
-                label: '추천 받기',
+                label: '다음',
                 isLoading: context.watch<VideoProvider>().isSearching,
                 onPressed: wizard.canSearch ? () => _onSearchPressed(context, wizard) : null,
               ),

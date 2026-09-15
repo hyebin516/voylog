@@ -35,6 +35,15 @@ class AuthRepository {
     }
   }
 
+  Future<bool> checkNicknameAvailable(String nickname) async {
+    try {
+      final response = await _dio.get('/auth/check-nickname', queryParameters: {'nickname': nickname});
+      return response.data['data']['available'] as bool;
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
   Future<UserModel> signup({required String email, required String password, required String nickname}) async {
     try {
       final response = await _dio.post('/auth/signup', data: {
@@ -80,6 +89,38 @@ class AuthRepository {
     try {
       final response = await _dio.patch('/auth/profile', data: {'nickname': nickname});
       return UserModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<void> changePassword({required String currentPassword, required String newPassword}) async {
+    try {
+      await _dio.patch('/auth/password', data: {'currentPassword': currentPassword, 'newPassword': newPassword});
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<void> requestPasswordResetOtp(String email) async {
+    try {
+      await _dio.post('/auth/password/reset/request-otp', data: {'email': email});
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<void> verifyPasswordResetOtp(String email, String code) async {
+    try {
+      await _dio.post('/auth/password/reset/verify-otp', data: {'email': email, 'code': code});
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<void> resetPassword({required String email, required String newPassword}) async {
+    try {
+      await _dio.post('/auth/password/reset', data: {'email': email, 'newPassword': newPassword});
     } on DioException catch (e) {
       throwApiException(e);
     }

@@ -14,36 +14,46 @@ void main() {
       statusCode: 200,
       body: {
         'success': true,
-        'data': {'tripAlerts': true, 'serviceAlerts': true, 'marketingAlerts': false},
+        'data': {'newVlogAlerts': true, 'routeCompleteAlerts': true, 'marketingAlerts': false, 'nightSilent': false},
       },
     );
     DioClient().dio.httpClientAdapter = adapter;
 
     final settings = await NotificationSettingsRepository().getSettings();
 
-    expect(settings.tripAlerts, isTrue);
+    expect(settings.newVlogAlerts, isTrue);
     expect(settings.marketingAlerts, isFalse);
     expect(adapter.lastOptions?.path, '/notification-settings');
     expect(adapter.lastOptions?.method, 'GET');
   });
 
-  test('updateSettings sends all three fields and maps the saved response', () async {
+  test('updateSettings sends all four fields and maps the saved response', () async {
     final adapter = FakeDioAdapter(
       statusCode: 200,
       body: {
         'success': true,
-        'data': {'tripAlerts': false, 'serviceAlerts': false, 'marketingAlerts': true},
+        'data': {'newVlogAlerts': false, 'routeCompleteAlerts': false, 'marketingAlerts': true, 'nightSilent': true},
       },
     );
     DioClient().dio.httpClientAdapter = adapter;
 
     final settings = await NotificationSettingsRepository().updateSettings(
-      const NotificationSettingsModel(tripAlerts: false, serviceAlerts: false, marketingAlerts: true),
+      const NotificationSettingsModel(
+        newVlogAlerts: false,
+        routeCompleteAlerts: false,
+        marketingAlerts: true,
+        nightSilent: true,
+      ),
     );
 
     expect(settings.marketingAlerts, isTrue);
     expect(adapter.lastOptions?.path, '/notification-settings');
     expect(adapter.lastOptions?.method, 'PUT');
-    expect(adapter.lastOptions?.data, {'tripAlerts': false, 'serviceAlerts': false, 'marketingAlerts': true});
+    expect(adapter.lastOptions?.data, {
+      'newVlogAlerts': false,
+      'routeCompleteAlerts': false,
+      'marketingAlerts': true,
+      'nightSilent': true,
+    });
   });
 }

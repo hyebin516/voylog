@@ -6,6 +6,7 @@ import 'package:travel_youtube_app/models/taste_preference_model.dart';
 import 'package:travel_youtube_app/providers/taste_preference_provider.dart';
 import 'package:travel_youtube_app/repositories/taste_preference_repository.dart';
 import 'package:travel_youtube_app/screens/taste_preference_screen.dart';
+import 'package:travel_youtube_app/widgets/primary_button.dart';
 
 class FakeTastePreferenceRepository extends TastePreferenceRepository {
   TastePreferenceModel preferencesToReturn = const TastePreferenceModel(tags: []);
@@ -44,7 +45,7 @@ void main() {
     await tester.pumpWidget(_wrap(TastePreferenceProvider(repository: repository)));
     await tester.pumpAndSettle();
 
-    final button = tester.widget<ElevatedButton>(find.byType(ElevatedButton));
+    final button = tester.widget<PrimaryButton>(find.byType(PrimaryButton));
     expect(button.onPressed, isNull);
   });
 

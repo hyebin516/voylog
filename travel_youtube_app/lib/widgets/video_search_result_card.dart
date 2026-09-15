@@ -53,6 +53,18 @@ class VideoSearchResultCard extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              '분석',
+              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white),
+            ),
+          ),
         ],
       ),
     );

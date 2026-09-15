@@ -38,11 +38,25 @@ class NotificationSettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateTripAlerts(bool value) => _update(_settings?.copyWith(tripAlerts: value));
+  Future<void> updateNewVlogAlerts(bool value) => _update(_settings?.copyWith(newVlogAlerts: value));
 
-  Future<void> updateServiceAlerts(bool value) => _update(_settings?.copyWith(serviceAlerts: value));
+  Future<void> updateRouteCompleteAlerts(bool value) => _update(_settings?.copyWith(routeCompleteAlerts: value));
 
   Future<void> updateMarketingAlerts(bool value) => _update(_settings?.copyWith(marketingAlerts: value));
+
+  Future<void> updateNightSilent(bool value) => _update(_settings?.copyWith(nightSilent: value));
+
+  /// Design's "전체 알림" master toggle -- not backed by its own field
+  /// (see [NotificationSettingsModel.allEnabled]), so turning it on/off
+  /// just fans out to every underlying toggle at once.
+  Future<void> updateAll(bool enabled) => _update(
+        _settings?.copyWith(
+          newVlogAlerts: enabled,
+          routeCompleteAlerts: enabled,
+          marketingAlerts: enabled,
+          nightSilent: !enabled,
+        ),
+      );
 
   Future<void> _update(NotificationSettingsModel? next) async {
     if (next == null) return;

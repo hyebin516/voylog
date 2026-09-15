@@ -10,6 +10,7 @@ import 'package:travel_youtube_app/screens/video_analysis_screen.dart';
 
 import 'fakes/fake_map_widget.dart';
 import 'fakes/fake_video_player_widget.dart';
+import 'helpers/phone_viewport.dart';
 
 const PlaceModel _geocodedPlace = PlaceModel(
   placeId: 'p1',
@@ -62,6 +63,7 @@ Widget _wrap({
 
 void main() {
   testWidgets('shows a loading indicator before a video is loaded', (tester) async {
+    usePhoneViewport(tester);
     final videoProvider = VideoProvider(repository: FakeVideoRepository());
 
     await tester.pumpWidget(
@@ -73,9 +75,11 @@ void main() {
   });
 
   testWidgets('shows the video title, the player, and place cards once loaded', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
       ..videoToReturn = const VideoModel(
         videoId: 'v1',
+        youtubeVideoId: 'v1',
         title: '부산 브이로그',
         isCached: false,
         places: [_geocodedPlace, _ungeocodedPlace],
@@ -94,8 +98,9 @@ void main() {
   });
 
   testWidgets('shows an empty message when the video has no places', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
-      ..videoToReturn = const VideoModel(videoId: 'v1', title: '빈 영상', isCached: false, places: []);
+      ..videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: '빈 영상', isCached: false, places: []);
     final videoProvider = VideoProvider(repository: repository);
     await videoProvider.analyze('https://youtu.be/v1');
 
@@ -107,9 +112,11 @@ void main() {
   });
 
   testWidgets('tapping a timestamp chip seeks the player to that second', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
       ..videoToReturn = const VideoModel(
         videoId: 'v1',
+        youtubeVideoId: 'v1',
         title: '부산 브이로그',
         isCached: false,
         places: [_geocodedPlace],
@@ -129,9 +136,11 @@ void main() {
   });
 
   testWidgets('tapping the map button on a geocoded place shows the map with a marker', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
       ..videoToReturn = const VideoModel(
         videoId: 'v1',
+        youtubeVideoId: 'v1',
         title: '부산 브이로그',
         isCached: false,
         places: [_geocodedPlace],
@@ -143,16 +152,18 @@ void main() {
       _wrap(videoProvider: videoProvider, videoPlayerRepository: FakeVideoPlayerRepository()),
     );
 
-    await tester.tap(find.byIcon(Icons.map_outlined));
+    await tester.tap(find.byTooltip('지도 보기'));
     await tester.pumpAndSettle();
 
     expect(find.text('marker:해운대해수욕장'), findsOneWidget);
   });
 
   testWidgets('the map button is disabled for a place with no coordinates', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
       ..videoToReturn = const VideoModel(
         videoId: 'v1',
+        youtubeVideoId: 'v1',
         title: '부산 브이로그',
         isCached: false,
         places: [_ungeocodedPlace],
@@ -164,14 +175,18 @@ void main() {
       _wrap(videoProvider: videoProvider, videoPlayerRepository: FakeVideoPlayerRepository()),
     );
 
-    final mapButton = tester.widget<IconButton>(find.widgetWithIcon(IconButton, Icons.map_outlined));
+    final mapButton = tester.widget<IconButton>(
+      find.ancestor(of: find.byTooltip('지도 보기'), matching: find.byType(IconButton)),
+    );
     expect(mapButton.onPressed, isNull);
   });
 
   testWidgets('tapping a place card navigates to place detail, and popping with a timestamp seeks the player', (tester) async {
+    usePhoneViewport(tester);
     final repository = FakeVideoRepository()
       ..videoToReturn = const VideoModel(
         videoId: 'v1',
+        youtubeVideoId: 'v1',
         title: '부산 브이로그',
         isCached: false,
         places: [_geocodedPlace],

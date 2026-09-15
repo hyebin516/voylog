@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
+import 'package:travel_youtube_app/models/bookmark_model.dart';
 import 'package:travel_youtube_app/models/itinerary_model.dart';
 import 'package:travel_youtube_app/models/saved_walking_course_model.dart';
+import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/saved_walking_course_provider.dart';
+import 'package:travel_youtube_app/repositories/bookmark_repository.dart';
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/screens/saved_walking_course_detail_screen.dart';
 
@@ -35,9 +38,18 @@ class FakeSavedWalkingCourseRepository extends SavedWalkingCourseRepository {
   }
 }
 
+class FakeBookmarkRepository extends BookmarkRepository {
+  @override
+  Future<List<BookmarkModel>> listBookmarks() async => [];
+}
+
 Widget _wrap(SavedWalkingCourseProvider provider) {
-  return ChangeNotifierProvider.value(
-    value: provider,
+  // Each stop card carries a BookmarkButton, which needs BookmarkProvider.
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider.value(value: provider),
+      ChangeNotifierProvider(create: (_) => BookmarkProvider(repository: FakeBookmarkRepository())),
+    ],
     child: MaterialApp(
       home: SavedWalkingCourseDetailScreen(course: _course, mapRepository: const FakeMapRepository()),
     ),
@@ -52,6 +64,34 @@ void main() {
     expect(find.text('제주 코스'), findsOneWidget);
     expect(find.text('왕복'), findsOneWidget);
     expect(find.text('marker:흑돼지집'), findsOneWidget);
+  });
+
+  testWidgets('excludes the virtual region-center anchor from the stop cards and map markers', (tester) async {
+    await tester.pumpWidget(_wrap(SavedWalkingCourseProvider(repository: FakeSavedWalkingCourseRepository())));
+    await tester.pumpAndSettle();
+
+    // The route's first point ("제주 중심") is a virtual region-center
+    // anchor, not a real place -- it must not render as a stop card or a
+    // map marker.
+    expect(find.text('제주 중심'), findsNothing);
+    expect(find.text('marker:제주 중심'), findsNothing);
+    expect(find.textContaining('장소 1곳'), findsOneWidget);
+  });
+
+  testWidgets('tapping a place stop focuses the map on that marker', (tester) async {
+    await tester.pumpWidget(_wrap(SavedWalkingCourseProvider(repository: FakeSavedWalkingCourseRepository())));
+    await tester.pumpAndSettle();
+
+    expect(find.text('focused:p1'), findsNothing);
+
+    // The map now sits above the list, which pushes the stops below the
+    // fold of the test viewport.
+    await tester.ensureVisible(find.text('흑돼지집'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('흑돼지집'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('focused:p1'), findsOneWidget);
   });
 
   testWidgets('deleting asks for confirmation, then pops on success', (tester) async {

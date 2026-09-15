@@ -40,9 +40,9 @@ void main() {
 
     expect(find.byKey(const Key('loginEmailField')), findsOneWidget);
     expect(find.byKey(const Key('loginPasswordField')), findsOneWidget);
-    expect(find.text('이메일로 로그인'), findsOneWidget);
-    expect(find.text('카카오로 로그인'), findsOneWidget);
-    expect(find.text('이메일로 회원가입'), findsOneWidget);
+    expect(find.text('로그인'), findsOneWidget);
+    expect(find.text('카카오로 3초만에 로그인'), findsOneWidget);
+    expect(find.text('회원가입'), findsOneWidget);
   });
 
   testWidgets('logging in with email/password authenticates the user', (tester) async {
@@ -52,7 +52,7 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('loginEmailField')), 'a@b.com');
     await tester.enterText(find.byKey(const Key('loginPasswordField')), 'password123');
-    await tester.tap(find.text('이메일로 로그인'));
+    await tester.tap(find.text('로그인'));
     await tester.pumpAndSettle();
 
     expect(repository.lastEmail, 'a@b.com');
@@ -67,18 +67,27 @@ void main() {
 
     await tester.enterText(find.byKey(const Key('loginEmailField')), 'a@b.com');
     await tester.enterText(find.byKey(const Key('loginPasswordField')), 'wrong-password');
-    await tester.tap(find.text('이메일로 로그인'));
+    await tester.tap(find.text('로그인'));
     await tester.pumpAndSettle();
 
     expect(find.text('이메일 또는 비밀번호가 올바르지 않습니다.'), findsOneWidget);
   });
 
-  testWidgets('tapping 이메일로 회원가입 navigates to the signup email route', (tester) async {
+  testWidgets('tapping 회원가입 navigates to the signup route', (tester) async {
     await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository())));
 
-    await tester.tap(find.text('이메일로 회원가입'));
+    await tester.tap(find.text('회원가입'));
     await tester.pumpAndSettle();
 
-    expect(find.text('route:/signup/email'), findsOneWidget);
+    expect(find.text('route:/signup'), findsOneWidget);
+  });
+
+  testWidgets('tapping 비밀번호를 잊으셨나요 navigates to the forgot-password route', (tester) async {
+    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository())));
+
+    await tester.tap(find.text('비밀번호를 잊으셨나요?'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('route:/forgot-password'), findsOneWidget);
   });
 }

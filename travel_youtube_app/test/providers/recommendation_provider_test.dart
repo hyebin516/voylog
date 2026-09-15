@@ -25,6 +25,8 @@ class FakeRecommendationRepository extends RecommendationRepository {
   ApiException? error;
   double? lastLatitude;
   double? lastLongitude;
+  String? lastCategoryGroup;
+  int calls = 0;
 
   @override
   Future<List<NearbyRecommendationModel>> getNearby({
@@ -33,9 +35,12 @@ class FakeRecommendationRepository extends RecommendationRepository {
     required DateTime localTime,
     int? radiusMeters,
     int? limit,
+    String? categoryGroup,
   }) async {
     lastLatitude = latitude;
     lastLongitude = longitude;
+    lastCategoryGroup = categoryGroup;
+    calls += 1;
     if (error != null) throw error!;
     return resultsToReturn;
   }
@@ -93,6 +98,35 @@ void main() {
       expect(provider.state, ViewState.error);
       expect(provider.errorMessage, isNotNull);
       expect(provider.recommendations, isEmpty);
+    });
+  });
+
+  group('selectCategoryGroup', () {
+    test('reloads from the server for the chosen group at the last location', () async {
+      await provider.loadNearby(latitude: 37.5, longitude: 127.0);
+      repository.resultsToReturn = [_rec];
+
+      await provider.selectCategoryGroup('cafe');
+
+      expect(repository.lastCategoryGroup, 'cafe');
+      expect(repository.lastLatitude, 37.5);
+      expect(provider.categoryGroup, 'cafe');
+      expect(provider.recommendations, [_rec]);
+    });
+
+    test('does not reload when the same group is selected again', () async {
+      await provider.loadNearby(latitude: 37.5, longitude: 127.0);
+
+      await provider.selectCategoryGroup(null);
+
+      expect(repository.calls, 1);
+    });
+
+    test('only remembers the group when no location has loaded yet', () async {
+      await provider.selectCategoryGroup('play');
+
+      expect(provider.categoryGroup, 'play');
+      expect(repository.calls, 0);
     });
   });
 

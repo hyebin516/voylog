@@ -1,21 +1,73 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
-/// Design tokens lifted from the Voylog Claude Design prototype (soft sky-blue
-/// palette, pill-shaped controls, blue-tinted shadows instead of grey).
+/// Design tokens from the Voylog design handoff
+/// (`Voylog UI/design_handoff_voylog/README.md`) -- soft sky-blue palette,
+/// pill-shaped controls, blue-tinted shadows instead of grey. Values here
+/// are copied verbatim from the handoff's Design Tokens table so screens
+/// stay pixel-faithful to the reference.
 class AppColors {
   AppColors._();
 
-  static const Color primary = Color(0xFF2F8FD0);
-  static const Color ink = Color(0xFF1C3F52);
+  /// Primary (brand blue).
+  static const Color primary = Color(0xFF3D9FDB);
+  /// Primary strong / text-on-light.
+  static const Color primaryStrong = Color(0xFF2F8FD0);
+  /// Primary gradient CTA: `linear-gradient(135deg, accentCyan, primaryStrong)`.
   static const Color accentCyan = Color(0xFF5FC2E8);
-  static const Color coral = Color(0xFFE2554F);
-  static const Color surfaceTint = Color(0xFFEAF6FD);
-  static const Color surfaceSoft = Color(0xFFDCECF5);
-  static const Color surfaceFaint = Color(0xFFF7FBFD);
 
-  /// Soft primary-tinted shadow used on cards and primary buttons instead of
-  /// Material's default grey elevation shadow.
+  static const Color ink = Color(0xFF1C3F52); // text primary
+  static const Color textSecondary = Color(0xFF4A90BB);
+  static const Color textTertiary = Color(0xFF7FA6BC); // caption
+  static const Color textMuted = Color(0xFF9DB8C9); // placeholder
+  static const Color textMuted2 = Color(0xFFA9C5D6);
+
+  static const Color divider = Color(0xFFE6F2F9);
+  static const Color dividerStrong = Color(0xFFE0EEF6);
+
+  static const Color surfaceTint1 = Color(0xFFF7FBFD);
+  static const Color surfaceTint2 = Color(0xFFF2F8FC);
+  static const Color surfaceTint3 = Color(0xFFEAF6FD);
+  static const Color surfaceTint3Alt = Color(0xFFE7F5FC);
+  static const Color selectedBorder = Color(0xFFBFE0F2);
+  static const Color appBackground = Color(0xFFDCECF5); // outside the phone frame
+
+  static const Color accentWarm = Color(0xFFF0A83A); // day-2 badge, filled bookmark
+  static const Color accentWarmAlt = Color(0xFFE2A45F);
+
+  static const Color kakaoYellow = Color(0xFFFEE500);
+  static const Color kakaoSymbol = Color(0xFF3C1E1E);
+
+  static const Color danger = Color(0xFFE2685F); // destructive confirm
+  static const Color overlay = Color(0x66142837); // rgba(20,40,55,.4)
+
+  /// Legacy aliases kept so earlier-written screens compile unchanged while
+  /// the rest of the app is brought in line with the handoff token names.
+  static const Color surfaceTint = surfaceTint3;
+  static const Color surfaceSoft = appBackground;
+  static const Color surfaceFaint = surfaceTint1;
+  static const Color coral = danger;
+
+  /// The exact shadow RGB from the handoff (`rgba(58,159,216,.07)` etc.) --
+  /// close to but not identical to [primary], kept as its own token.
+  static const Color _shadowRgb = Color(0xFF3A9FD8);
+
+  /// Card shadow: `0 4px 14px rgba(58,159,216,.07)`.
+  static List<BoxShadow> cardShadow() => [
+        BoxShadow(color: _shadowRgb.withValues(alpha: 0.07), blurRadius: 14, offset: const Offset(0, 4)),
+      ];
+
+  /// Floating icon-button shadow: `0 3px 8px rgba(58,159,216,.15)`.
+  static List<BoxShadow> floatingButtonShadow() => [
+        BoxShadow(color: _shadowRgb.withValues(alpha: 0.15), blurRadius: 8, offset: const Offset(0, 3)),
+      ];
+
+  /// Bottom-sheet shadow: `0 -12px 30px rgba(30,60,80,.15)`.
+  static List<BoxShadow> bottomSheetShadow() => [
+        BoxShadow(color: const Color(0xFF1E3C50).withValues(alpha: 0.15), blurRadius: 30, offset: const Offset(0, -12)),
+      ];
+
+  /// Generic soft primary-tinted shadow (used where the handoff doesn't
+  /// specify an exact card/sheet value, e.g. custom hero elements).
   static List<BoxShadow> softShadow({
     double opacity = 0.18,
     double blurRadius = 18,
@@ -52,9 +104,11 @@ class AppTheme {
       onPrimaryContainer: AppColors.ink,
     );
 
-    final textTheme = GoogleFonts.mPlusRounded1cTextTheme(
-      ThemeData.light().textTheme,
-    ).apply(bodyColor: AppColors.ink, displayColor: AppColors.ink);
+    final textTheme = ThemeData.light().textTheme.apply(
+          fontFamily: 'MPLUSRounded1c',
+          bodyColor: AppColors.ink,
+          displayColor: AppColors.ink,
+        );
 
     return ThemeData(
       useMaterial3: true,
@@ -69,12 +123,16 @@ class AppTheme {
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: colorScheme.primary,
+          // Solid approximation of the handoff's CTA gradient
+          // (linear-gradient(135deg, accentCyan, primaryStrong)) -- Material
+          // buttons don't support gradient fills without custom painting, so
+          // this anchors on the gradient's darker end.
+          backgroundColor: AppColors.primaryStrong,
           foregroundColor: colorScheme.onPrimary,
           minimumSize: const Size.fromHeight(52),
           shape: const StadiumBorder(),
           elevation: 6,
-          shadowColor: AppColors.primary.withValues(alpha: 0.35),
+          shadowColor: AppColors.primaryStrong.withValues(alpha: 0.35),
           textStyle: textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
             color: Colors.white,

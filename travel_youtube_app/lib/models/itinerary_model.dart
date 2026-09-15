@@ -6,6 +6,10 @@ class RoutePointModel {
   final String name;
   final double? latitude;
   final double? longitude;
+  // Distance/duration of the leg arriving at this point from the previous
+  // point in the route -- null for the first point (order 0).
+  final int? legDistanceM;
+  final int? legDurationSec;
 
   const RoutePointModel({
     required this.order,
@@ -15,9 +19,34 @@ class RoutePointModel {
     required this.name,
     required this.latitude,
     required this.longitude,
+    this.legDistanceM,
+    this.legDurationSec,
   });
 
+  /// Sentinel hotelId the AI worker uses for an FR-17 walking course that
+  /// the user generated without picking a real hotel -- the round trip is
+  /// anchored on the region's center point instead, named after the region
+  /// (e.g. "부산"). Never a real `hotels.hotel_id`.
+  static const String virtualRegionAnchorId = 'region-center';
+
   bool get isHotel => type == 'hotel';
+
+  /// True for the synthetic region-center anchor above: a routing artifact,
+  /// not a place the user can visit, so screens hide it rather than showing
+  /// it as a stop.
+  bool get isVirtualRegionAnchor => hotelId == virtualRegionAnchorId;
+
+  /// Sentinel hotelId for a start point the user picked for an FR-17 walking
+  /// course. Unlike the region-center anchor this is a real spot the walk
+  /// begins and ends at, so screens show it (as "출발") instead of hiding it.
+  static const String userStartPointId = 'start-point';
+
+  bool get isUserStartPoint => hotelId == userStartPointId;
+
+  /// Stable id for map marker/selection matching -- a real place/hotel id
+  /// when there is one, else the point's name (e.g. the FR-17 region-center
+  /// virtual anchor, which has neither).
+  String get markerId => placeId ?? hotelId ?? name;
 
   factory RoutePointModel.fromJson(Map<String, dynamic> json) {
     return RoutePointModel(
@@ -28,6 +57,8 @@ class RoutePointModel {
       name: json['name'] as String,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      legDistanceM: json['legDistanceM'] as int?,
+      legDurationSec: json['legDurationSec'] as int?,
     );
   }
 }
