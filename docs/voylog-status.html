@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voylog — 구현 현황</title>
+<style>
+  :root {
+    --paper: #f2f0ea;
+    --paper-raised: #ffffff;
+    --ink: #1c2430;
+    --accent: #2f6fed;
+    --accent-soft: #e4ecfb;
+    --line: #dad5c8;
+    --muted: #6e6a5e;
+    --good: #2e7d5b;
+    --good-soft: #e3f1ea;
+
+    --serif: Georgia, "Iowan Old Style", "Palatino Linotype", "Noto Serif KR", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Consolas, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161d;
+      --paper-raised: #171c25;
+      --ink: #e9e6dd;
+      --accent: #7ea1ff;
+      --accent-soft: #1c2740;
+      --line: #262b35;
+      --muted: #9a968a;
+      --good: #5cbd8e;
+      --good-soft: #17291f;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161d;
+    --paper-raised: #171c25;
+    --ink: #e9e6dd;
+    --accent: #7ea1ff;
+    --accent-soft: #1c2740;
+    --line: #262b35;
+    --muted: #9a968a;
+    --good: #5cbd8e;
+    --good-soft: #17291f;
+  }
+  :root[data-theme="light"] {
+    --paper: #f2f0ea;
+    --paper-raised: #ffffff;
+    --ink: #1c2430;
+    --accent: #2f6fed;
+    --accent-soft: #e4ecfb;
+    --line: #dad5c8;
+    --muted: #6e6a5e;
+    --good: #2e7d5b;
+    --good-soft: #e3f1ea;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 64px 24px 96px;
+  }
+
+  /* ---------- header ---------- */
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: 28px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+  h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 42px;
+    line-height: 1.1;
+    margin: 4px 0 0;
+    text-wrap: balance;
+  }
+  .tagline {
+    font-size: 16px;
+    color: var(--muted);
+    max-width: 46ch;
+    margin-top: 6px;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 18px;
+    margin-top: 18px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .meta-row b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- stat strip ---------- */
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-top: 28px;
+  }
+  .stat {
+    background: var(--paper-raised);
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat .n {
+    font-family: var(--serif);
+    font-size: 30px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .stat .l {
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  /* ---------- sections ---------- */
+  .section {
+    padding: 40px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .section:last-of-type { border-bottom: none; }
+
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .section-head h2 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 25px;
+    margin: 0;
+  }
+  .fr-tags {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .fr-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    padding: 2px 6px;
+    white-space: nowrap;
+  }
+
+  .section-body {
+    color: var(--muted);
+    font-size: 15px;
+    line-height: 1.65;
+    max-width: 62ch;
+    margin-top: 10px;
+  }
+
+  .items {
+    list-style: none;
+    margin: 18px 0 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .item {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 14.5px;
+    line-height: 1.55;
+  }
+  .item .check {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    margin-top: 3px;
+    border-radius: 50%;
+    background: var(--good-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .item .check svg { width: 9px; height: 9px; display: block; }
+  .item .check path { fill: none; stroke: var(--good); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  .item b { font-weight: 600; }
+  .item .stack {
+    color: var(--muted);
+  }
+
+  .layer-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 14px;
+  }
+  .layer {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.02em;
+    color: var(--muted);
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    padding: 3px 7px;
+  }
+
+  /* ---------- footer ---------- */
+  .footer {
+    margin-top: 44px;
+    padding-top: 28px;
+  }
+  .footer h3 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: 18px;
+    margin: 0 0 12px;
+  }
+  .stack-grid {
+    display: grid;
+    grid-template-columns: 100px 1fr;
+    row-gap: 8px;
+    column-gap: 16px;
+    font-size: 13.5px;
+  }
+  .stack-grid dt {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    padding-top: 2px;
+  }
+  .stack-grid dd { margin: 0; }
+  .stack-grid code {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  .colophon {
+    margin-top: 40px;
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  @media (max-width: 560px) {
+    .page { padding: 40px 18px 72px; }
+    h1 { font-size: 32px; }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+    .stack-grid { grid-template-columns: 84px 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="masthead">
+    <div class="eyebrow">Voylog · 구현 현황 리포트</div>
+    <h1>여행 유튜브 요약 서비스</h1>
+    <p class="tagline">유튜브 여행 영상에서 장소를 자동으로 추출하고, 호텔 기반 AI 동선을 여러 날짜에 걸쳐 계획하는 여행 플래너.</p>
+    <div class="meta-row">
+      <span><b>팀 럭키비키</b> · 팀장 김혜빈 · 팀원 최나경</span>
+      <span>Flutter · Node.js/Express · Python/FastAPI · PostgreSQL/Redis</span>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><span class="n">14</span><span class="l">완료된 요구사항 (FR-01 ~ FR-14)</span></div>
+      <div class="stat"><span class="n">469</span><span class="l">통과 테스트 (CI 그린)</span></div>
+      <div class="stat"><span class="n">4</span><span class="l">계층 (Flutter · Node · FastAPI · DB)</span></div>
+      <div class="stat"><span class="n">10</span><span class="l">DB 마이그레이션</span></div>
+    </div>
+  </header>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>영상 분석 &amp; 탐색</h2>
+      <div class="fr-tags">
+        <span class="fr-tag">FR-01</span><span class="fr-tag">FR-02</span><span class="fr-tag">FR-03</span>
+        <span class="fr-tag">FR-04</span><span class="fr-tag">FR-09</span><span class="fr-tag">FR-10</span>
+      </div>
+    </div>
+    <p class="section-body">유튜브 URL 하나로 영상 속 장소를 찾아내고, 해시태그나 지역/테마/기간 선택으로도 영상을 탐색할 수 있다. 세 가지 탐색 경로가 결과적으로 같은 인프라를 공유한다.</p>
+    <ul class="items">
+      <li class="item"><span class="check">✓</span><span><b>URL 분석</b> — 자막 추출 → LLM 파싱(OpenAI→Claude 폴백) → Kakao 지오코딩 → 장소 카드. 동일 URL은 Redis→DB 캐시로 즉시 반환.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>해시태그 탐색</b> — YouTube Data API 키워드 검색 결과를 카드 목록으로 제공.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>지역/테마/기간 추천 마법사</b> — 지역 → 테마 → 기간 3단계 선택 후, 해시태그 탐색과 동일한 검색 인프라로 브이로그 추천.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>타임스탬프 이동 &amp; 장소 카드</b> — 영상 속 등장 시점으로 바로 이동, 신뢰도/출처(자막·해시태그·설명·제목) 표시.</span></li>
+    </ul>
+    <div class="layer-row">
+      <span class="layer">AI Worker /search-videos</span>
+      <span class="layer">POST /videos/recommendations</span>
+      <span class="layer">RecommendationWizardProvider</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>지도 &amp; 북마크</h2>
+      <div class="fr-tags">
+        <span class="fr-tag">FR-05</span><span class="fr-tag">FR-06</span><span class="fr-tag">FR-11</span>
+      </div>
+    </div>
+    <p class="section-body">장소를 지도에서 확인하고 북마크한 뒤, 다대다 태그 방식의 폴더로 자유롭게 정리한다.</p>
+    <ul class="items">
+      <li class="item"><span class="check">✓</span><span><b>Kakao 지도 보기</b> — <span class="stack">kakao_map_plugin(webview_flutter 기반 네이티브 지도)로 위치 표시.</span></span></li>
+      <li class="item"><span class="check">✓</span><span><b>북마크</b> — 장소 저장/조회/삭제.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>북마크 폴더</b> — 폴더 생성, 북마크를 여러 폴더에 동시에 담는 다대다 태그 구조. 폴더 목록 → 폴더 상세 → 전체 북마크 피커 3단계 화면.</span></li>
+    </ul>
+    <div class="layer-row">
+      <span class="layer">bookmark_folders</span>
+      <span class="layer">bookmark_folder_items</span>
+      <span class="layer">POST /bookmark-folders/:id/bookmarks</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>여행 동선</h2>
+      <div class="fr-tags"><span class="fr-tag">FR-07</span></div>
+    </div>
+    <p class="section-body">여행 하나에 여러 날짜를 담고, 날짜마다 독립적으로 시작·종료 호텔을 골라 AI가 방문 순서를 최적화한다.</p>
+    <ul class="items">
+      <li class="item"><span class="check">✓</span><span><b>여행 · 일자 구조</b> — 여행(trip) 아래 1일차, 2일차… 를 누적 저장. 같은 여행 안에서도 날짜마다 호텔 조합이 다를 수 있음 (예: 1일차 A→B호텔, 2일차 B호텔 왕복).</span></li>
+      <li class="item"><span class="check">✓</span><span><b>왕복 / 호텔 간 이동 자동 판별</b> — 시작=종료 호텔이면 왕복, 다르면 호텔 간 이동으로 서버가 판별.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>AI 동선 최적화</b> — 장소 2~10개, Kakao Mobility 이동 시간 기반 TSP 스타일 순서 최적화.</span></li>
+    </ul>
+    <div class="layer-row">
+      <span class="layer">trips</span>
+      <span class="layer">itineraries.trip_id, day_number</span>
+      <span class="layer">POST /itineraries</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>계정</h2>
+      <div class="fr-tags"><span class="fr-tag">FR-08</span><span class="fr-tag">FR-14</span></div>
+    </div>
+    <p class="section-body">카카오 소셜 로그인과, 이메일+비밀번호 기반 네이티브 회원가입 두 경로를 모두 지원하며 동일한 JWT 발급 흐름을 공유한다.</p>
+    <ul class="items">
+      <li class="item"><span class="check">✓</span><span><b>카카오 로그인</b> — OAuth 토큰 검증 → 최초 로그인 시 자동 가입 → JWT 발급.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>네이티브 회원가입</b> — 이메일 입력 → 6자리 OTP 이메일 인증(SMTP, 5분 유효, 5회 시도 제한) → 비밀번호(8자 이상)·닉네임 입력 → 가입 완료.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>네이티브 로그인</b> — bcrypt 해시 비교. 카카오 전용 계정으로는 로그인 불가(비밀번호 미보유).</span></li>
+    </ul>
+    <div class="layer-row">
+      <span class="layer">users.password_hash</span>
+      <span class="layer">email_otps</span>
+      <span class="layer">POST /auth/signup/request-otp</span>
+      <span class="layer">POST /auth/login</span>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>부가 기능</h2>
+      <div class="fr-tags"><span class="fr-tag">FR-12</span><span class="fr-tag">FR-13</span></div>
+    </div>
+    <p class="section-body">알림 수신 여부와 고객 문의 안내처럼, 핵심 여행 플래닝 흐름을 보조하는 기능.</p>
+    <ul class="items">
+      <li class="item"><span class="check">✓</span><span><b>알림 설정</b> — 여행 일정 / 서비스 / 마케팅 3개 항목을 서버에 저장. 실제 발송 인프라는 없음.</span></li>
+      <li class="item"><span class="check">✓</span><span><b>고객센터</b> — FAQ 5개 + 문의 이메일. 백엔드 없이 프론트엔드 정적 콘텐츠로 제공.</span></li>
+    </ul>
+    <div class="layer-row">
+      <span class="layer">notification_settings</span>
+      <span class="layer">GET/PUT /notification-settings</span>
+    </div>
+  </section>
+
+  <div class="footer">
+    <h3>기술 스택</h3>
+    <dl class="stack-grid">
+      <dt>frontend</dt>
+      <dd>Flutter · Provider · Dio · <code>flutter_secure_storage</code> · kakao_map_plugin</dd>
+      <dt>backend</dt>
+      <dd>Node.js · Express · PostgreSQL · Redis · JWT · bcrypt · nodemailer</dd>
+      <dt>ai-worker</dt>
+      <dd>Python · FastAPI · youtube-transcript-api · OpenAI/Claude · Kakao Maps</dd>
+      <dt>external</dt>
+      <dd>YouTube Data API v3 · Kakao Local/Maps/Mobility · Kakao OAuth</dd>
+    </dl>
+  </div>
+
+  <div class="colophon">
+    <span>CI: backend 190 · ai-worker 59 · frontend 220 — all green</span>
+    <span>v2.2 기준 · FR-01–FR-14</span>
+  </div>
+
+</div>
+</body>
+</html>
