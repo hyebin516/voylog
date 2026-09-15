@@ -15,6 +15,24 @@ def _distance_score(distance_m: float, radius_m: int) -> float:
     return max(0.0, 1.0 - (distance_m / radius_m))
 
 
+# Shown to users inside the reason sentence, so the internal category codes
+# need Korean names. A category without a label (e.g. "other", or free text
+# from an older extraction) is simply not mentioned.
+_CATEGORY_LABELS = {
+    "cafe": "카페",
+    "bakery": "베이커리",
+    "restaurant": "음식점",
+    "dessert": "디저트 가게",
+    "bar": "술집",
+    "museum": "박물관",
+    "gallery": "미술관",
+    "attraction": "관광 명소",
+    "shopping": "쇼핑 장소",
+    "beach": "바닷가",
+    "night_view": "전망 명소",
+}
+
+
 def _build_reason(
     distance_m: int,
     is_open: Optional[bool],
@@ -32,9 +50,19 @@ def _build_reason(
         parts.append(f"취향으로 등록하신 {sample}와 잘 맞는 곳이에요.")
     elif has_embedding_pair:
         parts.append("취향에 맞는 장소예요.")
-    if category:
-        parts.append(f"{category} 카테고리의 장소예요.")
+    category_label = _CATEGORY_LABELS.get(category or "")
+    if category_label:
+        parts.append(f"{category_label}예요." if _ends_with_vowel(category_label) else f"{category_label}이에요.")
     return " ".join(parts)
+
+
+def _ends_with_vowel(word: str) -> bool:
+    """True when the last Hangul syllable has no final consonant, which picks
+    "예요" over "이에요" ("카페예요" / "음식점이에요")."""
+    last = word[-1]
+    if not "가" <= last <= "힣":
+        return True
+    return (ord(last) - ord("가")) % 28 == 0
 
 
 def score_nearby(request: NearbyScoreRequest) -> NearbyScoreResponse:

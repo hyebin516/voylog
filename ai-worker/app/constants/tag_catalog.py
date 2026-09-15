@@ -11,7 +11,28 @@ TAG_CATALOG = {
     "photo": ["포토존", "통창", "루프탑", "정원", "오션뷰", "야경"],
     "interior": ["감성 인테리어", "화이트톤", "빈티지"],
     "purpose": ["공부 작업", "데이트", "대화하기 좋은 곳", "전시 갤러리"],
-    "mood": ["조용한 분위기", "이색적인 곳"],
+    "mood": [
+        "조용한 분위기",
+        "이색적인 곳",
+        "활기찬 분위기",
+        "감성적인 분위기",
+        "힙한 분위기",
+        "전통적인 분위기",
+        "로컬스러운 분위기",
+    ],
 }
 
 ALL_TAG_CODES = [code for codes in TAG_CATALOG.values() for code in codes]
+
+# Maps the walking-course screen's short mood-chip labels (FR-17) to their
+# full tag code in TAG_CATALOG's "mood" group -- the chip labels themselves
+# aren't valid tag codes (missing the "분위기"/"곳" suffix), so a selected
+# mood needs translating before it can boost `userTagScores`.
+WALKING_COURSE_MOOD_TAG_MAP = {
+    "조용한": "조용한 분위기",
+    "활기찬": "활기찬 분위기",
+    "감성적인": "감성적인 분위기",
+    "힙한": "힙한 분위기",
+    "전통적인": "전통적인 분위기",
+    "로컬스러운": "로컬스러운 분위기",
+}

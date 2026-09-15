@@ -230,3 +230,23 @@ def test_embedding_and_tag_signals_combine_without_error():
     assert rec.scoreDetails.embeddingSimilarity is not None
     assert rec.scoreDetails.tagMatch is not None
     assert 0.0 <= rec.score <= 1.0
+
+
+def test_reason_names_the_category_in_korean_with_the_right_particle():
+    cafe = NearbyPlaceCandidate(placeId="p1", name="A", latitude=37.5005, longitude=127.0, category="cafe")
+    restaurant = NearbyPlaceCandidate(placeId="p2", name="B", latitude=37.5005, longitude=127.0, category="restaurant")
+
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=[cafe, restaurant]))
+    reasons = {rec.placeId: rec.reason for rec in result.recommendations}
+
+    assert "카페예요." in reasons["p1"]
+    assert "음식점이에요." in reasons["p2"]
+    assert "cafe" not in reasons["p1"]
+
+
+def test_reason_omits_a_category_without_a_korean_label():
+    candidate = NearbyPlaceCandidate(placeId="p1", name="A", latitude=37.5005, longitude=127.0, category="other")
+
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate]))
+
+    assert "other" not in result.recommendations[0].reason

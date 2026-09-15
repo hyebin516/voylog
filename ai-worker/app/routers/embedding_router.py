@@ -1,7 +1,13 @@
 from fastapi import APIRouter
 
-from app.schemas.request_schema import EmbeddingRequest, EmbeddingSimilarityRequest, PreferenceUpdateRequest
+from app.schemas.request_schema import (
+    EmbeddingBatchRequest,
+    EmbeddingRequest,
+    EmbeddingSimilarityRequest,
+    PreferenceUpdateRequest,
+)
 from app.schemas.response_schema import (
+    EmbeddingBatchResponse,
     EmbeddingResponse,
     EmbeddingSimilarityResponse,
     EmbeddingSimilarityScore,
@@ -18,6 +24,16 @@ async def generate_embedding(request: EmbeddingRequest) -> EmbeddingResponse:
     embedding = embedding_service.generate_embedding(request.text)
     return EmbeddingResponse(
         embedding=embedding,
+        model=embedding_service.EMBEDDING_MODEL,
+        dimensions=embedding_service.EMBEDDING_DIMENSIONS,
+    )
+
+
+@router.post("/embeddings/generate-batch", response_model=EmbeddingBatchResponse)
+async def generate_embeddings(request: EmbeddingBatchRequest) -> EmbeddingBatchResponse:
+    embeddings = embedding_service.generate_embeddings(request.texts)
+    return EmbeddingBatchResponse(
+        embeddings=embeddings,
         model=embedding_service.EMBEDDING_MODEL,
         dimensions=embedding_service.EMBEDDING_DIMENSIONS,
     )

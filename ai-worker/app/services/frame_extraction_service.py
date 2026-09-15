@@ -21,6 +21,21 @@ from app.utils.logger import logger
 _FORMAT_SELECTOR = "bestvideo[ext=mp4][height<=480]/bestvideo[ext=mp4]/bestvideo/best"
 
 
+# The vision call uses low detail, which is rendered at 512px regardless,
+# so larger frames only inflate the request (a 480p frame was ~160KB, and
+# the enrichment pass sends up to ENRICHMENT_MAX_FRAMES of them).
+_MAX_FRAME_WIDTH = 768
+_JPEG_QUALITY = 80
+
+
+def _shrink_for_vision(frame):
+    height, width = frame.shape[:2]
+    if width <= _MAX_FRAME_WIDTH:
+        return frame
+    scale = _MAX_FRAME_WIDTH / width
+    return cv2.resize(frame, (_MAX_FRAME_WIDTH, int(height * scale)), interpolation=cv2.INTER_AREA)
+
+
 def _download_video(youtube_url: str, dest_dir: str) -> str | None:
     """Downloads a low-resolution copy of the video into `dest_dir`.
     Returns the local file path, or None if the download failed for any
@@ -86,7 +101,8 @@ def _sample_frames(
             ok, frame = capture.read()
             if not ok:
                 continue
-            ok, encoded = cv2.imencode(".jpg", frame)
+            frame = _shrink_for_vision(frame)
+            ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, _JPEG_QUALITY])
             if ok:
                 frames.append(encoded.tobytes())
         return frames

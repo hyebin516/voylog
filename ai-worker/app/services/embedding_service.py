@@ -22,3 +22,21 @@ def generate_embedding(text: str) -> list[float]:
         raise AiProviderError(f"Embedding generation failed: {exc}") from exc
 
     return response.data[0].embedding
+
+
+def generate_embeddings(texts: list[str]) -> list[list[float]]:
+    """Embeds many texts in one provider call, in input order. Used to embed
+    public-dataset places lazily in bulk -- one request per place would take
+    a nearby list of ~100 candidates from one round trip to a hundred."""
+    if not texts:
+        return []
+    if not _openai_client:
+        raise AiProviderError("Embedding provider is not configured")
+
+    try:
+        response = _openai_client.embeddings.create(model=EMBEDDING_MODEL, input=texts)
+    except Exception as exc:
+        raise AiProviderError(f"Embedding generation failed: {exc}") from exc
+
+    # The API documents each item's index; sort rather than trust response order.
+    return [item.embedding for item in sorted(response.data, key=lambda item: item.index)]

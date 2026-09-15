@@ -64,7 +64,17 @@ async def get_transcript(youtube_url: str) -> TranscriptResponse:
     if not video_id:
         raise TranscriptNotFoundError("Could not parse a YouTube video id from the given URL")
 
-    segments = fetch_transcript_segments(video_id)
     metadata = await fetch_video_metadata(video_id)
+
+    try:
+        segments = fetch_transcript_segments(video_id)
+    except TranscriptNotFoundError:
+        # Place extraction still works from hashtags/description/title
+        # alone (CLAUDE.md priority: transcript > hashtags > description >
+        # title) -- only re-raise when there's truly nothing to extract
+        # from either.
+        if not metadata.get("title") and not metadata.get("description") and not metadata.get("hashtags"):
+            raise
+        segments = []
 
     return TranscriptResponse(segments=segments, **metadata)

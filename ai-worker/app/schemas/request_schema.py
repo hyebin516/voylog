@@ -1,6 +1,6 @@
 from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.schemas.response_schema import BusinessHours
 
@@ -36,6 +36,11 @@ class PlaceExtractionRequest(BaseModel):
     video: VideoMeta
     transcript: List[TranscriptSegment]
     llmProvider: Literal["auto", "openai", "claude"] = "auto"
+    # Runs the on-screen-text (OCR) pass even when a transcript exists.
+    # That pass downloads the video and takes minutes, so it's off by
+    # default and only used by the caller's background enrichment job --
+    # never on the request a user is waiting on.
+    forceScreenText: bool = False
 
 
 class HotelInput(BaseModel):
@@ -44,6 +49,18 @@ class HotelInput(BaseModel):
     latitude: float
     longitude: float
     address: Optional[str] = None
+
+
+class CoursePointInput(BaseModel):
+    """A start/end anchor for an FR-17 walking course. Unlike HotelInput
+    this is not a saved `hotels` row -- it's a point the user picked on the
+    map for this one course, so it has no owner and is never persisted on
+    its own."""
+
+    pointId: str
+    name: str
+    latitude: float
+    longitude: float
 
 
 class PlaceInput(BaseModel):
@@ -110,12 +127,25 @@ class WalkingCourseRequest(BaseModel):
     localTime: str
     radiusMeters: int = 3000
     bookmarkCandidates: List[NearbyPlaceCandidate] = []
+    # Every other stored place near the center -- vlog places and public
+    # dataset places (한국관광공사 / 소상공인 상가정보). Bookmarks alone were
+    # too few per area, so courses kept cycling the same stops.
+    placeCandidates: List[NearbyPlaceCandidate] = []
     userEmbedding: Optional[List[float]] = None
     userTagScores: Dict[str, float] = {}
     # FR-17 mood/duration filters (design handoff chips). Both optional --
     # None means "no preference", matching today's unfiltered behavior.
     mood: Optional[str] = None
     walkDuration: Optional[str] = None
+    # Where the user chose to start and end the walk. Deliberately NOT a
+    # hotel: a walking course start is an ephemeral point the user picked
+    # on the map, unrelated to the trip planner's saved accommodations.
+    # None keeps the cold-start behavior of anchoring the round trip on the
+    # region's center point instead (no login required).
+    startPoint: Optional[CoursePointInput] = None
+    # Place ids from the course being regenerated, pushed down the ranking so
+    # "다시 생성" comes back with different stops.
+    avoidPlaceIds: List[str] = []
 
 
 class SimilarTastePlaceCandidate(BaseModel):
@@ -146,6 +176,15 @@ class PlaceSummaryRequest(BaseModel):
 
 class EmbeddingRequest(BaseModel):
     text: str
+
+
+# Upper bound per batch request; OpenAI accepts far more, but a nearby
+# candidate list never needs more than this and it caps a runaway caller.
+MAX_EMBEDDING_BATCH_SIZE = 200
+
+
+class EmbeddingBatchRequest(BaseModel):
+    texts: List[str] = Field(..., min_length=1, max_length=MAX_EMBEDDING_BATCH_SIZE)
 
 
 class PreferenceUpdateRequest(BaseModel):

@@ -167,3 +167,36 @@ def test_extract_screen_text_returns_empty_string_instead_of_raising_when_both_p
     result = llm_service.extract_screen_text([b"frame1"], provider="auto")
 
     assert result == ""
+
+
+def test_extract_screen_text_sends_frames_in_batches(monkeypatch):
+    """The background pass reads up to 120 frames -- never in one request."""
+    monkeypatch.setattr(llm_service, "VISION_BATCH_SIZE", 24)
+    batch_sizes = []
+
+    def fake_vision(frames):
+        batch_sizes.append(len(frames))
+        return f"text{len(batch_sizes)}"
+
+    monkeypatch.setattr(llm_service, "_call_openai_vision", fake_vision)
+
+    text = llm_service.extract_screen_text([b"f"] * 60, "openai")
+
+    assert batch_sizes == [24, 24, 12]
+    assert text == "text1\ntext2\ntext3"
+
+
+def test_extract_screen_text_keeps_other_batches_when_one_fails(monkeypatch):
+    monkeypatch.setattr(llm_service, "VISION_BATCH_SIZE", 2)
+    calls = {"n": 0}
+
+    def flaky_vision(frames):
+        calls["n"] += 1
+        # First batch fails on both of its attempts, the second succeeds.
+        if calls["n"] <= 2:
+            raise RuntimeError("boom")
+        return "성심당"
+
+    monkeypatch.setattr(llm_service, "_call_openai_vision", flaky_vision)
+
+    assert llm_service.extract_screen_text([b"f"] * 4, "openai") == "성심당"

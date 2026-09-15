@@ -104,6 +104,33 @@ def test_optimize_route_reports_positive_totals_matching_the_chosen_path():
     assert result.totalDurationSec == pytest.approx(result.totalDistanceM / svc.ASSUMED_CITY_SPEED_MPS, rel=0.05)
 
 
+def test_optimize_route_reports_per_leg_distance_and_duration_for_each_stop_after_the_first():
+    request = RouteOptimizationRequest(
+        startHotel=HOTEL_A,
+        endHotel=HOTEL_B,
+        places=[PLACE_1, PLACE_2, PLACE_3],
+        routeType="hotelToHotel",
+        optimizationPriority="duration",
+    )
+
+    result = asyncio.run(svc.optimize_route(request))
+    route = result.optimizedRoute
+
+    # The first stop has no preceding leg.
+    assert route[0].legDistanceM is None
+    assert route[0].legDurationSec is None
+
+    # Every later stop's leg should be a real positive Haversine-derived
+    # value, not fabricated by dividing the aggregate total evenly.
+    for point in route[1:]:
+        assert point.legDistanceM is not None and point.legDistanceM > 0
+        assert point.legDurationSec is not None and point.legDurationSec > 0
+
+    # The legs should sum back to (approximately) the reported totals.
+    assert sum(p.legDistanceM for p in route[1:]) == pytest.approx(result.totalDistanceM, abs=len(route))
+    assert sum(p.legDurationSec for p in route[1:]) == pytest.approx(result.totalDurationSec, abs=len(route))
+
+
 def test_optimize_route_echoes_the_requested_route_type_and_priority():
     request = RouteOptimizationRequest(
         startHotel=HOTEL_A,

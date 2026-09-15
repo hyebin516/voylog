@@ -177,3 +177,30 @@ def test_get_transcript_combines_segments_and_metadata(monkeypatch):
         {"text": "world", "timestampSec": 3},
     ]
     assert result.title is None
+
+
+def test_get_transcript_falls_back_to_empty_segments_when_metadata_is_available(monkeypatch):
+    monkeypatch.setattr(transcript_service, "YouTubeTranscriptApi", lambda: FakeApiRaising(TranscriptsDisabled("id")))
+    monkeypatch.setattr(
+        transcript_service,
+        "fetch_video_metadata",
+        lambda video_id: _async_result({"title": "My trip", "description": None, "hashtags": ["travel"]}),
+    )
+
+    result = asyncio.run(transcript_service.get_transcript("https://youtu.be/dQw4w9WgXcQ"))
+
+    assert result.segments == []
+    assert result.title == "My trip"
+    assert result.hashtags == ["travel"]
+
+
+def test_get_transcript_still_raises_when_neither_transcript_nor_metadata_is_available(monkeypatch):
+    monkeypatch.setattr(transcript_service, "YouTubeTranscriptApi", lambda: FakeApiRaising(TranscriptsDisabled("id")))
+    monkeypatch.setattr(transcript_service, "YOUTUBE_API_KEY", None)  # fetch_video_metadata returns {}
+
+    with pytest.raises(TranscriptNotFoundError):
+        asyncio.run(transcript_service.get_transcript("https://youtu.be/dQw4w9WgXcQ"))
+
+
+async def _async_result(value):
+    return value

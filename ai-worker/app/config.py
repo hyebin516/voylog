@@ -26,4 +26,13 @@ FRAME_SAMPLING_INTERVAL_SECONDS = 30
 # Safety ceiling regardless of interval/duration -- an unusually long video
 # (e.g. a 1-2 hour vlog) shouldn't be allowed to balloon into hundreds of
 # frames in a single vision LLM call.
-FRAME_SAMPLING_MAX_FRAMES = 60
+FRAME_SAMPLING_MAX_FRAMES = 24
+
+# The background enrichment pass (forceScreenText) isn't waited on by a
+# user, so it can afford to look much harder: a place-name overlay is often
+# on screen for only a few seconds, and a 30s sampling interval simply
+# misses most of them. The frames go to the vision model in batches, so the
+# larger count never becomes one oversized request.
+ENRICHMENT_FRAME_INTERVAL_SECONDS = 10
+ENRICHMENT_MAX_FRAMES = 120
+VISION_BATCH_SIZE = 24

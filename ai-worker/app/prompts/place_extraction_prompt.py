@@ -31,6 +31,7 @@ Return JSON only. No markdown. No explanation. No code block.
 
 Schema:
 {{
+  "region": "string or null",
   "places": [
     {{
       "name": "string",
@@ -49,6 +50,13 @@ Schema:
     }}
   ]
 }}
+
+region: the city or area the trip in this video takes place in, as a
+short Korean place name ("대전", "제주", "부산 전포"). Read it from the
+title, hashtags, description or transcript. This is used to search the
+right city on a map, so prefer the specific city over a province when
+both are clear. Use null if the video never makes the location clear --
+do not guess.
 
 Allowed source values: transcript, on_screen_text, hashtags, description, title.
 Confidence must be between 0 and 1.

@@ -24,6 +24,22 @@ def test_generate_embedding_rejects_missing_text():
     assert res.status_code == 422
 
 
+def test_generate_batch_returns_one_embedding_per_text(monkeypatch):
+    monkeypatch.setattr(embedding_service, "generate_embeddings", lambda texts: [[float(len(t))] for t in texts])
+
+    res = client.post("/embeddings/generate-batch", json={"texts": ["카페", "미술관"]})
+
+    assert res.status_code == 200
+    data = res.json()
+    assert data["embeddings"] == [[2.0], [3.0]]
+    assert data["dimensions"] == embedding_service.EMBEDDING_DIMENSIONS
+
+
+def test_generate_batch_rejects_an_empty_or_oversized_batch():
+    assert client.post("/embeddings/generate-batch", json={"texts": []}).status_code == 422
+    assert client.post("/embeddings/generate-batch", json={"texts": ["x"] * 201}).status_code == 422
+
+
 def test_update_preference_returns_the_updated_embedding():
     res = client.post(
         "/embeddings/update-preference",

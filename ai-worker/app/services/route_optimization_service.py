@@ -161,6 +161,17 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
     total_duration_sec = round(_route_cost(optimized_indices, duration_matrix))
 
     def to_route_point(order: int, index: int) -> RoutePoint:
+        # The leg arriving here is from the previous stop in the optimized
+        # order -- order 0 has no preceding leg, so it stays null rather
+        # than fabricating a value.
+        if order == 0:
+            leg_distance_m = None
+            leg_duration_sec = None
+        else:
+            prev_index = optimized_indices[order - 1]
+            leg_distance_m = round(distance_matrix[prev_index][index])
+            leg_duration_sec = round(duration_matrix[prev_index][index])
+
         if index == start_idx:
             return RoutePoint(
                 order=order,
@@ -169,6 +180,8 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
                 name=start_hotel.name,
                 latitude=start_hotel.latitude,
                 longitude=start_hotel.longitude,
+                legDistanceM=leg_distance_m,
+                legDurationSec=leg_duration_sec,
             )
         if index == end_idx:
             return RoutePoint(
@@ -178,6 +191,8 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
                 name=end_hotel.name,
                 latitude=end_hotel.latitude,
                 longitude=end_hotel.longitude,
+                legDistanceM=leg_distance_m,
+                legDurationSec=leg_duration_sec,
             )
         place = request.places[index - 1]
         return RoutePoint(
@@ -187,6 +202,8 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
             name=place.name,
             latitude=place.latitude,
             longitude=place.longitude,
+            legDistanceM=leg_distance_m,
+            legDurationSec=leg_duration_sec,
         )
 
     optimized_route = [to_route_point(order, index) for order, index in enumerate(optimized_indices)]

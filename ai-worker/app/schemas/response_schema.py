@@ -56,6 +56,10 @@ class PlaceCandidate(BaseModel):
 
 class LlmPlaceExtractionResult(BaseModel):
     places: List[PlaceCandidate]
+    # City/area the video is set in ("대전", "제주" ...), used to scope the
+    # map search so a common place name doesn't resolve to a same-named
+    # place in another city. None when the video doesn't make it clear.
+    region: Optional[str] = None
 
 
 class GeocodedPlace(BaseModel):
@@ -146,6 +150,12 @@ class EmbeddingResponse(BaseModel):
     dimensions: int
 
 
+class EmbeddingBatchResponse(BaseModel):
+    embeddings: List[List[float]]
+    model: str
+    dimensions: int
+
+
 class PreferenceUpdateResponse(BaseModel):
     embedding: List[float]
 
@@ -196,6 +206,15 @@ class WalkingCourseResponse(BaseModel):
 class PlaceSummaryResult(BaseModel):
     pros: Optional[str] = None
     cons: Optional[str] = None
+
+
+class PlaceMatchResult(BaseModel):
+    """Which map-search candidate the LLM judged to be the extracted place.
+    `index` is None when none of them is a confident match -- better no pin
+    than a pin on the wrong place."""
+
+    index: Optional[int] = None
+    reason: Optional[str] = None
 
 
 class PlaceSummaryResponse(BaseModel):
