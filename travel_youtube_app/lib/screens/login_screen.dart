@@ -44,20 +44,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     String kakaoAccessToken;
     try {
-      kakaoAccessToken = await KakaoAuthService.login(context);
+      kakaoAccessToken = await KakaoAuthService.login();
     } on KakaoClientException catch (e) {
-      // TEMP DEBUG (remove once the real login failure is diagnosed):
-      debugPrint('KAKAO_DEBUG KakaoClientException reason=${e.reason} msg=${e.msg}');
-      if (e.reason == ClientErrorCause.cancelled) return; // user dismissed the chooser
+      if (e.reason == ClientErrorCause.cancelled) return; // user backed out
       if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
       return;
-    } on KakaoAuthException catch (e) {
-      debugPrint('KAKAO_DEBUG KakaoAuthException error=${e.error} msg=${e.message}');
-      if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
-      return;
-    } catch (e, st) {
-      debugPrint('KAKAO_DEBUG unknown exception: $e');
-      debugPrint('KAKAO_DEBUG stack: $st');
+    } catch (e) {
+      // The reason (a Kakao auth error, a platform hand-off failure) is only
+      // useful to us, never to the user, who gets one plain message.
+      debugPrint('Kakao login failed: $e');
       if (context.mounted) await showErrorDialog(context, '카카오 로그인에 실패했습니다.');
       return;
     }

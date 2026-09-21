@@ -6,6 +6,7 @@ Map<String, dynamic> _recJson({String placeId = 'p1'}) => {
       'name': '흑돼지집',
       'latitude': 33.51,
       'longitude': 126.51,
+      'address': '제주 제주시 관덕로 32',
       'category': 'restaurant',
       'score': 1.6,
       'contributorCount': 2,
@@ -21,6 +22,7 @@ void main() {
       expect(rec.name, '흑돼지집');
       expect(rec.latitude, 33.51);
       expect(rec.longitude, 126.51);
+      expect(rec.address, '제주 제주시 관덕로 32');
       expect(rec.category, 'restaurant');
       expect(rec.score, 1.6);
       expect(rec.contributorCount, 2);
@@ -30,6 +32,11 @@ void main() {
     test('category may be null', () {
       final json = _recJson()..['category'] = null;
       expect(SimilarTasteRecommendationModel.fromJson(json).category, isNull);
+    });
+
+    test('address may be missing', () {
+      final json = _recJson()..remove('address');
+      expect(SimilarTasteRecommendationModel.fromJson(json).address, isNull);
     });
   });
 

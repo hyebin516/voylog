@@ -155,6 +155,32 @@ Xcode의 Info.plist는 `.env`를 직접 읽을 수 없어서, Android와 달리 
       `Info.plist`의 `CFBundleURLTypes`/`LSApplicationQueriesSchemes`가 정상
       반영되는지 확인 (Mac 보유자가 직접 검증 필요)
 
+### 동의항목(닉네임·이메일) — 2026-09-16 실기기 확인 결과 **미설정 상태**
+
+실기기에서 카카오 로그인은 정상 성공했지만, 카카오가 프로필을 전혀 돌려주지 않아
+`users` 행이 `nickname='Kakao User'`, `email=null`로 저장됩니다(백엔드
+`auth.service.js`의 폴백값). 동의 화면에도 체크 항목이 하나도 안 떴습니다 —
+콘솔에 **동의항목이 설정돼 있지 않아서**입니다. 앱 코드로는 해결 불가.
+
+- [ ] 카카오 로그인 → **동의항목** → "닉네임"(프로필 정보)을 필수 또는 선택 동의로 설정
+- [ ] 이메일도 쓰려면 "카카오계정(이메일)" 동의항목 추가 (선택 동의 권장 — 사용자가
+      거부해도 로그인은 되어야 하므로). 앱은 이메일이 없어도 동작합니다
+      (마이페이지가 이메일 대신 "카카오 계정으로 로그인"을 표시)
+- [ ] 설정 후 **이미 가입된 계정은 로그아웃했다 다시 로그인하면 이메일·프로필
+      이미지가 채워집니다**(`auth.service.js`의 `refreshKakaoProfile`). 단
+      **닉네임은 갱신되지 않습니다** — 가입 후의 이름은 사용자가 앱에서 바꿀 수
+      있는 값이라 카카오 값으로 덮어쓰지 않습니다. 닉네임은 마이페이지 "수정"으로
+      바꾸세요
+
+### 로그인 방식 선택 (앱 코드)
+
+`UserApi.loginWithKakao(context)`(SDK 기본 선택창)는 **쓰지 않습니다.** 카카오톡이
+설치되지 않은 기기에서도 "카카오톡으로 로그인"을 보여주고, 그걸 누르면
+`PlatformException(ACTIVITY_NOT_FOUND, KakaoTalk is not installed.)`로 끝나
+폴백 없이 실패합니다(2026-09-16 실기기에서 재현). 대신
+`kakao_auth_service.dart`가 `isKakaoTalkInstalled()`로 직접 분기해
+카카오톡/카카오계정 웹 로그인을 고릅니다.
+
 ## 7. REST API 키 (백엔드/AI Worker용, 프론트엔드에는 절대 넣지 않음)
 
 - [ ] REST API 키를 복사해 `ai-worker/.env`의 `KAKAO_REST_API_KEY`에 설정

@@ -6,6 +6,8 @@ import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/screens/signup_otp_screen.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 class FakeAuthRepository extends AuthRepository {
   ApiException? verifyOtpError;
   String? lastEmail;
@@ -48,7 +50,7 @@ Widget _wrap(AuthProvider provider) {
 void main() {
   testWidgets('shows an inline error for a code shorter than 6 digits', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
     await tester.tap(find.text('open otp'));
     await tester.pumpAndSettle();
 
@@ -62,7 +64,7 @@ void main() {
 
   testWidgets('verifying successfully pops back with the verified flag', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
     await tester.tap(find.text('open otp'));
     await tester.pumpAndSettle();
 
@@ -77,7 +79,7 @@ void main() {
 
   testWidgets('shows an error view for an incorrect code', (tester) async {
     final repository = FakeAuthRepository()..verifyOtpError = const ApiException(code: 'OTP_INVALID', message: 'boom');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
     await tester.tap(find.text('open otp'));
     await tester.pumpAndSettle();
 

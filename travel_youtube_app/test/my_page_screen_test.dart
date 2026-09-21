@@ -14,11 +14,17 @@ import 'package:travel_youtube_app/screens/my_page_screen.dart';
 
 import 'helpers/phone_viewport.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 const UserModel _user = UserModel(userId: 'u1', email: 'a@b.com', nickname: 'Nagyeong', profileImage: null);
 
 class FakeAuthRepository extends AuthRepository {
+  FakeAuthRepository({UserModel user = _user}) : _loggedIn = user;
+
+  final UserModel _loggedIn;
+
   @override
-  Future<UserModel> loginWithKakao(String kakaoAccessToken) async => _user;
+  Future<UserModel> loginWithKakao(String kakaoAccessToken) async => _loggedIn;
 }
 
 class FakeTripRepository extends TripRepository {
@@ -31,8 +37,8 @@ class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
   Future<List<BookmarkFolderModel>> listFolders() async => [];
 }
 
-Future<AuthProvider> _authenticatedProvider() async {
-  final authProvider = AuthProvider(repository: FakeAuthRepository());
+Future<AuthProvider> _authenticatedProvider({UserModel user = _user}) async {
+  final authProvider = AuthProvider(repository: FakeAuthRepository(user: user), pushRegistration: fakePushRegistration());
   await authProvider.loginWithKakao('kakao-token');
   return authProvider;
 }
@@ -70,9 +76,29 @@ void main() {
     expect(find.text('로그인하기'), findsNothing);
   });
 
+  testWidgets('a Kakao account without an email is not labelled as a non-member', (tester) async {
+    // Kakao only returns an email when the user consented to sharing it, so
+    // a signed-in Kakao user often has none -- and the guest line then said
+    // they were just browsing without an account.
+    usePhoneViewport(tester);
+    const kakaoUser = UserModel(
+      userId: 'u2',
+      email: null,
+      nickname: 'Kakao User',
+      profileImage: null,
+      provider: 'kakao',
+    );
+    await tester.pumpWidget(_wrap(await _authenticatedProvider(user: kakaoUser)));
+    await tester.pumpAndSettle();
+
+    expect(find.text('비회원으로 둘러보는 중'), findsNothing);
+    expect(find.text('카카오 계정으로 로그인'), findsOneWidget);
+    expect(find.text('로그아웃'), findsOneWidget);
+  });
+
   testWidgets('shows a login prompt instead of logout/withdraw for a guest', (tester) async {
     usePhoneViewport(tester);
-    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository())));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration())));
     await tester.pumpAndSettle();
 
     expect(find.text('게스트'), findsOneWidget);
@@ -84,7 +110,7 @@ void main() {
 
   testWidgets('tapping 로그인하기 as a guest navigates to the login route', (tester) async {
     usePhoneViewport(tester);
-    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository())));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration())));
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('로그인하기'));

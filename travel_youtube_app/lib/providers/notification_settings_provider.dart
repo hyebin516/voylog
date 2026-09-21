@@ -38,7 +38,7 @@ class NotificationSettingsProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateNewVlogAlerts(bool value) => _update(_settings?.copyWith(newVlogAlerts: value));
+  Future<void> updateTripStartAlerts(bool value) => _update(_settings?.copyWith(tripStartAlerts: value));
 
   Future<void> updateRouteCompleteAlerts(bool value) => _update(_settings?.copyWith(routeCompleteAlerts: value));
 
@@ -51,7 +51,7 @@ class NotificationSettingsProvider extends ChangeNotifier {
   /// just fans out to every underlying toggle at once.
   Future<void> updateAll(bool enabled) => _update(
         _settings?.copyWith(
-          newVlogAlerts: enabled,
+          tripStartAlerts: enabled,
           routeCompleteAlerts: enabled,
           marketingAlerts: enabled,
           nightSilent: !enabled,

@@ -7,6 +7,7 @@ import '../models/place_model.dart';
 import '../providers/place_summary_provider.dart';
 import '../repositories/behavior_repository.dart';
 import '../repositories/map_repository.dart';
+import '../services/kakao_map_launcher.dart';
 import '../services/place_share_service.dart';
 import '../utils/timestamp_format.dart';
 import '../utils/view_state.dart';
@@ -26,6 +27,10 @@ class PlaceDetailScreen extends StatefulWidget {
   /// `flutter test` never touches the real `share_plus` platform channel.
   final PlaceShareService shareService;
 
+  /// Defaults to opening the real Kakao Map app (or web). Widget tests
+  /// inject a fake so nothing is launched under `flutter test`.
+  final KakaoMapLauncher kakaoMapLauncher;
+
   /// Best-effort FR-15 behavior logging (see [RecommendationProvider] for
   /// the same pattern) -- a screen-level repository call rather than a
   /// dedicated provider, since this screen is reached from many different
@@ -37,6 +42,7 @@ class PlaceDetailScreen extends StatefulWidget {
     required this.place,
     this.mapRepository = const KakaoMapRepository(),
     this.shareService = const PlaceShareService(),
+    this.kakaoMapLauncher = const KakaoMapLauncher(),
     BehaviorRepository? behaviorRepository,
   }) : behaviorRepository = behaviorRepository ?? BehaviorRepository();
 
@@ -65,6 +71,30 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
 
     try {
       await widget.behaviorRepository.record(placeId: place.placeId, action: 'share', screen: 'place_detail');
+    } catch (_) {
+      // best-effort: a failed behavior log must never surface to the user
+    }
+  }
+
+  Future<void> _onOpenKakaoMapPressed() async {
+    final place = widget.place;
+    if (!place.hasCoordinates) return;
+
+    final opened = await widget.kakaoMapLauncher.open(
+      placeId: place.placeId,
+      name: place.name,
+      latitude: place.latitude!,
+      longitude: place.longitude!,
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('카카오맵을 열 수 없어요.')),
+      );
+      return;
+    }
+
+    try {
+      await widget.behaviorRepository.record(placeId: place.placeId, action: 'map_view', screen: 'place_detail');
     } catch (_) {
       // best-effort: a failed behavior log must never surface to the user
     }
@@ -120,6 +150,12 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                     child: _HeroBookmarkButton(placeId: place.placeId),
                   ),
                 ),
+                if (place.hasCoordinates)
+                  Positioned(
+                    right: 16,
+                    bottom: 12,
+                    child: _OpenKakaoMapButton(onTap: _onOpenKakaoMapPressed),
+                  ),
               ],
             ),
           ),
@@ -212,6 +248,42 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Hands the place off to the Kakao Map app for directions, reviews and
+/// street view, which the in-app preview map doesn't have.
+class _OpenKakaoMapButton extends StatelessWidget {
+  const _OpenKakaoMapButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      elevation: 3,
+      shadowColor: const Color(0x33000000),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: const Padding(
+          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.open_in_new_rounded, size: 15, color: AppColors.primaryStrong),
+              SizedBox(width: 6),
+              Text(
+                '카카오맵에서 보기',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

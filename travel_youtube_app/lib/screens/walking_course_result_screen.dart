@@ -14,6 +14,7 @@ import '../utils/view_state.dart';
 import '../widgets/data_source_attribution.dart';
 import '../widgets/error_view.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/pinned_map_sliver.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 import '../utils/place_category_label.dart';
@@ -203,23 +204,28 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
           point: placeStops[i],
           recommendation: recommendationByPlaceId[placeStops[i].placeId],
           isFirst: i == 0,
+          walkingOnly: !course.isMixedTransport,
           isSelected: markerId == _selectedMarkerId,
           onTap: () => setState(() => _selectedMarkerId = markerId),
         ),
       );
       if (i < placeStops.length - 1) {
         stopListItems.add(
-          _WalkTimeRow(durationSec: placeStops[i + 1].legDurationSec),
+          _WalkTimeRow(point: placeStops[i + 1]),
         );
       }
     }
 
-    return SingleChildScrollView(
-      child: ResponsiveCenter(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
+    // The map stays pinned under the header while the stops scroll beneath
+    // it -- in a plain scroll view it scrolled away with the first stop, so
+    // tapping a stop further down moved a map nobody could see.
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: ResponsiveCenter(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+            child: Container(
+              width: double.infinity,
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 10,
@@ -229,8 +235,8 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    '걸어서 도는 코스예요',
+                  Text(
+                    course.isMixedTransport ? '걷고, 먼 곳은 버스로 가는 코스예요' : '걸어서 도는 코스예요',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.w700,
@@ -240,97 +246,105 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '${provider.region ?? ''} · 도보 ${placeStops.length}곳 · 약 ${formatRouteDuration(course.totalDurationSec)}',
+                    '${provider.region ?? ''} · ${course.isMixedTransport ? '장소' : '도보'} ${placeStops.length}곳 · 약 ${formatRouteDuration(course.totalDurationSec)}',
                     style: const TextStyle(
                       fontSize: 13.5,
                       fontWeight: FontWeight.w500,
                       color: AppColors.textTertiary,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  _StartPointRow(
-                    pointName: startPoint?.name,
-                    onPickStartPoint: () => _onPickStartPointPressed(context),
-                  ),
+                  // A bookmark-folder course has no region to search from
+                  // again, so a new start point has nothing to re-anchor:
+                  // picking one would search the folder's name as a place.
+                  if (!provider.isFromBookmarkFolder) ...[
+                    const SizedBox(height: 10),
+                    _StartPointRow(
+                      pointName: startPoint?.name,
+                      onPickStartPoint: () => _onPickStartPointPressed(context),
+                    ),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
-            if (routeMarkers.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: SizedBox(
-                  height: 180,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: widget.mapRepository.buildMap(
-                      initialLatitude: routeMarkers.first.latitude,
-                      initialLongitude: routeMarkers.first.longitude,
-                      markers: routeMarkers,
-                      drawRoutePolyline: true,
-                      focusedMarkerId: _selectedMarkerId,
-                    ),
+          ),
+        ),
+        if (routeMarkers.isNotEmpty)
+          PinnedMapSliver(
+            map: widget.mapRepository.buildMap(
+              initialLatitude: routeMarkers.first.latitude,
+              initialLongitude: routeMarkers.first.longitude,
+              markers: routeMarkers,
+              drawRoutePolyline: true,
+              focusedMarkerId: _selectedMarkerId,
+            ),
+          ),
+        SliverToBoxAdapter(
+          child: ResponsiveCenter(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.md,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var i = 0; i < stopListItems.length; i++) ...[
+                        stopListItems[i],
+                        if (i < stopListItems.length - 1)
+                          const SizedBox(height: 10),
+                      ],
+                      const DataSourceAttribution(),
+                    ],
                   ),
                 ),
-              ),
-            const SizedBox(height: AppSpacing.md),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (var i = 0; i < stopListItems.length; i++) ...[
-                    stopListItems[i],
-                    if (i < stopListItems.length - 1)
-                      const SizedBox(height: 10),
-                  ],
-                  const DataSourceAttribution(),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                AppSpacing.lg,
-              ),
-              child: Row(
-                children: [
-                  OutlinedButton(
-                    onPressed: () => _onRegeneratePressed(context),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(0, 48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                    ),
-                    child: const Text(
-                      '다시 생성',
-                      style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                const SizedBox(height: AppSpacing.md),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    AppSpacing.lg,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: PrimaryButton(
-                      label: provider.saved ? '저장됨' : '코스 저장하기',
-                      isLoading: provider.isSaving,
-                      onPressed: provider.saved
-                          ? null
-                          : () => _onSavePressed(context),
-                    ),
+                  child: Row(
+                    children: [
+                      OutlinedButton(
+                        onPressed: () => _onRegeneratePressed(context),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                        ),
+                        child: const Text(
+                          '다시 생성',
+                          style: TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: PrimaryButton(
+                          label: provider.saved ? '저장됨' : '코스 저장하기',
+                          isLoading: provider.isSaving,
+                          onPressed: provider.saved
+                              ? null
+                              : () => _onSavePressed(context),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -341,6 +355,7 @@ class _StopRow extends StatelessWidget {
     required this.point,
     required this.recommendation,
     required this.isFirst,
+    this.walkingOnly = true,
     required this.isSelected,
     required this.onTap,
   });
@@ -349,6 +364,9 @@ class _StopRow extends StatelessWidget {
   final RoutePointModel point;
   final NearbyRecommendationModel? recommendation;
   final bool isFirst;
+
+  /// False on a route that also drives -- "도보 시작" would be wrong there.
+  final bool walkingOnly;
   final bool isSelected;
   final VoidCallback onTap;
 
@@ -358,7 +376,7 @@ class _StopRow extends StatelessWidget {
     if (category != null) parts.add(category);
 
     if (isFirst) {
-      parts.add('도보 시작');
+      parts.add(walkingOnly ? '도보 시작' : '출발');
     } else if (recommendation?.isOpen != null) {
       parts.add(recommendation!.isOpen! ? '지금 영업중' : '영업 종료');
     }
@@ -437,33 +455,49 @@ class _StopRow extends StatelessWidget {
   }
 }
 
+/// The leg arriving at [point]: "도보 N분", or on a bookmark-folder route
+/// "버스 N분" with which bus to take and between which stops.
 class _WalkTimeRow extends StatelessWidget {
-  const _WalkTimeRow({required this.durationSec});
+  const _WalkTimeRow({required this.point});
 
-  final int? durationSec;
+  final RoutePointModel point;
 
   @override
   Widget build(BuildContext context) {
-    final seconds = durationSec;
+    final seconds = point.legDurationSec;
     if (seconds == null) return const SizedBox.shrink();
 
     final minutes = (seconds / 60).round().clamp(1, 999);
+    final IconData icon;
+    final String label;
+    if (point.isTransitLeg) {
+      icon = Icons.directions_bus_rounded;
+      label = '버스 $minutes분';
+    } else if (point.isDrivenLeg) {
+      icon = Icons.directions_car_rounded;
+      label = '차량 $minutes분';
+    } else {
+      icon = Icons.directions_walk_rounded;
+      label = '도보 $minutes분';
+    }
+    const style = TextStyle(
+      fontSize: 11.5,
+      fontWeight: FontWeight.w500,
+      color: AppColors.textMuted2,
+    );
+    final guidance = point.legGuidance;
+
     return Padding(
       padding: const EdgeInsets.only(left: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(
-            Icons.directions_walk_rounded,
-            size: 14,
-            color: AppColors.textMuted2,
-          ),
+          Icon(icon, size: 14, color: AppColors.textMuted2),
           const SizedBox(width: 8),
-          Text(
-            '도보 $minutes분',
-            style: const TextStyle(
-              fontSize: 11.5,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textMuted2,
+          Flexible(
+            child: Text(
+              guidance == null ? label : '$label · $guidance',
+              style: style,
             ),
           ),
         ],

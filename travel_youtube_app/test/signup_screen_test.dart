@@ -8,6 +8,8 @@ import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/signup_screen.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 const UserModel _user = UserModel(userId: 'u1', email: 'a@b.com', nickname: 'Nagyeong', profileImage: null);
 
 class FakeAuthRepository extends AuthRepository {
@@ -82,7 +84,7 @@ Future<void> _verifyEmail(WidgetTester tester) async {
 void main() {
   testWidgets('shows an inline error for a missing nickname', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
     await tester.tap(find.text('가입하기'));
@@ -93,7 +95,7 @@ void main() {
 
   testWidgets('checking nickname availability shows a checkmark', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
 
@@ -102,7 +104,7 @@ void main() {
 
   testWidgets('shows an inline message when the nickname is already taken', (tester) async {
     final repository = FakeAuthRepository()..takenNicknames.add('Nagyeong');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
 
@@ -112,7 +114,7 @@ void main() {
 
   testWidgets('blocks signup until the nickname is checked', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong');
     await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
@@ -125,7 +127,7 @@ void main() {
 
   testWidgets('blocks signup until the email is verified', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
@@ -138,7 +140,7 @@ void main() {
 
   testWidgets('checking, verifying, and filling in every field enables signup', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await _verifyEmail(tester);
@@ -157,7 +159,7 @@ void main() {
 
   testWidgets('editing the nickname after checking it requires re-checking', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Different');
@@ -169,7 +171,7 @@ void main() {
 
   testWidgets('shows an inline error for a password shorter than 8 characters', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await _verifyEmail(tester);
@@ -183,7 +185,7 @@ void main() {
 
   testWidgets('shows an inline error when the password confirmation does not match', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await _verifyEmail(tester);
@@ -198,7 +200,7 @@ void main() {
 
   testWidgets('shows an inline error when the terms checkbox is not checked', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await _verifyEmail(tester);
@@ -213,7 +215,7 @@ void main() {
 
   testWidgets('shows an error view when the email is already registered', (tester) async {
     final repository = FakeAuthRepository()..requestOtpError = const ApiException(code: 'EMAIL_EXISTS', message: 'boom');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('signupEmailField')), 'a@b.com');
     await tester.tap(find.text('인증하기'));
@@ -224,7 +226,7 @@ void main() {
 
   testWidgets('shows an error view when signup fails server-side', (tester) async {
     final repository = FakeAuthRepository()..signupError = const ApiException(code: 'OTP_NOT_VERIFIED', message: 'boom');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
     await _verifyEmail(tester);

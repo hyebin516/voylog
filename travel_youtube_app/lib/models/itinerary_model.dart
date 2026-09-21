@@ -11,6 +11,16 @@ class RoutePointModel {
   final int? legDistanceM;
   final int? legDurationSec;
 
+  /// How that leg is travelled on a route that mixes modes -- 'walk' or
+  /// 'transit' (a bookmark-folder route, FR-11; 'car' in courses saved
+  /// before it switched to buses). Null when the whole route uses one
+  /// transport mode.
+  final String? legTransportMode;
+
+  /// For a bus leg: which bus, between which stops -- "600번 · 온양온천역
+  /// 신한은행 → 신정호관광지 건너".
+  final String? legGuidance;
+
   const RoutePointModel({
     required this.order,
     required this.type,
@@ -21,7 +31,15 @@ class RoutePointModel {
     required this.longitude,
     this.legDistanceM,
     this.legDurationSec,
+    this.legTransportMode,
+    this.legGuidance,
   });
+
+  /// True when the leg arriving here is ridden by bus rather than walked.
+  bool get isTransitLeg => legTransportMode == 'transit';
+
+  /// True for a driven leg (bookmark-folder courses saved before buses).
+  bool get isDrivenLeg => legTransportMode == 'car';
 
   /// Sentinel hotelId the AI worker uses for an FR-17 walking course that
   /// the user generated without picking a real hotel -- the round trip is
@@ -59,8 +77,27 @@ class RoutePointModel {
       longitude: (json['longitude'] as num?)?.toDouble(),
       legDistanceM: json['legDistanceM'] as int?,
       legDurationSec: json['legDurationSec'] as int?,
+      legTransportMode: json['legTransportMode'] as String?,
+      legGuidance: json['legGuidance'] as String?,
     );
   }
+
+  /// The shape the backend stores a route point in. Keeps the leg data,
+  /// which saved courses used to drop -- so a saved course lost its
+  /// per-stop travel times.
+  Map<String, dynamic> toJson() => {
+        'order': order,
+        'type': type,
+        'hotelId': hotelId,
+        'placeId': placeId,
+        'name': name,
+        'latitude': latitude,
+        'longitude': longitude,
+        'legDistanceM': legDistanceM,
+        'legDurationSec': legDurationSec,
+        if (legTransportMode != null) 'legTransportMode': legTransportMode,
+        if (legGuidance != null) 'legGuidance': legGuidance,
+      };
 }
 
 class ItineraryModel {

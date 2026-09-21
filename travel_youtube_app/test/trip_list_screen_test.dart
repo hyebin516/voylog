@@ -10,6 +10,8 @@ import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/repositories/trip_repository.dart';
 import 'package:travel_youtube_app/screens/trip_list_screen.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 const UserModel _user = UserModel(userId: 'u1', email: 'a@b.com', nickname: 'Nagyeong', profileImage: null);
 
 class FakeTripRepository extends TripRepository {
@@ -37,7 +39,7 @@ class FakeAuthRepository extends AuthRepository {
 }
 
 Future<AuthProvider> _authenticatedProvider() async {
-  final authProvider = AuthProvider(repository: FakeAuthRepository());
+  final authProvider = AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration());
   await authProvider.loginWithKakao('kakao-token');
   return authProvider;
 }
@@ -132,7 +134,7 @@ void main() {
 
   testWidgets('shows a login-required prompt for guests instead of an error', (tester) async {
     final repository = FakeTripRepository();
-    await tester.pumpWidget(_wrap(TripProvider(repository: repository), AuthProvider(repository: FakeAuthRepository())));
+    await tester.pumpWidget(_wrap(TripProvider(repository: repository), AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration())));
     await tester.pumpAndSettle();
 
     expect(find.text('로그인이 필요해요'), findsOneWidget);

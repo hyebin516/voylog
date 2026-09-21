@@ -5,6 +5,7 @@ import '../core/constants/recommendation_options.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/recommendation_wizard_provider.dart';
 import '../routes/app_routes.dart';
+import '../widgets/custom_option_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 
@@ -37,7 +38,12 @@ class RecommendationRegionScreen extends StatelessWidget {
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
-                  for (final region in RecommendationOptions.regions)
+                  // Typed-in regions join the list as chips, so they can be
+                  // seen and unpicked the same way the offered ones are.
+                  for (final region in [
+                    ...RecommendationOptions.regions,
+                    ...wizard.selectedRegions.where((r) => !RecommendationOptions.regions.contains(r)),
+                  ])
                     FilterChip(
                       key: Key('region_$region'),
                       label: Text(
@@ -53,6 +59,13 @@ class RecommendationRegionScreen extends StatelessWidget {
                       onSelected: (_) => wizard.toggleRegion(region),
                     ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              CustomOptionField(
+                key: const Key('customRegionField'),
+                hintText: '찾는 지역이 없다면 직접 입력 (예: 통영)',
+                icon: Icons.edit_location_alt_outlined,
+                onSubmitted: wizard.addRegion,
               ),
               const SizedBox(height: AppSpacing.xl),
               PrimaryButton(

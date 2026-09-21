@@ -5,6 +5,7 @@ import 'package:travel_youtube_app/models/shared_route_model.dart';
 import 'package:travel_youtube_app/models/similar_taste_recommendation_model.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/models/video_search_result_model.dart';
+import 'package:travel_youtube_app/providers/app_shell_provider.dart';
 import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
 import 'package:travel_youtube_app/providers/shared_route_provider.dart';
 import 'package:travel_youtube_app/providers/similar_taste_provider.dart';
@@ -47,10 +48,15 @@ class FakeSharedRouteRepository extends SharedRouteRepository {
   Future<List<SharedRouteModel>> getFeed({int? limit}) async => [];
 }
 
-Widget _wrap({required FakeVideoRepository videoRepository, RecommendationWizardProvider? wizard}) {
+Widget _wrap({
+  required FakeVideoRepository videoRepository,
+  RecommendationWizardProvider? wizard,
+  AppShellProvider? shell,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => VideoProvider(repository: videoRepository)),
+      ChangeNotifierProvider.value(value: shell ?? AppShellProvider()),
       ChangeNotifierProvider.value(value: wizard ?? RecommendationWizardProvider()),
       ChangeNotifierProvider(create: (_) => SimilarTasteProvider(repository: FakeSimilarTasteRepository())),
       ChangeNotifierProvider(create: (_) => SharedRouteProvider(repository: FakeSharedRouteRepository())),
@@ -80,10 +86,11 @@ void main() {
     expect(videoRepository.lastUrl, isNull);
   });
 
-  testWidgets('analyzing a URL opens the analysis screen', (tester) async {
+  testWidgets('analyzing a URL hands the result to the 분석 tab and frees 홈', (tester) async {
     usePhoneViewport(tester);
     final videoRepository = FakeVideoRepository();
-    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
+    final shell = AppShellProvider();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository, shell: shell));
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('urlField')), 'https://youtu.be/v1');
@@ -91,7 +98,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(videoRepository.lastUrl, 'https://youtu.be/v1');
-    expect(find.text('route:${AppRoutes.videoAnalysis}'), findsOneWidget);
+    // The result is not stacked on top of 홈 any more -- it lives on the
+    // 분석 tab, and 홈's field is empty for the next video.
+    expect(shell.tabIndex, AppShellProvider.analysisTab);
+    expect(find.text('route:${AppRoutes.videoAnalysis}'), findsNothing);
+    expect(tester.widget<TextField>(find.byKey(const Key('urlField'))).controller!.text, isEmpty);
   });
 
   testWidgets('tapping a hashtag chip searches for it and opens the results', (tester) async {
@@ -108,6 +119,52 @@ void main() {
 
     expect(videoRepository.lastHashtag, '부산여행');
     expect(find.text('route:${AppRoutes.recommendationResults}'), findsOneWidget);
+  });
+
+  testWidgets('a typed hashtag is searched for, with or without the #', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
+    await tester.pumpAndSettle();
+
+    // 통영여행 is not one of the five offered chips.
+    await tester.ensureVisible(find.byKey(const Key('customHashtagField')));
+    await tester.enterText(find.byKey(const Key('customHashtagField')), '#통영여행 ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(videoRepository.lastHashtag, '통영여행');
+    expect(find.text('route:${AppRoutes.recommendationResults}'), findsOneWidget);
+  });
+
+  testWidgets('the 내 여행 shortcut steps aside while the keyboard is open', (tester) async {
+    // The Scaffold lifts its FAB above the keyboard, which parked it right
+    // on top of the hashtag field's search button.
+    usePhoneViewport(tester);
+    await tester.pumpWidget(_wrap(videoRepository: FakeVideoRepository()));
+    await tester.pumpAndSettle();
+    expect(find.byTooltip('내 여행'), findsOneWidget);
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 900);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    expect(find.byTooltip('내 여행'), findsNothing);
+  });
+
+  testWidgets('a blank hashtag searches for nothing', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('customHashtagField')));
+    await tester.enterText(find.byKey(const Key('customHashtagField')), '  # ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(videoRepository.lastHashtag, isNull);
+    expect(find.text('route:${AppRoutes.recommendationResults}'), findsNothing);
   });
 
   testWidgets('더보기 resets the recommendation wizard and opens its first step', (tester) async {

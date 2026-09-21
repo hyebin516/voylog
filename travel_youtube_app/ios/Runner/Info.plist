@@ -44,6 +44,15 @@
 	<array>
 		<string>kakaokompassauth</string>
 		<string>kakaolink</string>
+		<string>kakaomap</string>
+	</array>
+	<!-- FR-12 push notifications: lets a notification wake the app to
+	     handle its data payload. The Push Notifications capability and the
+	     APNs key still have to be set up in Xcode / Apple Developer;
+	     see docs/PUSH_SETUP.md. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>

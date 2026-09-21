@@ -1,3 +1,5 @@
+import 'itinerary_model.dart';
+
 class SharedRouteModel {
   final String sharedRouteId;
   final String title;
@@ -12,6 +14,11 @@ class SharedRouteModel {
   final int? matchPercent;
   final DateTime createdAt;
 
+  /// The published stops in order -- places only (hotels are stripped when
+  /// a route is published). Coordinates may be null on a stop the backend
+  /// couldn't locate; the detail screen leaves that stop off the map.
+  final List<RoutePointModel> routeData;
+
   const SharedRouteModel({
     required this.sharedRouteId,
     required this.title,
@@ -25,6 +32,7 @@ class SharedRouteModel {
     required this.isOwner,
     required this.matchPercent,
     required this.createdAt,
+    this.routeData = const [],
   });
 
   SharedRouteModel copyWith({int? likeCount, bool? likedByMe, String? title}) {
@@ -41,6 +49,7 @@ class SharedRouteModel {
       isOwner: isOwner,
       matchPercent: matchPercent,
       createdAt: createdAt,
+      routeData: routeData,
     );
   }
 
@@ -58,6 +67,9 @@ class SharedRouteModel {
       isOwner: json['isOwner'] as bool? ?? false,
       matchPercent: json['matchPercent'] as int?,
       createdAt: DateTime.parse(json['createdAt'] as String),
+      routeData: (json['routeData'] as List<dynamic>? ?? [])
+          .map((e) => RoutePointModel.fromJson(e as Map<String, dynamic>))
+          .toList(),
     );
   }
 }

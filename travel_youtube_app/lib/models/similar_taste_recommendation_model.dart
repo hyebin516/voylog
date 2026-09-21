@@ -3,6 +3,9 @@ class SimilarTasteRecommendationModel {
   final String name;
   final double latitude;
   final double longitude;
+  // Carried from the stored place so tapping a card opens the place detail
+  // screen with its address instead of a name and a map pin alone.
+  final String? address;
   final String? category;
   final double score;
   final int contributorCount;
@@ -14,6 +17,7 @@ class SimilarTasteRecommendationModel {
     required this.latitude,
     required this.longitude,
     required this.category,
+    this.address,
     required this.score,
     required this.contributorCount,
     required this.reason,
@@ -25,6 +29,7 @@ class SimilarTasteRecommendationModel {
       name: json['name'] as String,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
+      address: json['address'] as String?,
       category: json['category'] as String?,
       score: (json['score'] as num).toDouble(),
       contributorCount: json['contributorCount'] as int,

@@ -73,4 +73,43 @@ void main() {
       expect(model.recommendations, isEmpty);
     });
   });
+
+  test("a bookmark-folder route keeps each leg's transport mode", () {
+    final model = WalkingCourseModel.fromJson({
+      'course': {
+        'routeType': 'placeToPlace',
+        'transportMode': 'mixed',
+        'totalDistanceM': 5600,
+        'totalDurationSec': 1140,
+        'optimizedRoute': [
+          {'order': 0, 'type': 'place', 'placeId': 'a', 'name': 'A', 'latitude': 36.78, 'longitude': 127.0},
+          {
+            'order': 1,
+            'type': 'place',
+            'placeId': 'b',
+            'name': 'B',
+            'latitude': 36.77,
+            'longitude': 126.95,
+            'legDistanceM': 3391,
+            'legDurationSec': 1253,
+            'legTransportMode': 'transit',
+            'legGuidance': '600번 · 온양온천역 → 신정호',
+          },
+        ],
+      },
+      'recommendations': [],
+    });
+
+    final course = model.course!;
+    expect(course.isPlaceToPlace, isTrue);
+    expect(course.isMixedTransport, isTrue);
+    expect(course.routeData[0].legTransportMode, isNull);
+    expect(course.routeData[1].isTransitLeg, isTrue);
+    expect(course.routeData[1].legGuidance, '600번 · 온양온천역 → 신정호');
+    // Saving sends the legs along, including how each is travelled.
+    expect(course.routeData[1].toJson(), containsPair('legTransportMode', 'transit'));
+    expect(course.routeData[1].toJson(), containsPair('legGuidance', '600번 · 온양온천역 → 신정호'));
+    expect(course.routeData[1].toJson(), containsPair('legDurationSec', 1253));
+    expect(course.routeData[0].toJson().containsKey('legTransportMode'), isFalse);
+  });
 }

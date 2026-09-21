@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/api_exception.dart';
 import '../models/start_point_model.dart';
 import '../models/walking_course_model.dart';
+import '../repositories/bookmark_folder_repository.dart';
 import '../repositories/saved_walking_course_repository.dart';
 import '../repositories/walking_course_repository.dart';
 import '../utils/view_state.dart';
@@ -10,13 +11,16 @@ import '../utils/view_state.dart';
 class WalkingCourseProvider extends ChangeNotifier {
   final WalkingCourseRepository _repository;
   final SavedWalkingCourseRepository _savedCourseRepository;
+  final BookmarkFolderRepository _folderRepository;
 
   WalkingCourseProvider({
     WalkingCourseRepository? repository,
     SavedWalkingCourseRepository? savedCourseRepository,
+    BookmarkFolderRepository? folderRepository,
   }) : _repository = repository ?? WalkingCourseRepository(),
        _savedCourseRepository =
-           savedCourseRepository ?? SavedWalkingCourseRepository();
+           savedCourseRepository ?? SavedWalkingCourseRepository(),
+       _folderRepository = folderRepository ?? BookmarkFolderRepository();
 
   ViewState _state = ViewState.idle;
   WalkingCourseModel? _result;
@@ -25,6 +29,11 @@ class WalkingCourseProvider extends ChangeNotifier {
   String? _mood;
   String? _walkDuration;
   StartPointModel? _startPoint;
+
+  /// Set when the course came from a bookmark folder rather than a region
+  /// search -- the stops are the user's own bookmarks, so regenerating means
+  /// re-routing the same folder, not searching the area again.
+  String? _folderId;
 
   bool _isSaving = false;
   bool _saved = false;
@@ -35,6 +44,10 @@ class WalkingCourseProvider extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   String? get region => _region;
   bool get isLoading => _state == ViewState.loading;
+
+  /// True when the current course is a bookmark folder's own places rather
+  /// than a region search.
+  bool get isFromBookmarkFolder => _folderId != null;
 
   bool get isSaving => _isSaving;
   bool get saved => _saved;
@@ -51,6 +64,7 @@ class WalkingCourseProvider extends ChangeNotifier {
     _mood = mood;
     _walkDuration = walkDuration;
     _startPoint = startPoint;
+    _folderId = null;
     _state = ViewState.loading;
     _errorMessage = null;
     _saved = false;
@@ -75,9 +89,44 @@ class WalkingCourseProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Routes a bookmark folder's places directly -- no region search, no
+  /// hotel, no trip. The folder is the plan the user already made, so the
+  /// result is only ordered, not re-chosen.
+  Future<void> generateFromBookmarkFolder({
+    required String folderId,
+    required String folderName,
+  }) async {
+    _folderId = folderId;
+    _region = folderName;
+    _mood = null;
+    _walkDuration = null;
+    _startPoint = null;
+    _state = ViewState.loading;
+    _errorMessage = null;
+    _saved = false;
+    _saveErrorMessage = null;
+    notifyListeners();
+
+    try {
+      _result = await _folderRepository.createRoute(folderId);
+      _state = ViewState.success;
+    } on ApiException catch (e) {
+      _state = ViewState.error;
+      _errorMessage = e.friendlyMessage;
+    }
+
+    notifyListeners();
+  }
+
   /// Regenerates the course for the same region, reusing whichever
   /// mood/walkDuration filters and start point were last used to generate it.
   Future<void> regenerate() async {
+    final folderId = _folderId;
+    if (folderId != null) {
+      // Same folder, same places -- only the order can change.
+      await generateFromBookmarkFolder(folderId: folderId, folderName: _region!);
+      return;
+    }
     final region = _region;
     if (region == null) return;
     await generate(
@@ -105,7 +154,8 @@ class WalkingCourseProvider extends ChangeNotifier {
   /// real place).
   Future<void> regenerateWithStartPoint(StartPointModel startPoint) async {
     final region = _region;
-    if (region == null) return;
+    // A folder course's "region" is the folder's name, not a searchable area.
+    if (region == null || isFromBookmarkFolder) return;
     await generate(
       region,
       mood: _mood,
@@ -138,6 +188,7 @@ class WalkingCourseProvider extends ChangeNotifier {
   }
 
   void reset() {
+    _folderId = null;
     _region = null;
     _result = null;
     _state = ViewState.idle;

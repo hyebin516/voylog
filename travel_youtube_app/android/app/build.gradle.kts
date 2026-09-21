@@ -4,6 +4,14 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// FR-12 push notifications. google-services.json holds the Firebase project
+// config and is git-ignored (see ../.gitignore), so this is conditional:
+// without it the app still builds and runs, just with notifications off
+// (FirebasePushMessagingService catches the missing-config error).
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 // Reads a single value out of the git-ignored ../.env file (see README.md /
 // docs/KAKAO_SETUP.md) so the real Kakao native app key never has to be
 // hardcoded in a committed file. Used below for the Kakao Login manifest

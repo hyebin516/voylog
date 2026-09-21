@@ -42,4 +42,56 @@ void main() {
 
     expect(find.text('theme screen'), findsOneWidget);
   });
+
+  testWidgets('a typed region joins the selection as its own chip', (tester) async {
+    final provider = RecommendationWizardProvider();
+    await tester.pumpWidget(_wrap(provider));
+
+    // 통영 isn't on the curated list, so before this it was unreachable.
+    await tester.enterText(find.byKey(const Key('customRegionField')), ' 통영 ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(provider.selectedRegions, {'통영'});
+    expect(find.byKey(const Key('region_통영')), findsOneWidget);
+    expect(find.text('다음 (1개 선택됨)'), findsOneWidget);
+    // Cleared, so the next entry starts fresh.
+    expect(find.text('통영'), findsOneWidget);
+  });
+
+  testWidgets('a typed region can be unpicked like any other chip', (tester) async {
+    final provider = RecommendationWizardProvider();
+    await tester.pumpWidget(_wrap(provider));
+
+    await tester.enterText(find.byKey(const Key('customRegionField')), '통영');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('region_통영')));
+    await tester.pump();
+
+    expect(provider.selectedRegions, isEmpty);
+  });
+
+  testWidgets('blank input adds nothing', (tester) async {
+    final provider = RecommendationWizardProvider();
+    await tester.pumpWidget(_wrap(provider));
+
+    await tester.enterText(find.byKey(const Key('customRegionField')), '   ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(provider.selectedRegions, isEmpty);
+  });
+
+  testWidgets('typing a region that is already picked keeps it picked', (tester) async {
+    final provider = RecommendationWizardProvider()..toggleRegion('제주도');
+    await tester.pumpWidget(_wrap(provider));
+
+    await tester.enterText(find.byKey(const Key('customRegionField')), '제주도');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(provider.selectedRegions, {'제주도'});
+  });
 }

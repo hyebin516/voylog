@@ -21,9 +21,10 @@ PlaceModel _toPlaceModel(SimilarTasteRecommendationModel rec) {
     timestampSec: null,
     latitude: rec.latitude,
     longitude: rec.longitude,
-    address: null,
+    address: rec.address,
     source: 'similar-taste',
     confidence: 1.0,
+    category: rec.category,
   );
 }
 

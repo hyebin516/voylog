@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/constants/customer_service_content.dart';
 import '../core/constants/public_data_sources.dart';
 import '../core/theme/app_theme.dart';
+import '../routes/app_routes.dart';
 
 class CustomerServiceScreen extends StatelessWidget {
   const CustomerServiceScreen({super.key});
@@ -95,29 +96,47 @@ class CustomerServiceScreen extends StatelessWidget {
                   const SizedBox(height: AppSpacing.lg),
                   const Text('문의하기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
                   const SizedBox(height: 10),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceTint1,
+                  // FR-13: the address alone was unusable from inside the
+                  // app -- this opens the form that actually sends it.
+                  Material(
+                    color: AppColors.surfaceTint1,
+                    shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
-                      border: Border.all(color: const Color(0xFFE3F0F8), width: 1.5),
+                      side: const BorderSide(color: Color(0xFFE3F0F8), width: 1.5),
                     ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.mail_outline_rounded, size: 18, color: AppColors.primary),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('이메일로 문의', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
-                              const SizedBox(height: 2),
-                              const Text(CustomerServiceContent.contactEmail, style: TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
-                            ],
-                          ),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      key: const Key('supportInquiryEntry'),
+                      onTap: () => Navigator.of(context).pushNamed(AppRoutes.supportInquiry),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.mail_outline_rounded, size: 18, color: AppColors.primary),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('문의 보내기', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.ink)),
+                                  const SizedBox(height: 2),
+                                  const Text(
+                                    '앱에서 바로 문의하고 답변은 메일로 받아요',
+                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textTertiary),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '메일로 직접 보내셔도 됩니다 — ${CustomerServiceContent.contactEmail}',
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   const Text('데이터 출처', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textMuted)),

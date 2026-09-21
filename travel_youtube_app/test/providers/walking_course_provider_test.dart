@@ -5,6 +5,7 @@ import 'package:travel_youtube_app/models/saved_walking_course_model.dart';
 import 'package:travel_youtube_app/models/start_point_model.dart';
 import 'package:travel_youtube_app/models/walking_course_model.dart';
 import 'package:travel_youtube_app/providers/walking_course_provider.dart';
+import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/repositories/walking_course_repository.dart';
 import 'package:travel_youtube_app/utils/view_state.dart';
@@ -70,6 +71,16 @@ class FakeWalkingCourseRepository extends WalkingCourseRepository {
     lastAvoidPlaceIds = avoidPlaceIds;
     if (error != null) throw error!;
     return resultToReturn ?? _emptyResult;
+  }
+}
+
+class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
+  final List<String> routedFolderIds = [];
+
+  @override
+  Future<WalkingCourseModel> createRoute(String folderId) async {
+    routedFolderIds.add(folderId);
+    return _emptyResult;
   }
 }
 
@@ -315,5 +326,51 @@ void main() {
         expect(provider.saveErrorMessage, '네트워크 연결을 확인해 주세요.');
       },
     );
+  });
+
+  group('generateFromBookmarkFolder', () {
+    test('routes the folder, and regenerating re-routes it instead of searching its name', () async {
+      final regionRepository = FakeWalkingCourseRepository();
+      final folderRepository = FakeBookmarkFolderRepository();
+      final provider = WalkingCourseProvider(
+        repository: regionRepository,
+        folderRepository: folderRepository,
+      );
+
+      await provider.generateFromBookmarkFolder(folderId: 'f1', folderName: '부산 코스');
+      expect(provider.state, ViewState.success);
+      expect(provider.region, '부산 코스');
+      expect(provider.isFromBookmarkFolder, isTrue);
+
+      await provider.regenerate();
+
+      expect(folderRepository.routedFolderIds, ['f1', 'f1']);
+      expect(regionRepository.generateCalls, 0);
+    });
+
+    test('ignores a start point: the folder name is not a searchable region', () async {
+      final regionRepository = FakeWalkingCourseRepository();
+      final provider = WalkingCourseProvider(
+        repository: regionRepository,
+        folderRepository: FakeBookmarkFolderRepository(),
+      );
+      await provider.generateFromBookmarkFolder(folderId: 'f1', folderName: 'ㄹ');
+
+      await provider.regenerateWithStartPoint(_startPoint);
+
+      expect(regionRepository.generateCalls, 0);
+    });
+
+    test('a later region search is a region course again', () async {
+      final provider = WalkingCourseProvider(
+        repository: FakeWalkingCourseRepository(),
+        folderRepository: FakeBookmarkFolderRepository(),
+      );
+      await provider.generateFromBookmarkFolder(folderId: 'f1', folderName: 'ㄹ');
+
+      await provider.generate('제주');
+
+      expect(provider.isFromBookmarkFolder, isFalse);
+    });
   });
 }

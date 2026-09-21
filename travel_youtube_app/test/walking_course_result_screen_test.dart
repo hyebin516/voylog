@@ -11,6 +11,7 @@ import 'package:travel_youtube_app/models/walking_course_model.dart';
 import 'package:travel_youtube_app/models/saved_walking_course_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/walking_course_provider.dart';
+import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/repositories/walking_course_repository.dart';
 import 'package:travel_youtube_app/screens/walking_course_result_screen.dart';
@@ -110,6 +111,27 @@ class FakeWalkingCourseRepository extends WalkingCourseRepository {
     if (pendingCompleter != null) return pendingCompleter!.future;
     if (error != null) throw error!;
     return resultToReturn!;
+  }
+}
+
+/// Returns a bookmark-folder route: two places walked between, then a bus.
+class FakeFolderRouteRepository extends BookmarkFolderRepository {
+  @override
+  Future<WalkingCourseModel> createRoute(String folderId) async {
+    return const WalkingCourseModel(
+      course: WalkingCourseRouteModel(
+        routeType: 'placeToPlace',
+        transportMode: 'mixed',
+        totalDistanceM: 5600,
+        totalDurationSec: 1140,
+        routeData: [
+          RoutePointModel(order: 0, type: 'place', hotelId: null, placeId: 'a', name: '허그스', latitude: 36.78, longitude: 127.0),
+          RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'b', name: '파인데이즈', latitude: 36.781, longitude: 127.0, legDistanceM: 400, legDurationSec: 420, legTransportMode: 'walk'),
+          RoutePointModel(order: 2, type: 'place', hotelId: null, placeId: 'c', name: '카페 산시', latitude: 36.77, longitude: 126.95, legDistanceM: 3391, legDurationSec: 1253, legTransportMode: 'transit', legGuidance: '600번 · 온양온천역 신한은행 → 신정호관광지 건너'),
+        ],
+      ),
+      recommendations: [],
+    );
   }
 }
 
@@ -405,4 +427,26 @@ void main() {
       ); // button stays enabled to retry
     },
   );
+
+  testWidgets('a bookmark-folder route shows which legs are walked and which bus to take', (tester) async {
+    // A pure walking route had a 61-minute walk between two bookmarks.
+    usePhoneViewport(tester);
+    final provider = WalkingCourseProvider(
+      repository: FakeWalkingCourseRepository(),
+      folderRepository: FakeFolderRouteRepository(),
+    );
+    await provider.generateFromBookmarkFolder(folderId: 'f1', folderName: '아산');
+
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pumpAndSettle();
+
+    expect(find.text('걷고, 먼 곳은 버스로 가는 코스예요'), findsOneWidget);
+    expect(find.textContaining('아산 · 장소 3곳'), findsOneWidget);
+    expect(find.text('도보 7분'), findsOneWidget);
+    expect(find.text('버스 21분 · 600번 · 온양온천역 신한은행 → 신정호관광지 건너'), findsOneWidget);
+    expect(find.text('출발'), findsOneWidget);
+    expect(find.textContaining('도보 시작'), findsNothing);
+    // No region to re-anchor on, so no start point picker.
+    expect(find.text('시작 지점 정하기'), findsNothing);
+  });
 }

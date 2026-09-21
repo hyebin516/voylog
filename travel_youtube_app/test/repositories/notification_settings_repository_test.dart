@@ -14,14 +14,14 @@ void main() {
       statusCode: 200,
       body: {
         'success': true,
-        'data': {'newVlogAlerts': true, 'routeCompleteAlerts': true, 'marketingAlerts': false, 'nightSilent': false},
+        'data': {'tripStartAlerts': true, 'routeCompleteAlerts': true, 'marketingAlerts': false, 'nightSilent': false},
       },
     );
     DioClient().dio.httpClientAdapter = adapter;
 
     final settings = await NotificationSettingsRepository().getSettings();
 
-    expect(settings.newVlogAlerts, isTrue);
+    expect(settings.tripStartAlerts, isTrue);
     expect(settings.marketingAlerts, isFalse);
     expect(adapter.lastOptions?.path, '/notification-settings');
     expect(adapter.lastOptions?.method, 'GET');
@@ -32,14 +32,14 @@ void main() {
       statusCode: 200,
       body: {
         'success': true,
-        'data': {'newVlogAlerts': false, 'routeCompleteAlerts': false, 'marketingAlerts': true, 'nightSilent': true},
+        'data': {'tripStartAlerts': false, 'routeCompleteAlerts': false, 'marketingAlerts': true, 'nightSilent': true},
       },
     );
     DioClient().dio.httpClientAdapter = adapter;
 
     final settings = await NotificationSettingsRepository().updateSettings(
       const NotificationSettingsModel(
-        newVlogAlerts: false,
+        tripStartAlerts: false,
         routeCompleteAlerts: false,
         marketingAlerts: true,
         nightSilent: true,
@@ -50,7 +50,7 @@ void main() {
     expect(adapter.lastOptions?.path, '/notification-settings');
     expect(adapter.lastOptions?.method, 'PUT');
     expect(adapter.lastOptions?.data, {
-      'newVlogAlerts': false,
+      'tripStartAlerts': false,
       'routeCompleteAlerts': false,
       'marketingAlerts': true,
       'nightSilent': true,

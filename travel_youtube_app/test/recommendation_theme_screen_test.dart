@@ -41,4 +41,30 @@ void main() {
 
     expect(find.text('duration screen'), findsOneWidget);
   });
+
+  testWidgets('a typed theme joins the selection as its own chip', (tester) async {
+    final provider = RecommendationWizardProvider();
+    await tester.pumpWidget(_wrap(provider));
+
+    await tester.enterText(find.byKey(const Key('customThemeField')), ' 야경 ');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+
+    expect(provider.selectedThemes, {'야경'});
+    expect(find.byKey(const Key('theme_야경')), findsOneWidget);
+    expect(find.text('다음 (1개 선택됨)'), findsOneWidget);
+  });
+
+  testWidgets('a typed theme can be unpicked like any other chip', (tester) async {
+    final provider = RecommendationWizardProvider();
+    await tester.pumpWidget(_wrap(provider));
+
+    await tester.enterText(find.byKey(const Key('customThemeField')), '야경');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('theme_야경')));
+    await tester.pump();
+
+    expect(provider.selectedThemes, isEmpty);
+  });
 }

@@ -4,12 +4,16 @@ import '../core/network/dio_client.dart';
 import '../models/api_exception.dart';
 import '../models/user_model.dart';
 import '../repositories/auth_repository.dart';
+import '../services/push_registration_service.dart';
 import '../utils/view_state.dart';
 
 class AuthProvider extends ChangeNotifier {
   final AuthRepository _repository;
+  final PushRegistrationService _pushRegistration;
 
-  AuthProvider({AuthRepository? repository}) : _repository = repository ?? AuthRepository() {
+  AuthProvider({AuthRepository? repository, PushRegistrationService? pushRegistration})
+      : _repository = repository ?? AuthRepository(),
+        _pushRegistration = pushRegistration ?? PushRegistrationService() {
     DioClient().onUnauthorized = _handleUnauthorized;
   }
 
@@ -31,6 +35,8 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = await _repository.fetchProfile();
       _state = ViewState.success;
       notifyListeners();
+      // FR-12: a returning session is a device the backend can push to.
+      await _pushRegistration.registerDevice();
       return true;
     } on ApiException {
       await _repository.logout();
@@ -46,6 +52,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       _currentUser = await _repository.loginWithKakao(kakaoAccessToken);
       _state = ViewState.success;
+      await _pushRegistration.registerDevice();
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.friendlyMessage;
@@ -109,6 +116,7 @@ class AuthProvider extends ChangeNotifier {
       _currentUser = await _repository.signup(email: email, password: password, nickname: nickname);
       _state = ViewState.success;
       notifyListeners();
+      await _pushRegistration.registerDevice();
       return true;
     } on ApiException catch (e) {
       _state = ViewState.error;
@@ -126,6 +134,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       _currentUser = await _repository.loginWithEmail(email, password);
       _state = ViewState.success;
+      await _pushRegistration.registerDevice();
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.friendlyMessage;
@@ -135,6 +144,9 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    // Before the JWT goes: the request needs it, and this phone must stop
+    // receiving the notifications of the account leaving it.
+    await _pushRegistration.unregisterDevice();
     await _repository.logout();
     _currentUser = null;
     _state = ViewState.idle;
@@ -142,6 +154,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> deleteAccount() async {
+    await _pushRegistration.unregisterDevice();
     try {
       await _repository.deleteAccount();
     } on ApiException catch (e) {

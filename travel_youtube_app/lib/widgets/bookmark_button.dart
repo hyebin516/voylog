@@ -12,7 +12,10 @@ class BookmarkButton extends StatelessWidget {
   /// to record a "bookmark" behavior signal (phase 5 personalization).
   final VoidCallback? onBookmarked;
 
-  const BookmarkButton({super.key, required this.placeId, this.onBookmarked});
+  const BookmarkButton({super.key, required this.placeId, this.onBookmarked, this.compact = false});
+
+  /// A smaller icon and tap area, for rows that sit next to another icon.
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +39,9 @@ class BookmarkButton extends StatelessWidget {
           icon: Icon(
             bookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
             color: bookmarked ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            size: compact ? 21 : null,
           ),
+          visualDensity: compact ? VisualDensity.compact : null,
           tooltip: bookmarked ? '북마크 해제' : '북마크',
         );
       },

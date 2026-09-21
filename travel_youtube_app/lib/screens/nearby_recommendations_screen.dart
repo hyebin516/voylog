@@ -25,9 +25,13 @@ PlaceModel _toPlaceModel(NearbyRecommendationModel rec) {
     timestampSec: null,
     latitude: rec.latitude,
     longitude: rec.longitude,
-    address: null,
+    address: rec.address,
     source: 'nearby',
     confidence: 1.0,
+    category: rec.category,
+    businessHours: rec.businessHours,
+    businessHoursIsEstimated: rec.businessHoursIsEstimated,
+    tags: rec.tags,
   );
 }
 

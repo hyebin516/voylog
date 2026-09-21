@@ -3,18 +3,32 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../providers/video_provider.dart';
-import '../routes/app_routes.dart';
+import '../repositories/map_repository.dart';
+import '../repositories/video_player_repository.dart';
 import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
 import '../widgets/nav_icons.dart';
 import '../widgets/responsive_center.dart';
+import 'video_analysis_screen.dart';
 
-/// Landing content for the bottom nav's "분석" tab. The design handoff's
-/// navigation model lists this as its own tab without specifying separate
-/// content for it, so this mirrors the URL-analyze entry point (the same
-/// action Home's hero section offers) as a focused, always-reachable tab.
+/// Content for the bottom nav's "분석" tab.
+///
+/// Holds the most recent analysis: analyzing a URL anywhere (here or on 홈)
+/// leaves its result here, so it stays reachable while 홈 goes back to being
+/// ready for the next video. With nothing analyzed yet -- or after "새 영상
+/// 분석" -- it shows the URL field instead.
 class AnalysisTabScreen extends StatefulWidget {
-  const AnalysisTabScreen({super.key});
+  /// Handed to [VideoAnalysisScreen] when a result is being shown. Both
+  /// default to the real native implementations; widget tests inject fakes
+  /// so no WebView or map SDK loads under `flutter test`.
+  final MapRepository mapRepository;
+  final VideoPlayerRepository videoPlayerRepository;
+
+  const AnalysisTabScreen({
+    super.key,
+    this.mapRepository = const KakaoMapRepository(),
+    this.videoPlayerRepository = const YoutubeIframePlayerRepository(),
+  });
 
   @override
   State<AnalysisTabScreen> createState() => _AnalysisTabScreenState();
@@ -40,15 +54,28 @@ class _AnalysisTabScreenState extends State<AnalysisTabScreen> {
 
     await videoProvider.analyze(url);
 
+    // No navigation: a successful analysis simply replaces this tab's
+    // content with the result.
     if (!mounted) return;
-    if (videoProvider.state == ViewState.success) {
-      Navigator.pushNamed(context, AppRoutes.videoAnalysis);
-    }
+    if (videoProvider.state == ViewState.success) _urlController.clear();
   }
 
   @override
   Widget build(BuildContext context) {
     final videoProvider = context.watch<VideoProvider>();
+
+    final video = videoProvider.currentVideo;
+    if (video != null) {
+      return VideoAnalysisScreen(
+        // Keyed by video: the screen builds its player once, for the video
+        // it starts with, so a different video analyzed while this tab
+        // already shows one needs a new screen -- not the old player.
+        key: ValueKey(video.videoId),
+        isTabRoot: true,
+        mapRepository: widget.mapRepository,
+        videoPlayerRepository: widget.videoPlayerRepository,
+      );
+    }
 
     return Scaffold(
       backgroundColor: Colors.white,

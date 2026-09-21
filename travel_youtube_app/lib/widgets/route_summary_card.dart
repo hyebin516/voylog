@@ -2,8 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 import '../models/itinerary_model.dart';
-import '../models/map_view_types.dart';
-import '../repositories/map_repository.dart';
+import '../services/kakao_map_launcher.dart';
 import '../utils/route_format.dart';
 import 'app_card.dart';
 import 'bookmark_button.dart';
@@ -28,16 +27,20 @@ class RouteSummaryCard extends StatelessWidget {
   final int? totalDistanceM;
   final List<RoutePointModel> routeData;
 
-  /// Defaults to the real native Kakao map. Widget tests inject
-  /// `FakeMapRepository()` instead.
-  final MapRepository mapRepository;
-
   /// When set, tapping a stop calls this with its [RoutePointModel.markerId]
   /// instead of just opening the per-stop map bottom sheet -- lets a parent
   /// screen drive a shared map's `focusedMarkerId`. Optional so existing
   /// callers (trip overview, route planner) keep their current behavior.
   final ValueChanged<String>? onPointTap;
   final String? selectedPointId;
+
+  /// The 왕복 / 호텔 → 호텔 chip. Off for a shared route, whose hotels were
+  /// stripped on publish, so neither label describes it.
+  final bool showRouteTypeChip;
+
+  /// Opens a stop in the Kakao Map app from its map button. Widget tests
+  /// inject a fake so nothing is launched.
+  final KakaoMapLauncher kakaoMapLauncher;
 
   const RouteSummaryCard({
     super.key,
@@ -46,10 +49,24 @@ class RouteSummaryCard extends StatelessWidget {
     required this.totalDurationSec,
     required this.totalDistanceM,
     required this.routeData,
-    this.mapRepository = const KakaoMapRepository(),
     this.onPointTap,
     this.selectedPointId,
+    this.showRouteTypeChip = true,
+    this.kakaoMapLauncher = const KakaoMapLauncher(),
   });
+
+  String get _transportModeLabel {
+    switch (transportMode) {
+      case 'walk':
+        return '도보';
+      case 'transit':
+        return '대중교통';
+      case 'mixed':
+        return '도보·버스';
+      default:
+        return '자동차';
+    }
+  }
 
   IconData get _transportModeIcon {
     switch (transportMode) {
@@ -57,6 +74,8 @@ class RouteSummaryCard extends StatelessWidget {
         return Icons.directions_walk_rounded;
       case 'transit':
         return Icons.directions_transit_rounded;
+      case 'mixed':
+        return Icons.alt_route_rounded;
       default:
         return Icons.directions_car_rounded;
     }
@@ -75,26 +94,40 @@ class RouteSummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceTint2,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  isRoundTrip ? '왕복' : '호텔 → 호텔',
-                  style: const TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textSecondary,
+              if (showRouteTypeChip) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceTint2,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    isRoundTrip ? '왕복' : '호텔 → 호텔',
+                    style: const TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+              ],
+              // Named, not just an icon: with the route-type chip hidden
+              // (a shared or bookmark-folder route) a lone icon sat at the
+              // left edge with nothing to say what it meant.
+              Icon(_transportModeIcon, size: 16, color: AppColors.textTertiary),
+              const SizedBox(width: 4),
+              Text(
+                _transportModeLabel,
+                style: const TextStyle(
+                  fontSize: 12.5,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(width: 8),
-              Icon(_transportModeIcon, size: 17, color: AppColors.textTertiary),
               const Spacer(),
               Icon(
                 Icons.timer_outlined,
@@ -135,8 +168,8 @@ class RouteSummaryCard extends StatelessWidget {
               ),
               child: _RoutePointCard(
                 point: routeData[i],
+                kakaoMapLauncher: kakaoMapLauncher,
                 placeNumber: placeNumbers[i],
-                mapRepository: mapRepository,
                 isSelected:
                     onPointTap != null &&
                     selectedPointId == routeData[i].markerId,
@@ -154,55 +187,32 @@ class RouteSummaryCard extends StatelessWidget {
 class _RoutePointCard extends StatelessWidget {
   const _RoutePointCard({
     required this.point,
+    required this.kakaoMapLauncher,
     required this.placeNumber,
-    required this.mapRepository,
     this.isSelected = false,
     this.onTap,
   });
 
   final RoutePointModel point;
+  final KakaoMapLauncher kakaoMapLauncher;
   final int? placeNumber;
-  final MapRepository mapRepository;
   final bool isSelected;
   final VoidCallback? onTap;
 
-  void _showOnMap(BuildContext context) {
-    if (point.latitude == null || point.longitude == null) return;
-
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => SizedBox(
-        height: MediaQuery.of(context).size.height * 0.6,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(point.name, style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: AppSpacing.sm),
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(20),
-                  child: mapRepository.buildMap(
-                    initialLatitude: point.latitude!,
-                    initialLongitude: point.longitude!,
-                    markers: [
-                      MapMarkerData(
-                        id: point.placeId ?? point.hotelId ?? point.name,
-                        title: point.name,
-                        latitude: point.latitude!,
-                        longitude: point.longitude!,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+  /// The stop itself in the Kakao Map app (or its web page without the app)
+  /// -- directions, reviews and street view the in-app preview doesn't have.
+  Future<void> _openInKakaoMap(BuildContext context) async {
+    final opened = await kakaoMapLauncher.open(
+      placeId: point.placeId ?? point.hotelId ?? point.name,
+      name: point.name,
+      latitude: point.latitude!,
+      longitude: point.longitude!,
     );
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('카카오맵을 열 수 없어요.')),
+      );
+    }
   }
 
   @override
@@ -211,14 +221,14 @@ class _RoutePointCard extends StatelessWidget {
     final hasCoordinates = point.latitude != null && point.longitude != null;
     final legLabel =
         (point.legDistanceM != null && point.legDurationSec != null)
-        ? '${formatRouteDistance(point.legDistanceM)} · ${formatRouteDuration(point.legDurationSec)}'
+        ? '${_legModePrefix(point)}${formatRouteDistance(point.legDistanceM)} · ${formatRouteDuration(point.legDurationSec)}'
         : null;
 
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
         decoration: BoxDecoration(
           color: AppColors.surfaceTint1,
           borderRadius: BorderRadius.circular(20),
@@ -226,13 +236,15 @@ class _RoutePointCard extends StatelessWidget {
               ? Border.all(color: AppColors.selectedBorder, width: 2)
               : null,
         ),
+        // Centered: the number, the name (+ leg), and the icons line up on
+        // one axis instead of the number hugging the top while the icons
+        // spread down the side.
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Container(
               width: 28,
               height: 28,
-              margin: const EdgeInsets.only(top: 3),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: point.isUserStartPoint
@@ -287,7 +299,7 @@ class _RoutePointCard extends StatelessWidget {
                     ),
                   ],
                   if (legLabel != null) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 9,
@@ -310,27 +322,40 @@ class _RoutePointCard extends StatelessWidget {
                 ],
               ),
             ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  onPressed: hasCoordinates ? () => _showOnMap(context) : null,
-                  icon: MapPinGlyphIcon(
-                    size: 20,
-                    color: hasCoordinates
-                        ? AppColors.textTertiary
-                        : AppColors.textMuted2,
-                  ),
-                  tooltip: '지도 보기',
-                  visualDensity: VisualDensity.compact,
-                ),
-                if (!isHotel && point.placeId != null)
-                  BookmarkButton(placeId: point.placeId!),
-              ],
+            // Side by side: stacked, the two icons made every card twice
+            // the height its content needed.
+            IconButton(
+              onPressed: hasCoordinates ? () => _openInKakaoMap(context) : null,
+              icon: MapPinGlyphIcon(
+                size: 20,
+                color: hasCoordinates
+                    ? AppColors.textTertiary
+                    : AppColors.textMuted2,
+              ),
+              tooltip: '카카오맵에서 보기',
+              visualDensity: VisualDensity.compact,
             ),
+            if (!isHotel && point.placeId != null)
+              BookmarkButton(placeId: point.placeId!, compact: true),
           ],
         ),
       ),
     );
+  }
+}
+
+/// "도보 " / "차량 " before a leg's distance on a route that mixes modes;
+/// nothing on a single-mode route, whose header already says how it moves.
+String _legModePrefix(RoutePointModel point) {
+  switch (point.legTransportMode) {
+    case 'walk':
+      return '도보 ';
+    case 'transit':
+      final bus = point.legGuidance?.split(' · ').first;
+      return bus == null ? '버스 ' : '버스 $bus · ';
+    case 'car':
+      return '차량 ';
+    default:
+      return '';
   }
 }

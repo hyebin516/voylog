@@ -8,7 +8,7 @@ import 'package:travel_youtube_app/repositories/notification_settings_repository
 import 'package:travel_youtube_app/screens/notification_settings_screen.dart';
 
 const NotificationSettingsModel _defaults = NotificationSettingsModel(
-  newVlogAlerts: true,
+  tripStartAlerts: true,
   routeCompleteAlerts: true,
   marketingAlerts: false,
   nightSilent: false,
@@ -43,7 +43,7 @@ void main() {
   testWidgets('shows every toggle with its loaded value', (tester) async {
     final repository = FakeNotificationSettingsRepository()
       ..settingsToReturn = const NotificationSettingsModel(
-        newVlogAlerts: true,
+        tripStartAlerts: true,
         routeCompleteAlerts: false,
         marketingAlerts: true,
         nightSilent: false,
@@ -51,12 +51,12 @@ void main() {
     await tester.pumpWidget(_wrap(NotificationSettingsProvider(repository: repository)));
     await tester.pumpAndSettle();
 
-    final newVlogSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('newVlogAlertsSwitch')));
+    final tripStartSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('tripStartAlertsSwitch')));
     final routeCompleteSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('routeCompleteAlertsSwitch')));
     final marketingSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('marketingAlertsSwitch')));
     final nightSilentSwitch = tester.widget<SwitchListTile>(find.byKey(const Key('nightSilentSwitch')));
 
-    expect(newVlogSwitch.value, isTrue);
+    expect(tripStartSwitch.value, isTrue);
     expect(routeCompleteSwitch.value, isFalse);
     expect(marketingSwitch.value, isTrue);
     expect(nightSilentSwitch.value, isFalse);
@@ -73,7 +73,7 @@ void main() {
     await tester.tap(find.byKey(const Key('allAlertsSwitch')));
     await tester.pumpAndSettle();
 
-    expect(repository.lastUpdate?.newVlogAlerts, isTrue);
+    expect(repository.lastUpdate?.tripStartAlerts, isTrue);
     expect(repository.lastUpdate?.routeCompleteAlerts, isTrue);
     expect(repository.lastUpdate?.marketingAlerts, isTrue);
     expect(repository.lastUpdate?.nightSilent, isFalse);

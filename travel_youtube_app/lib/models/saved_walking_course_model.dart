@@ -23,6 +23,10 @@ class SavedWalkingCourseModel {
 
   bool get isRoundTrip => routeType == 'roundTrip';
 
+  /// A bookmark-folder route: from one place to another, no hotel -- so
+  /// neither the 왕복 nor the 호텔 → 호텔 label applies.
+  bool get isPlaceToPlace => routeType == 'placeToPlace';
+
   factory SavedWalkingCourseModel.fromJson(Map<String, dynamic> json) {
     return SavedWalkingCourseModel(
       savedCourseId: json['savedCourseId'] as String,

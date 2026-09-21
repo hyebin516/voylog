@@ -5,6 +5,7 @@ import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/bookmark_model.dart';
 import 'package:travel_youtube_app/models/location_result.dart';
 import 'package:travel_youtube_app/models/nearby_recommendation_model.dart';
+import 'package:travel_youtube_app/models/place_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/location_provider.dart';
 import 'package:travel_youtube_app/providers/recommendation_provider.dart';
@@ -26,6 +27,9 @@ const NearbyRecommendationModel _rec = NearbyRecommendationModel(
   longitude: 127.0,
   distanceMeters: 420,
   category: 'bakery',
+  address: '서울 성동구 왕십리로 83',
+  businessHours: {'mon': {'open': '09:00', 'close': '21:00'}},
+  tags: ['소금빵'],
   isOpen: true,
   isOpenEstimated: true,
   score: 0.87,
@@ -80,11 +84,13 @@ class FakeBookmarkRepository extends BookmarkRepository {
 
 class _RecordingNavigatorObserver extends NavigatorObserver {
   final List<String> pushedRoutes = [];
+  Object? lastPushedArguments;
 
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     final name = route.settings.name;
     if (name != null) pushedRoutes.add(name);
+    lastPushedArguments = route.settings.arguments;
   }
 }
 
@@ -193,6 +199,15 @@ void main() {
 
     expect(behaviorRepository.recordedActions, contains('view_detail'));
     expect(observer.pushedRoutes, contains(AppRoutes.placeDetail));
+
+    // The detail screen is opened with everything the recommendation already
+    // carries; it used to get a name and a pin only, so the address, category
+    // and hours sections came up empty for a place that has them.
+    final place = observer.lastPushedArguments as PlaceModel;
+    expect(place.address, '서울 성동구 왕십리로 83');
+    expect(place.category, 'bakery');
+    expect(place.businessHours!['mon'], {'open': '09:00', 'close': '21:00'});
+    expect(place.tags, ['소금빵']);
   });
 
   testWidgets('bookmarking a card records a bookmark behavior', (tester) async {

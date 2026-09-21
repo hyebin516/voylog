@@ -14,7 +14,7 @@ const _route = WalkingCourseRouteModel(
   totalDurationSec: 1897,
   routeData: [
     RoutePointModel(order: 0, type: 'hotel', hotelId: 'region-center', placeId: null, name: '제주', latitude: 33.5, longitude: 126.5),
-    RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'p1', name: '흑돼지집', latitude: 33.51, longitude: 126.51),
+    RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'p1', name: '흑돼지집', latitude: 33.51, longitude: 126.51, legDistanceM: 900, legDurationSec: 720),
   ],
 );
 
@@ -58,7 +58,13 @@ void main() {
       'name': '제주',
       'latitude': 33.5,
       'longitude': 126.5,
+      'legDistanceM': null,
+      'legDurationSec': null,
     });
+    // Each stop's travel time is saved with it -- it used to be dropped, so a
+    // saved course showed no time between stops.
+    expect((adapter.lastOptions?.data['routeData'] as List)[1], containsPair('legDurationSec', 720));
+    expect((adapter.lastOptions?.data['routeData'] as List)[1], containsPair('legDistanceM', 900));
     expect(saved.savedCourseId, 'sc1');
   });
 

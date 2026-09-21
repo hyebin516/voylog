@@ -4,7 +4,11 @@ import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/user_model.dart';
 import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
+import 'package:travel_youtube_app/services/push_registration_service.dart';
 import 'package:travel_youtube_app/utils/view_state.dart';
+
+import '../fakes/fake_device_token_repository.dart';
+import '../fakes/fake_push_messaging_service.dart';
 
 const UserModel _user = UserModel(userId: 'u1', email: 'a@b.com', nickname: 'Nagyeong', profileImage: null);
 
@@ -82,12 +86,25 @@ class FakeAuthRepository extends AuthRepository {
 
 void main() {
   late FakeAuthRepository repository;
+  late FakeDeviceTokenRepository deviceTokens;
+  late FakePushMessagingService messaging;
   late AuthProvider provider;
 
   setUp(() {
     repository = FakeAuthRepository();
-    provider = AuthProvider(repository: repository);
+    deviceTokens = FakeDeviceTokenRepository();
+    messaging = FakePushMessagingService();
+    provider = AuthProvider(
+      repository: repository,
+      pushRegistration: PushRegistrationService(
+        messaging: messaging,
+        repository: deviceTokens,
+        platform: 'android',
+      ),
+    );
   });
+
+  tearDown(() => messaging.refreshController.close());
 
   test('starts unauthenticated', () {
     expect(provider.isAuthenticated, isFalse);
@@ -273,6 +290,59 @@ void main() {
       expect(result, isFalse);
       expect(provider.isAuthenticated, isTrue);
       expect(provider.errorMessage, isNotNull);
+    });
+  });
+
+  group('push notification registration (FR-12)', () {
+    test('registers this device after a Kakao login', () async {
+      repository.loginResult = _user;
+
+      await provider.loginWithKakao('kakao-token');
+
+      expect(deviceTokens.registered, [(token: 'fcm-token', platform: 'android')]);
+    });
+
+    test('registers this device after an email login', () async {
+      repository.emailLoginResult = _user;
+
+      await provider.loginWithEmail('a@b.com', 'password123');
+
+      expect(deviceTokens.registered, hasLength(1));
+    });
+
+    test('registers this device when a stored session is restored', () async {
+      repository.sessionIsValid = true;
+      repository.profileToReturn = _user;
+
+      await provider.restoreSession();
+
+      expect(deviceTokens.registered, hasLength(1));
+    });
+
+    test('does not register anything when the login failed', () async {
+      repository.loginError = const ApiException(code: 'INVALID_CREDENTIALS', message: 'no');
+
+      await provider.loginWithKakao('kakao-token');
+
+      expect(deviceTokens.registered, isEmpty);
+    });
+
+    test('releases the device on logout, before the token is cleared', () async {
+      repository.loginResult = _user;
+      await provider.loginWithKakao('kakao-token');
+
+      await provider.logout();
+
+      expect(deviceTokens.unregistered, ['fcm-token']);
+    });
+
+    test('releases the device when the account is deleted', () async {
+      repository.loginResult = _user;
+      await provider.loginWithKakao('kakao-token');
+
+      await provider.deleteAccount();
+
+      expect(deviceTokens.unregistered, ['fcm-token']);
     });
   });
 }

@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../models/bookmark_model.dart';
 import '../providers/bookmark_folder_provider.dart';
-import '../providers/trip_provider.dart';
+import '../providers/walking_course_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/dashed_border_container.dart';
@@ -50,9 +50,24 @@ class _BookmarkFolderDetailScreenState
     );
   }
 
-  void _startRouteFromFolder() {
-    context.read<TripProvider>().setPendingFolderId(widget.folderId);
-    Navigator.pushNamed(context, AppRoutes.tripList);
+  /// Routes the folder's places right here -- no hotel, no trip, the way
+  /// a 뚜벅이 코스 is generated. Sending the user to the 여행 tab to pick a
+  /// trip, a day and two hotels first meant the button never actually made
+  /// a route; saving it to a trip stays available from the result screen.
+  Future<void> _startRouteFromFolder(String folderName) async {
+    final courseProvider = context.read<WalkingCourseProvider>();
+    await courseProvider.generateFromBookmarkFolder(
+      folderId: widget.folderId,
+      folderName: folderName,
+    );
+    if (!mounted) return;
+
+    if (courseProvider.state == ViewState.error) {
+      await showErrorDialog(context, courseProvider.errorMessage ?? '동선을 만들지 못했습니다.');
+      return;
+    }
+    if (!mounted) return;
+    Navigator.pushNamed(context, AppRoutes.walkingCourseResult);
   }
 
   @override
@@ -224,7 +239,10 @@ class _BookmarkFolderDetailScreenState
               child: PrimaryButton(
                 label: 'AI 동선 생성하기',
                 iconWidget: const SparkleGlyphIcon(size: 15, color: Colors.white),
-                onPressed: folderProvider.folderBookmarks.length >= 2 ? _startRouteFromFolder : null,
+                isLoading: context.watch<WalkingCourseProvider>().isLoading,
+                onPressed: folderProvider.folderBookmarks.length >= 2
+                    ? () => _startRouteFromFolder(folderName ?? '내 북마크')
+                    : null,
               ),
             ),
           ],

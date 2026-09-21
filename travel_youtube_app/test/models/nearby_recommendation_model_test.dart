@@ -10,6 +10,12 @@ void main() {
       'longitude': 127.057,
       'distanceMeters': 420,
       'category': 'bakery',
+      'address': '서울 성동구 왕십리로 83',
+      'businessHours': {
+        'mon': {'open': '09:00', 'close': '21:00'},
+      },
+      'businessHoursIsEstimated': true,
+      'tags': ['소금빵', '오션뷰'],
       'isOpen': true,
       'isOpenEstimated': true,
       'score': 0.87,
@@ -23,6 +29,12 @@ void main() {
     expect(rec.isOpenEstimated, isTrue);
     expect(rec.score, 0.87);
     expect(rec.matchedTags, ['소금빵', '오션뷰']);
+    // Everything the place detail screen needs travels with the card, so
+    // opening it from a recommendation doesn't fetch the place again.
+    expect(rec.address, '서울 성동구 왕십리로 83');
+    expect(rec.businessHours!['mon'], {'open': '09:00', 'close': '21:00'});
+    expect(rec.businessHoursIsEstimated, isTrue);
+    expect(rec.tags, ['소금빵', '오션뷰']);
   });
 
   test('category and isOpen may be null (unknown), matchedTags defaults to empty', () {
@@ -42,5 +54,9 @@ void main() {
     expect(rec.category, isNull);
     expect(rec.isOpen, isNull);
     expect(rec.matchedTags, isEmpty);
+    expect(rec.address, isNull);
+    expect(rec.businessHours, isNull);
+    expect(rec.businessHoursIsEstimated, isFalse);
+    expect(rec.tags, isEmpty);
   });
 }

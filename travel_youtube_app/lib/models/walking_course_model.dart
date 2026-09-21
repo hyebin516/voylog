@@ -21,6 +21,12 @@ class WalkingCourseRouteModel {
 
   bool get isRoundTrip => routeType == 'roundTrip';
 
+  /// A bookmark-folder route: from one place to another, no hotel.
+  bool get isPlaceToPlace => routeType == 'placeToPlace';
+
+  /// Some legs walked, some by bus.
+  bool get isMixedTransport => transportMode == 'mixed';
+
   factory WalkingCourseRouteModel.fromJson(Map<String, dynamic> json) {
     return WalkingCourseRouteModel(
       routeType: json['routeType'] as String,

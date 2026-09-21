@@ -6,6 +6,8 @@ import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/screens/forgot_password_screen.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 class FakeAuthRepository extends AuthRepository {
   ApiException? requestOtpError;
   String? lastEmail;
@@ -34,7 +36,7 @@ Widget _wrap(AuthProvider provider) {
 void main() {
   testWidgets('shows an inline error for an empty email', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.tap(find.text('인증코드 받기'));
     await tester.pump();
@@ -45,7 +47,7 @@ void main() {
 
   testWidgets('requesting a code navigates to the OTP route with the email', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('forgotPasswordEmailField')), 'a@b.com');
     await tester.tap(find.text('인증코드 받기'));
@@ -58,7 +60,7 @@ void main() {
   testWidgets('shows an error view when the email is not registered', (tester) async {
     final repository = FakeAuthRepository()
       ..requestOtpError = const ApiException(code: 'EMAIL_NOT_FOUND', message: 'boom');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('forgotPasswordEmailField')), 'nope@b.com');
     await tester.tap(find.text('인증코드 받기'));

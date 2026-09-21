@@ -10,6 +10,7 @@ import 'package:travel_youtube_app/providers/saved_walking_course_provider.dart'
 import 'package:travel_youtube_app/repositories/bookmark_repository.dart';
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/screens/saved_walking_course_detail_screen.dart';
+import 'package:travel_youtube_app/services/kakao_map_launcher.dart';
 
 import 'fakes/fake_map_widget.dart';
 
@@ -41,6 +42,53 @@ class FakeSavedWalkingCourseRepository extends SavedWalkingCourseRepository {
 class FakeBookmarkRepository extends BookmarkRepository {
   @override
   Future<List<BookmarkModel>> listBookmarks() async => [];
+}
+
+class FakeKakaoMapLauncher extends KakaoMapLauncher {
+  final List<Map<String, Object>> opened = [];
+
+  @override
+  Future<bool> open({
+    required String placeId,
+    required String name,
+    required double latitude,
+    required double longitude,
+  }) async {
+    opened.add({'placeId': placeId, 'name': name, 'latitude': latitude});
+    return true;
+  }
+}
+
+/// A saved bookmark-folder route: a bus leg, then a walk.
+final SavedWalkingCourseModel _folderCourse = SavedWalkingCourseModel(
+  savedCourseId: 'sc2',
+  region: 'ㄹ',
+  routeType: 'placeToPlace',
+  transportMode: 'mixed',
+  totalDistanceM: 4657,
+  totalDurationSec: 1736,
+  routeData: const [
+    RoutePointModel(order: 0, type: 'place', hotelId: null, placeId: 'a', name: '카페 산시', latitude: 36.7735, longitude: 126.9739),
+    RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'b', name: '파인데이즈', latitude: 36.7798, longitude: 127.004, legDistanceM: 4222, legDurationSec: 1289, legTransportMode: 'transit', legGuidance: '614번 · 점등이 → 온양온천역 입구'),
+    RoutePointModel(order: 2, type: 'place', hotelId: null, placeId: 'c', name: '허그스', latitude: 36.7774, longitude: 127.002, legDistanceM: 435, legDurationSec: 447, legTransportMode: 'walk'),
+  ],
+  createdAt: DateTime(2026, 9, 17),
+);
+
+Widget _wrapCourse(SavedWalkingCourseModel course, KakaoMapLauncher launcher) {
+  return MultiProvider(
+    providers: [
+      ChangeNotifierProvider(create: (_) => SavedWalkingCourseProvider(repository: FakeSavedWalkingCourseRepository())),
+      ChangeNotifierProvider(create: (_) => BookmarkProvider(repository: FakeBookmarkRepository())),
+    ],
+    child: MaterialApp(
+      home: SavedWalkingCourseDetailScreen(
+        course: course,
+        mapRepository: const FakeMapRepository(),
+        kakaoMapLauncher: launcher,
+      ),
+    ),
+  );
 }
 
 Widget _wrap(SavedWalkingCourseProvider provider) {
@@ -114,5 +162,21 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.deleteCalls, ['sc1']);
+  });
+
+  testWidgets("a stop's map button opens that place in Kakao Map", (tester) async {
+    final launcher = FakeKakaoMapLauncher();
+    await tester.pumpWidget(_wrapCourse(_folderCourse, launcher));
+    await tester.pumpAndSettle();
+
+    final mapButtons = find.byTooltip('카카오맵에서 보기');
+    expect(mapButtons, findsNWidgets(3));
+    await tester.ensureVisible(mapButtons.at(1));
+    await tester.tap(mapButtons.at(1));
+    await tester.pump();
+
+    expect(launcher.opened, [
+      {'placeId': 'b', 'name': '파인데이즈', 'latitude': 36.7798},
+    ]);
   });
 }

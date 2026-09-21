@@ -22,9 +22,21 @@ class RecommendationWizardProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds a region the fixed list doesn't offer. Unlike [toggleRegion] this
+  /// never removes: typing a region that's already picked should leave it
+  /// picked rather than silently undo it.
+  void addRegion(String region) {
+    if (_selectedRegions.add(region)) notifyListeners();
+  }
+
   void toggleTheme(String theme) {
     if (!_selectedThemes.remove(theme)) _selectedThemes.add(theme);
     notifyListeners();
+  }
+
+  /// See [addRegion] -- same rule for a theme typed in by hand.
+  void addTheme(String theme) {
+    if (_selectedThemes.add(theme)) notifyListeners();
   }
 
   void selectDuration(String duration) {

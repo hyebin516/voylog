@@ -26,10 +26,17 @@ class VideoAnalysisScreen extends StatefulWidget {
   /// inject `FakeVideoPlayerRepository()` instead.
   final VideoPlayerRepository videoPlayerRepository;
 
+  /// True when this is the 분석 tab's own content rather than a pushed
+  /// screen: there's nothing to go back to, so the header offers "새 영상
+  /// 분석" (which clears the result and brings the URL field back) in place
+  /// of the back button.
+  final bool isTabRoot;
+
   const VideoAnalysisScreen({
     super.key,
     this.mapRepository = const KakaoMapRepository(),
     this.videoPlayerRepository = const YoutubeIframePlayerRepository(),
+    this.isTabRoot = false,
   });
 
   @override
@@ -132,24 +139,26 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
                 ),
                 child: Row(
                   children: [
-                    GestureDetector(
-                      onTap: () => Navigator.of(context).maybePop(),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: AppColors.surfaceTint2,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(
-                          Icons.arrow_back_ios_new_rounded,
-                          size: 16,
-                          color: AppColors.textSecondary,
+                    if (!widget.isTabRoot) ...[
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).maybePop(),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: AppColors.surfaceTint2,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 16,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
+                      const SizedBox(width: 12),
+                    ],
                     const Text(
                       '동선 분석',
                       style: TextStyle(
@@ -158,6 +167,19 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
                         color: AppColors.ink,
                       ),
                     ),
+                    if (widget.isTabRoot) ...[
+                      const Spacer(),
+                      TextButton.icon(
+                        key: const Key('analyzeAnotherVideoButton'),
+                        onPressed: () => context.read<VideoProvider>().reset(),
+                        icon: const Icon(Icons.refresh_rounded, size: 16),
+                        label: const Text('새 영상 분석'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          textStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

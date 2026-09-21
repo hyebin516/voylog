@@ -17,17 +17,7 @@ class SavedWalkingCourseRepository {
         'transportMode': course.transportMode,
         'totalDistanceM': course.totalDistanceM,
         'totalDurationSec': course.totalDurationSec,
-        'routeData': course.routeData
-            .map((p) => {
-                  'order': p.order,
-                  'type': p.type,
-                  'hotelId': p.hotelId,
-                  'placeId': p.placeId,
-                  'name': p.name,
-                  'latitude': p.latitude,
-                  'longitude': p.longitude,
-                })
-            .toList(),
+        'routeData': course.routeData.map((p) => p.toJson()).toList(),
       });
       return SavedWalkingCourseModel.fromJson(response.data['data'] as Map<String, dynamic>);
     } on DioException catch (e) {

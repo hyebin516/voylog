@@ -16,6 +16,8 @@ import 'package:travel_youtube_app/screens/walking_course_region_screen.dart';
 import 'package:travel_youtube_app/widgets/primary_button.dart';
 import 'helpers/phone_viewport.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 const WalkingCourseModel _emptyResult = WalkingCourseModel(
   course: null,
   recommendations: [],
@@ -80,7 +82,7 @@ Widget _wrap(
     providers: [
       ChangeNotifierProvider.value(value: provider),
       ChangeNotifierProvider.value(
-        value: authProvider ?? AuthProvider(repository: FakeAuthRepository()),
+        value: authProvider ?? AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration()),
       ),
       ChangeNotifierProvider.value(
         value:
@@ -242,7 +244,7 @@ void main() {
     (tester) async {
     usePhoneViewport(tester);
       final repository = FakeWalkingCourseRepository();
-      final authProvider = AuthProvider(repository: FakeAuthRepository());
+      final authProvider = AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration());
       await authProvider.loginWithEmail('a@b.com', 'password123');
 
       await tester.pumpWidget(

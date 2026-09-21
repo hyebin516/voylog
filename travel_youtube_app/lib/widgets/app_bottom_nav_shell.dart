@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../providers/app_shell_provider.dart';
 import '../screens/analysis_tab_screen.dart';
 import '../screens/bookmark_folder_list_screen.dart';
 import '../screens/home_screen.dart';
@@ -14,15 +16,8 @@ import 'voylog_logo.dart';
 /// the app is still reached by pushing on top of this shell -- only these
 /// five live inside the [IndexedStack] so each tab keeps its own state
 /// when switching away and back.
-class AppBottomNavShell extends StatefulWidget {
+class AppBottomNavShell extends StatelessWidget {
   const AppBottomNavShell({super.key});
-
-  @override
-  State<AppBottomNavShell> createState() => _AppBottomNavShellState();
-}
-
-class _AppBottomNavShellState extends State<AppBottomNavShell> {
-  int _index = 0;
 
   static const _tabs = [
     _TabSpec(label: '홈', glyph: _Glyph.home),
@@ -42,12 +37,17 @@ class _AppBottomNavShellState extends State<AppBottomNavShell> {
 
   @override
   Widget build(BuildContext context) {
+    // The selected tab lives in a provider, not in this widget's state, so
+    // a screen inside a tab can move the user to another one (홈's analyze
+    // hands the result to 분석).
+    final shell = context.watch<AppShellProvider>();
+
     return Scaffold(
-      body: IndexedStack(index: _index, children: _pages),
+      body: IndexedStack(index: shell.tabIndex, children: _pages),
       bottomNavigationBar: _BottomBar(
-        currentIndex: _index,
+        currentIndex: shell.tabIndex,
         tabs: _tabs,
-        onTap: (i) => setState(() => _index = i),
+        onTap: shell.goToTab,
       ),
     );
   }

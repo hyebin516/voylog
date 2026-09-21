@@ -5,6 +5,7 @@ import '../core/constants/recommendation_options.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/recommendation_wizard_provider.dart';
 import '../routes/app_routes.dart';
+import '../widgets/custom_option_field.dart';
 import '../widgets/primary_button.dart';
 import '../widgets/responsive_center.dart';
 
@@ -37,7 +38,11 @@ class RecommendationThemeScreen extends StatelessWidget {
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
                 children: [
-                  for (final theme in RecommendationOptions.themes)
+                  // Same as the region step: a typed theme becomes a chip.
+                  for (final theme in [
+                    ...RecommendationOptions.themes,
+                    ...wizard.selectedThemes.where((t) => !RecommendationOptions.themes.contains(t)),
+                  ])
                     FilterChip(
                       key: Key('theme_$theme'),
                       label: Text(
@@ -53,6 +58,13 @@ class RecommendationThemeScreen extends StatelessWidget {
                       onSelected: (_) => wizard.toggleTheme(theme),
                     ),
                 ],
+              ),
+              const SizedBox(height: AppSpacing.md),
+              CustomOptionField(
+                key: const Key('customThemeField'),
+                hintText: '찾는 테마가 없다면 직접 입력 (예: 야경)',
+                icon: Icons.edit_outlined,
+                onSubmitted: wizard.addTheme,
               ),
               const SizedBox(height: AppSpacing.xl),
               PrimaryButton(

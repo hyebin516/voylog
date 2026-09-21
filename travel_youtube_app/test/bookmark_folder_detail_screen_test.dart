@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/bookmark_folder_model.dart';
 import 'package:travel_youtube_app/models/bookmark_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_folder_provider.dart';
-import 'package:travel_youtube_app/providers/trip_provider.dart';
+import 'package:travel_youtube_app/models/walking_course_model.dart';
+import 'package:travel_youtube_app/providers/walking_course_provider.dart';
 import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/screens/bookmark_folder_detail_screen.dart';
 
@@ -27,6 +28,22 @@ BookmarkModel _bookmark(String bookmarkId, String name) {
 class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
   List<BookmarkModel> bookmarksToReturn = [];
   final List<String> removeCalls = [];
+  String? routedFolderId;
+
+  @override
+  Future<WalkingCourseModel> createRoute(String folderId) async {
+    routedFolderId = folderId;
+    return const WalkingCourseModel(
+      course: WalkingCourseRouteModel(
+        routeType: 'roundTrip',
+        transportMode: 'walk',
+        totalDistanceM: 1200,
+        totalDurationSec: 900,
+        routeData: [],
+      ),
+      recommendations: [],
+    );
+  }
 
   @override
   Future<List<BookmarkModel>> listBookmarksInFolder(String folderId) async =>
@@ -47,17 +64,19 @@ class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
   Future<List<BookmarkFolderModel>> listFolders() async => [];
 }
 
-Widget _wrap(BookmarkFolderProvider provider, {TripProvider? tripProvider}) {
+Widget _wrap(
+  BookmarkFolderProvider provider, {
+  WalkingCourseProvider? courseProvider,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: provider),
-      ChangeNotifierProvider.value(value: tripProvider ?? TripProvider()),
+      ChangeNotifierProvider.value(value: courseProvider ?? WalkingCourseProvider()),
     ],
     child: MaterialApp(
       home: const BookmarkFolderDetailScreen(folderId: 'f1'),
-      routes: {'/trips': (_) => const Scaffold(body: Text('trip list'))},
       onGenerateRoute: (settings) => MaterialPageRoute(
-        builder: (_) => const Scaffold(body: Text('picker')),
+        builder: (_) => Scaffold(body: Text('route:${settings.name}')),
       ),
     ),
   );
@@ -116,7 +135,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.add_rounded));
     await tester.pumpAndSettle();
 
-    expect(find.text('picker'), findsOneWidget);
+    expect(find.text('route:/bookmark-folder-picker'), findsOneWidget);
   });
 
   testWidgets(
@@ -133,23 +152,25 @@ void main() {
       await tester.tap(find.text('AI 동선 생성하기'));
       await tester.pumpAndSettle();
       // Disabled -- tapping it does nothing (no navigation).
-      expect(find.text('trip list'), findsNothing);
+      expect(find.textContaining('route:'), findsNothing);
     },
   );
 
   testWidgets(
-    'tapping "AI 동선 생성하기" stashes the folder id on TripProvider and navigates to the trip list',
+    'tapping "AI 동선 생성하기" routes the folder itself and opens the result',
     (tester) async {
+      // It used to hand the user to the 여행 tab to pick a trip, a day and
+      // two hotels -- so the button never actually produced a route.
       final repository = FakeBookmarkFolderRepository()
         ..bookmarksToReturn = [
           _bookmark('b1', '해운대해수욕장'),
           _bookmark('b2', '스타벅스'),
         ];
-      final tripProvider = TripProvider();
+      final courseProvider = WalkingCourseProvider(folderRepository: repository);
       await tester.pumpWidget(
         _wrap(
           BookmarkFolderProvider(repository: repository),
-          tripProvider: tripProvider,
+          courseProvider: courseProvider,
         ),
       );
       await tester.pumpAndSettle();
@@ -159,8 +180,9 @@ void main() {
       await tester.tap(find.text('AI 동선 생성하기'));
       await tester.pumpAndSettle();
 
-      expect(tripProvider.takePendingFolderId(), 'f1');
-      expect(find.text('trip list'), findsOneWidget);
+      expect(repository.routedFolderId, 'f1');
+      expect(courseProvider.result?.course?.totalDistanceM, 1200);
+      expect(find.text('route:/walking-course/result'), findsOneWidget);
     },
   );
 }

@@ -4,6 +4,9 @@
     <!-- Required by geolocator for "내 주변 추천" (nearby recommendations) -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <!-- FR-12 push notifications. A runtime permission from Android 13 (API
+         33) on; firebase_messaging's requestPermission() asks for it. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:label="Voylog"
@@ -61,6 +64,16 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- KakaoMapLauncher: opening a place in the Kakao Map app, or in a
+             browser when the app isn't installed. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="kakaomap"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
         </intent>
     </queries>
 </manifest>

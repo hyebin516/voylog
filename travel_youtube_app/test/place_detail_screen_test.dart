@@ -8,9 +8,30 @@ import 'package:travel_youtube_app/providers/place_summary_provider.dart';
 import 'package:travel_youtube_app/repositories/behavior_repository.dart';
 import 'package:travel_youtube_app/repositories/place_summary_repository.dart';
 import 'package:travel_youtube_app/screens/place_detail_screen.dart';
+import 'package:travel_youtube_app/services/kakao_map_launcher.dart';
 import 'package:travel_youtube_app/services/place_share_service.dart';
 
 import 'fakes/fake_map_widget.dart';
+
+class FakeKakaoMapLauncher extends KakaoMapLauncher {
+  FakeKakaoMapLauncher({this.succeeds = true});
+
+  final bool succeeds;
+  String? lastPlaceId;
+  String? lastName;
+
+  @override
+  Future<bool> open({
+    required String placeId,
+    required String name,
+    required double latitude,
+    required double longitude,
+  }) async {
+    lastPlaceId = placeId;
+    lastName = name;
+    return succeeds;
+  }
+}
 
 class FakePlaceSummaryRepository extends PlaceSummaryRepository {
   PlaceSummaryModel? resultToReturn;
@@ -181,6 +202,55 @@ void main() {
     expect(behaviorRepository.recordedActions, contains('share'));
     expect(behaviorRepository.lastPlaceId, 'p1');
     expect(behaviorRepository.lastScreen, 'place_detail');
+  });
+
+  testWidgets('"카카오맵에서 보기" hands the place to Kakao Map and records a map view', (tester) async {
+    final launcher = FakeKakaoMapLauncher();
+    final behaviorRepository = FakeBehaviorRepository();
+
+    await tester.pumpWidget(
+      _wrap(
+        PlaceDetailScreen(
+          place: _geocodedPlace,
+          mapRepository: const FakeMapRepository(),
+          kakaoMapLauncher: launcher,
+          behaviorRepository: behaviorRepository,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('카카오맵에서 보기'));
+    await tester.pumpAndSettle();
+
+    expect(launcher.lastPlaceId, 'p1');
+    expect(launcher.lastName, '해운대해수욕장');
+    expect(behaviorRepository.recordedActions, contains('map_view'));
+  });
+
+  testWidgets('tells the user when Kakao Map could not be opened', (tester) async {
+    await tester.pumpWidget(
+      _wrap(
+        PlaceDetailScreen(
+          place: _geocodedPlace,
+          mapRepository: const FakeMapRepository(),
+          kakaoMapLauncher: FakeKakaoMapLauncher(succeeds: false),
+          behaviorRepository: FakeBehaviorRepository(),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('카카오맵에서 보기'));
+    await tester.pump();
+
+    expect(find.text('카카오맵을 열 수 없어요.'), findsOneWidget);
+  });
+
+  testWidgets('has no "카카오맵에서 보기" for a place without coordinates', (tester) async {
+    await tester.pumpWidget(
+      _wrap(PlaceDetailScreen(place: _ungeocodedPlace, mapRepository: const FakeMapRepository())),
+    );
+
+    expect(find.text('카카오맵에서 보기'), findsNothing);
   });
 
   testWidgets('hides "공유하기" when the place has no coordinates', (tester) async {

@@ -7,6 +7,8 @@ import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/routes/app_routes.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 const UserModel _emailUser = UserModel(
   userId: 'u1',
   email: 'a@b.com',
@@ -74,7 +76,7 @@ Widget _wrap(AuthProvider provider) {
 
 Future<AuthProvider> _loggedIn(WidgetTester tester, FakeAuthRepository repository, {UserModel? user}) async {
   repository.loginUser = user ?? _emailUser;
-  final authProvider = AuthProvider(repository: repository);
+  final authProvider = AuthProvider(repository: repository, pushRegistration: fakePushRegistration());
   await authProvider.loginWithKakao('token');
   await tester.pumpWidget(_wrap(authProvider));
   await tester.pumpAndSettle();

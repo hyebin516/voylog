@@ -72,6 +72,9 @@ const Duration _recueEvery = Duration(seconds: 2);
 
 const Duration _apiCallbackGrace = Duration(seconds: 3);
 
+// While the video is up, how often to check that it still is.
+const Duration _healthCheckEvery = Duration(seconds: 2);
+
 /// Drives the page until the requested video is actually cued, observed via
 /// DevTools on a real device to fail in two different ways:
 ///
@@ -83,6 +86,12 @@ const Duration _apiCallbackGrace = Duration(seconds: 3);
 ///
 /// Instead of trusting that a command landed, this keeps checking what the
 /// player reports (`getVideoUrl`) and re-sends whatever is missing.
+///
+/// It keeps checking after the video is up, too. The WebView can reload the
+/// player page later (seen on device: a fresh page with an empty player, 27s
+/// after the video had loaded), and a loader that stopped at the first
+/// success left that as a blank white box with no spinner and no error --
+/// and "영상에서 보기" then seeked a player that had no video in it.
 class _PlayerLoader {
   final YoutubePlayerController controller;
   final String videoId;
@@ -93,8 +102,13 @@ class _PlayerLoader {
   DateTime _lastScriptRetry = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime _lastCue = DateTime.fromMillisecondsSinceEpoch(0);
   DateTime? _apiLoadedSince;
+  DateTime _lastHealthCheck = DateTime.fromMillisecondsSinceEpoch(0);
   bool _checking = false;
   bool _disposed = false;
+
+  /// A seek asked for before the player could take it (still loading, or
+  /// reloaded and empty). Applied as soon as the player is there.
+  int? _pendingSeek;
 
   _PlayerLoader(this.controller, this.videoId);
 
@@ -114,6 +128,26 @@ class _PlayerLoader {
     start();
   }
 
+  /// Jumps to [seconds], loading the video there first if the player lost it.
+  void seekTo(int seconds) {
+    if (_disposed) return;
+    _pendingSeek = seconds;
+    unawaited(_tick());
+  }
+
+  /// The video was up and is gone again (the page reloaded): back to the
+  /// loading overlay, with a fresh clock so the "can't load" message isn't
+  /// shown the instant this happens.
+  void _lostVideo() {
+    if (status.value != _PlayerLoad.ready) return;
+    status.value = _PlayerLoad.loading;
+    _sinceStart
+      ..reset()
+      ..start();
+    _lastCue = DateTime.fromMillisecondsSinceEpoch(0);
+    _apiLoadedSince = null;
+  }
+
   void dispose() {
     _disposed = true;
     _timer?.cancel();
@@ -122,12 +156,20 @@ class _PlayerLoader {
 
   Future<void> _tick() async {
     if (_checking) return;
+    final now = DateTime.now();
+    // Once the video is up there is nothing to do but notice if it goes
+    // away again, which doesn't need the loading-time 500ms pace.
+    if (status.value == _PlayerLoad.ready &&
+        _pendingSeek == null &&
+        now.difference(_lastHealthCheck) < _healthCheckEvery) {
+      return;
+    }
+    _lastHealthCheck = now;
     _checking = true;
     try {
       final state = await _readState();
       // The screen may have closed while the check was in flight.
       if (_disposed) return;
-      final now = DateTime.now();
 
       if (state.startsWith('error:')) {
         // YouTube itself refused this video in an embed (the owner disabled
@@ -137,12 +179,35 @@ class _PlayerLoader {
         return;
       }
 
+      // Only an empty player or a missing API means the video is gone. A
+      // known video at -1 while it was up is just playback starting --
+      // treating that as lost would re-cue and stop what the user started.
+      if (state == 'ready' || state == 'api-loaded' || state == 'no-api') {
+        _lostVideo();
+      }
+      if (state == 'starting' && status.value == _PlayerLoad.ready) return;
+
       switch (state) {
         case 'cued':
           status.value = _PlayerLoad.ready;
-          _timer?.cancel();
+          final seek = _pendingSeek;
+          if (seek != null) {
+            _pendingSeek = null;
+            _runOnPlayer(controller, 'player.seekTo($seek, true);');
+          }
         case 'ready':
-          if (now.difference(_lastCue) >= _recueEvery) {
+        case 'starting':
+          final seek = _pendingSeek;
+          if (seek != null) {
+            // The player is there but empty: load the video straight at the
+            // requested moment instead of cueing it and seeking afterwards.
+            _pendingSeek = null;
+            _lastCue = now;
+            _runOnPlayer(
+              controller,
+              'player.loadVideoById(${jsonEncode({'videoId': videoId, 'startSeconds': seek})});',
+            );
+          } else if (now.difference(_lastCue) >= _recueEvery) {
             _lastCue = now;
             _runOnPlayer(
               controller,
@@ -192,12 +257,15 @@ class _PlayerLoader {
     window.__voylogErrorHooked = true;
   }
   if (window.__voylogError !== undefined) return 'error:' + window.__voylogError;
-  // getVideoUrl() is not proof: it echoes the requested id even when the
-  // iframe never loaded it (observed at state -1 behind a blank player).
-  // The player state is what reflects a video actually loaded.
+  // getVideoUrl() alone is not proof: it echoes the requested id even when
+  // the iframe never loaded it (observed at state -1 behind a blank player).
+  // The player state is what reflects a video actually loaded -- but -1 is
+  // also the brief "unstarted" step every play goes through, so a known
+  // video at -1 is reported separately ('starting') rather than as missing.
   var st = typeof player.getPlayerState === 'function' ? player.getPlayerState() : -1;
   var url = typeof player.getVideoUrl === 'function' ? (player.getVideoUrl() || '') : '';
-  return (st !== -1 && url.indexOf($id) >= 0) ? 'cued' : 'ready';
+  if (url.indexOf($id) < 0) return 'ready';
+  return st !== -1 ? 'cued' : 'starting';
 })()
 ''');
       return result.toString().replaceAll('"', '');
@@ -226,8 +294,14 @@ class _YoutubeIframeHandle extends VideoPlayerHandle {
   _YoutubeIframeHandle(this._controller, this._loader);
 
   @override
-  void seekTo(int seconds) =>
+  void seekTo(int seconds) {
+    final loader = _loader;
+    if (loader != null) {
+      loader.seekTo(seconds);
+    } else {
       _runOnPlayer(_controller, 'player.seekTo($seconds, true);');
+    }
+  }
 
   @override
   void dispose() {

@@ -6,6 +6,7 @@ import '../models/map_view_types.dart';
 import '../models/saved_walking_course_model.dart';
 import '../providers/saved_walking_course_provider.dart';
 import '../repositories/map_repository.dart';
+import '../services/kakao_map_launcher.dart';
 import '../widgets/error_view.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/route_summary_card.dart';
@@ -17,10 +18,14 @@ class SavedWalkingCourseDetailScreen extends StatefulWidget {
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
+  /// Opens a leg's directions in Kakao Map. Widget tests inject a fake.
+  final KakaoMapLauncher kakaoMapLauncher;
+
   const SavedWalkingCourseDetailScreen({
     super.key,
     required this.course,
     this.mapRepository = const KakaoMapRepository(),
+    this.kakaoMapLauncher = const KakaoMapLauncher(),
   });
 
   @override
@@ -232,10 +237,12 @@ class _SavedWalkingCourseDetailScreenState
                       ],
                       RouteSummaryCard(
                         isRoundTrip: course.isRoundTrip,
+                        showRouteTypeChip: !course.isPlaceToPlace,
                         transportMode: course.transportMode,
                         totalDurationSec: course.totalDurationSec,
                         totalDistanceM: course.totalDistanceM,
                         routeData: visibleRouteData,
+                        kakaoMapLauncher: widget.kakaoMapLauncher,
                         selectedPointId: _selectedMarkerId,
                         onPointTap: (markerId) =>
                             setState(() => _selectedMarkerId = markerId),

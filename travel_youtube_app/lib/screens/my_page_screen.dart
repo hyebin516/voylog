@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../models/user_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/bookmark_folder_provider.dart';
 import '../providers/trip_provider.dart';
@@ -121,6 +122,15 @@ class _MyPageScreenState extends State<MyPageScreen> {
     );
   }
 
+  /// A Kakao account only has an email if the user consented to sharing it,
+  /// so a logged-in Kakao user often has none -- showing the logged-out
+  /// "비회원으로 둘러보는 중" line for them said they weren't a member at all.
+  static String _accountSubtitle(UserModel? user) {
+    if (user == null) return '비회원으로 둘러보는 중';
+    if (user.email != null && user.email!.isNotEmpty) return user.email!;
+    return user.isKakaoAccount ? '카카오 계정으로 로그인' : '로그인 중';
+  }
+
   Future<void> _openEditNickname(String currentNickname) async {
     final controller = TextEditingController(text: currentNickname);
     final newNickname = await showDialog<String>(
@@ -229,7 +239,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                               ),
                               const SizedBox(height: 2),
                               Text(
-                                user?.email ?? '비회원으로 둘러보는 중',
+                                _accountSubtitle(user),
                                 style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
                                 overflow: TextOverflow.ellipsis,
                               ),

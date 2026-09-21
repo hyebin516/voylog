@@ -6,6 +6,8 @@ import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/screens/reset_password_screen.dart';
 
+import 'fakes/fake_push_registration.dart';
+
 class FakeAuthRepository extends AuthRepository {
   ApiException? resetError;
   String? lastEmail;
@@ -35,7 +37,7 @@ Widget _wrap(AuthProvider provider) {
 void main() {
   testWidgets('shows an inline error for a password shorter than 8 characters', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('resetPasswordField')), 'short');
     await tester.enterText(find.byKey(const Key('resetPasswordConfirmField')), 'short');
@@ -48,7 +50,7 @@ void main() {
 
   testWidgets('shows an inline error when the confirmation does not match', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('resetPasswordField')), 'new-password123');
     await tester.enterText(find.byKey(const Key('resetPasswordConfirmField')), 'different123');
@@ -61,7 +63,7 @@ void main() {
 
   testWidgets('resetting successfully shows a confirmation dialog then returns to login', (tester) async {
     final repository = FakeAuthRepository();
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('resetPasswordField')), 'new-password123');
     await tester.enterText(find.byKey(const Key('resetPasswordConfirmField')), 'new-password123');
@@ -80,7 +82,7 @@ void main() {
 
   testWidgets('shows an error view when the reset request fails', (tester) async {
     final repository = FakeAuthRepository()..resetError = const ApiException(code: 'OTP_NOT_VERIFIED', message: 'boom');
-    await tester.pumpWidget(_wrap(AuthProvider(repository: repository)));
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await tester.enterText(find.byKey(const Key('resetPasswordField')), 'new-password123');
     await tester.enterText(find.byKey(const Key('resetPasswordConfirmField')), 'new-password123');

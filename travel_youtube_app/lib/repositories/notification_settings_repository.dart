@@ -19,7 +19,7 @@ class NotificationSettingsRepository {
   Future<NotificationSettingsModel> updateSettings(NotificationSettingsModel settings) async {
     try {
       final response = await _dio.put('/notification-settings', data: {
-        'newVlogAlerts': settings.newVlogAlerts,
+        'tripStartAlerts': settings.tripStartAlerts,
         'routeCompleteAlerts': settings.routeCompleteAlerts,
         'marketingAlerts': settings.marketingAlerts,
         'nightSilent': settings.nightSilent,

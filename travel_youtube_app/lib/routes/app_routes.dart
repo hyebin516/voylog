@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../models/shared_route_model.dart';
 import '../models/place_model.dart';
 import '../models/saved_walking_course_model.dart';
 import '../screens/bookmark_folder_detail_screen.dart';
 import '../screens/bookmark_folder_list_screen.dart';
 import '../screens/bookmark_folder_picker_screen.dart';
 import '../screens/customer_service_screen.dart';
+import '../screens/support_inquiry_screen.dart';
 import '../screens/day_folder_select_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/hotel_search_screen.dart';
@@ -29,6 +31,7 @@ import '../screens/signup_otp_screen.dart';
 import '../screens/signup_screen.dart';
 import '../screens/splash_screen.dart';
 import '../screens/start_point_picker_screen.dart';
+import '../screens/shared_route_detail_screen.dart';
 import '../screens/taste_preference_screen.dart';
 import '../screens/trip_detail_screen.dart';
 import '../screens/trip_list_screen.dart';
@@ -63,6 +66,7 @@ class AppRoutes {
   static const String bookmarkFolderPicker = '/bookmark-folder-picker';
   static const String notificationSettings = '/notification-settings';
   static const String customerService = '/customer-service';
+  static const String supportInquiry = '/customer-service/inquiry';
   static const String signup = '/signup';
   static const String signupOtp = '/signup/otp';
   static const String forgotPassword = '/forgot-password';
@@ -76,6 +80,7 @@ class AppRoutes {
   static const String savedWalkingCourses = '/walking-courses/saved';
   static const String savedWalkingCourseDetail =
       '/walking-courses/saved-detail';
+  static const String sharedRouteDetail = '/routes/shared-detail';
   static const String similarTasteRecommendations =
       '/recommendations/similar-taste';
 
@@ -197,6 +202,11 @@ class AppRoutes {
           builder: (_) => const CustomerServiceScreen(),
           settings: settings,
         );
+      case AppRoutes.supportInquiry:
+        return MaterialPageRoute(
+          builder: (_) => const SupportInquiryScreen(),
+          settings: settings,
+        );
       case AppRoutes.signup:
         return MaterialPageRoute(
           builder: (_) => const SignupScreen(),
@@ -264,6 +274,12 @@ class AppRoutes {
         final course = settings.arguments as SavedWalkingCourseModel;
         return MaterialPageRoute(
           builder: (_) => SavedWalkingCourseDetailScreen(course: course),
+          settings: settings,
+        );
+      case AppRoutes.sharedRouteDetail:
+        final sharedRoute = settings.arguments as SharedRouteModel;
+        return MaterialPageRoute(
+          builder: (_) => SharedRouteDetailScreen(route: sharedRoute),
           settings: settings,
         );
       case AppRoutes.similarTasteRecommendations:

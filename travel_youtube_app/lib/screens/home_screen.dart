@@ -7,6 +7,7 @@ import '../models/place_model.dart';
 import '../models/saved_walking_course_model.dart';
 import '../models/shared_route_model.dart';
 import '../models/similar_taste_recommendation_model.dart';
+import '../providers/app_shell_provider.dart';
 import '../providers/recommendation_wizard_provider.dart';
 import '../providers/saved_walking_course_provider.dart';
 import '../providers/shared_route_provider.dart';
@@ -19,6 +20,7 @@ import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
 import '../widgets/auth_backdrop.dart';
 import '../widgets/bookmark_button.dart';
+import '../widgets/custom_option_field.dart';
 import '../widgets/dashed_border_container.dart';
 import '../widgets/error_view.dart';
 import '../widgets/nav_icons.dart';
@@ -33,7 +35,13 @@ const List<Color> _authorInitialColors = [
   Color(0xFFF3EEFB),
 ];
 
-const Map<String, String> _transportModeLabels = {'car': '차 이동', 'walk': '도보', 'transit': '대중교통'};
+const Map<String, String> _transportModeLabels = {
+  'car': '차 이동',
+  'walk': '도보',
+  'transit': '대중교통',
+  // A bookmark-folder route (FR-11): short legs walked, long ones by bus.
+  'mixed': '도보·버스',
+};
 
 String _formatSharedRouteMeta(SharedRouteModel route) {
   final transportLabel = _transportModeLabels[route.transportMode] ?? route.transportMode;
@@ -81,12 +89,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (!mounted) return;
     if (videoProvider.state == ViewState.success) {
-      Navigator.pushNamed(context, AppRoutes.videoAnalysis);
+      // The result belongs to the 분석 tab, not on top of 홈: the user
+      // asked for 홈 to stay free for the next video while the analysis
+      // they just ran keeps its own place to come back to.
+      _urlController.clear();
+      context.read<AppShellProvider>().goToTab(AppShellProvider.analysisTab);
     }
   }
 
   Future<void> _onHashtagTap(VideoProvider videoProvider, String tag) async {
-    await videoProvider.searchByHashtag(tag.replaceFirst('#', ''));
+    // A hand-typed tag may or may not carry the '#', and the search API
+    // wants the bare word either way.
+    final hashtag = tag.trim().replaceFirst(RegExp(r'^#+'), '').trim();
+    if (hashtag.isEmpty) return;
+
+    await videoProvider.searchByHashtag(hashtag);
     if (!mounted) return;
     Navigator.pushNamed(context, AppRoutes.recommendationResults);
   }
@@ -103,9 +120,10 @@ class _HomeScreenState extends State<HomeScreen> {
       timestampSec: null,
       latitude: rec.latitude,
       longitude: rec.longitude,
-      address: null,
+      address: rec.address,
       source: 'similar-taste',
       confidence: 1.0,
+      category: rec.category,
     );
     Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: place);
   }
@@ -333,6 +351,17 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                     ),
+                    // A chip-sized field in the chip row itself: a
+                    // full-width one under the chips was too long.
+                    CustomOptionField(
+                      key: const Key('customHashtagField'),
+                      hintText: '직접 입력',
+                      icon: Icons.tag_rounded,
+                      submitLabel: '검색',
+                      submitIcon: Icons.search_rounded,
+                      compactWidth: 140,
+                      onSubmitted: (tag) => _onHashtagTap(videoProvider, tag),
+                    ),
                   ],
                 ),
                 if (similarTaste.result?.hasPreference == true && (similarTaste.result?.recommendations.isNotEmpty ?? false)) ...[
@@ -385,6 +414,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                       child: _SharedRouteCard(
                         route: route,
+                        onTap: () => Navigator.pushNamed(context, AppRoutes.sharedRouteDetail, arguments: route),
                         onLikeTap: () => context.read<SharedRouteProvider>().toggleLike(route.sharedRouteId),
                         onEditTap: () => _editSharedRouteTitle(route),
                         onDeleteTap: () => _unpublishSharedRoute(route),
@@ -510,12 +540,14 @@ class _SimilarTastePlaceCard extends StatelessWidget {
 class _SharedRouteCard extends StatelessWidget {
   const _SharedRouteCard({
     required this.route,
+    required this.onTap,
     required this.onLikeTap,
     required this.onEditTap,
     required this.onDeleteTap,
   });
 
   final SharedRouteModel route;
+  final VoidCallback onTap;
   final VoidCallback onLikeTap;
   final VoidCallback onEditTap;
   final VoidCallback onDeleteTap;
@@ -527,6 +559,7 @@ class _SharedRouteCard extends StatelessWidget {
     final authorColor = _authorInitialColors[authorName.hashCode.abs() % _authorInitialColors.length];
 
     return AppCard(
+      onTap: onTap,
       padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

@@ -25,7 +25,10 @@ class FakeMapWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    // Scrollable so a route with several markers still fits whatever fixed
+    // height the screen gives its map -- the real map has no such limit.
+    return SingleChildScrollView(
+      child: Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text('fake-map center=$initialLatitude,$initialLongitude'),
@@ -48,6 +51,7 @@ class FakeMapWidget extends StatelessWidget {
             child: const Text('simulate-drag'),
           ),
       ],
+      ),
     );
   }
 }
