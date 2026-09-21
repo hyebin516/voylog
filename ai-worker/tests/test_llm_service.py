@@ -200,3 +200,64 @@ def test_extract_screen_text_keeps_other_batches_when_one_fails(monkeypatch):
     monkeypatch.setattr(llm_service, "_call_openai_vision", flaky_vision)
 
     assert llm_service.extract_screen_text([b"f"] * 4, "openai") == "성심당"
+
+
+class _RateLimitError(Exception):
+    pass
+
+
+def test_a_rate_limited_call_waits_the_time_the_provider_asks_and_tries_again(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_service.time, "sleep", sleeps.append)
+    attempts = {"n": 0}
+
+    def call_fn(prompt):
+        attempts["n"] += 1
+        if attempts["n"] <= 3:
+            raise _RateLimitError("Error code: 429 - Rate limit reached ... Please try again in 1.5s.")
+        return SUCCESS_RESULT
+
+    assert llm_service._call_with_retry(call_fn, "prompt", "openai") is SUCCESS_RESULT
+    assert sleeps == [1.5, 1.5, 1.5]
+
+
+def test_rate_limit_waits_are_clamped_and_bounded_by_a_total_budget(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_service.time, "sleep", sleeps.append)
+
+    def call_fn(prompt):
+        raise _RateLimitError("429 rate_limit_exceeded, try again in 132ms")
+
+    with pytest.raises(AiProviderError):
+        llm_service._call_with_retry(call_fn, "prompt", "openai")
+
+    assert all(wait == llm_service._RATE_LIMIT_MIN_WAIT_SECONDS for wait in sleeps)
+    assert sum(sleeps) <= llm_service._RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS
+
+
+def test_a_non_rate_limit_failure_still_gets_only_one_retry(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(llm_service.time, "sleep", sleeps.append)
+    attempts = {"n": 0}
+
+    def call_fn(prompt):
+        attempts["n"] += 1
+        raise RuntimeError("invalid json")
+
+    with pytest.raises(AiProviderError):
+        llm_service._call_with_retry(call_fn, "prompt", "openai")
+
+    assert attempts["n"] == 2
+    assert sleeps == []
+
+
+def test_thorough_extraction_uses_the_stronger_openai_model(monkeypatch):
+    models = []
+    monkeypatch.setattr(
+        llm_service, "_call_openai", lambda prompt, model=llm_service._OPENAI_EXTRACTION_MODEL: (models.append(model), SUCCESS_RESULT)[1]
+    )
+
+    llm_service.extract_places("prompt", "openai")
+    llm_service.extract_places("prompt", "openai", thorough=True)
+
+    assert models == [llm_service._OPENAI_EXTRACTION_MODEL, llm_service._OPENAI_THOROUGH_EXTRACTION_MODEL]

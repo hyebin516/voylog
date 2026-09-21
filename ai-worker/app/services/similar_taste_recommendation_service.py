@@ -34,6 +34,7 @@ def score_similar_taste(request: SimilarTasteRequest) -> SimilarTasteResponse:
             name=entry["place"].name,
             latitude=entry["place"].latitude,
             longitude=entry["place"].longitude,
+            address=entry["place"].address,
             category=entry["place"].category,
             score=round(entry["score"], 3),
             contributorCount=entry["contributorCount"],

@@ -343,3 +343,111 @@ def test_kakao_travel_time_rejects_a_non_ok_transit_response_instead_of_treating
 
     with pytest.raises(Exception):
         asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "transit"))
+
+
+# --- optimize_place_route (bookmark-folder routes, FR-11) -----------------
+# Walking uses the Haversine fallback at 1.1 m/s: ~0.5 km apart is a 7-8
+# minute walk (walked), ~5 km apart is a 75 minute walk (bus instead).
+NEAR_A = PlaceInput(placeId="near-a", name="Near A", latitude=36.7800, longitude=127.0000)
+NEAR_B = PlaceInput(placeId="near-b", name="Near B", latitude=36.7845, longitude=127.0000)
+FAR = PlaceInput(placeId="far", name="Far", latitude=36.8250, longitude=127.0000)
+
+
+@pytest.fixture
+def buses(monkeypatch):
+    """A 20-minute bus for any pair, recording which pairs were looked up."""
+    looked_up = []
+
+    async def fake_bus_leg(client, origin, dest):
+        looked_up.append((origin["latitude"], dest["latitude"]))
+        return 5100.0, 1200.0, "600번 · 온양온천역 → 신정호"
+
+    monkeypatch.setattr(svc, "_bus_leg", fake_bus_leg)
+    return looked_up
+
+
+def _place_route(places):
+    from app.schemas.request_schema import PlaceRouteRequest
+
+    return asyncio.run(svc.optimize_place_route(PlaceRouteRequest(places=places)))
+
+
+def test_place_route_walks_short_legs_and_takes_the_bus_for_long_ones(buses):
+    result = _place_route([NEAR_A, FAR, NEAR_B])
+
+    far_leg = next(p for p in result.optimizedRoute if p.name == "Far")
+    if far_leg.order == 0:
+        far_leg = result.optimizedRoute[1]
+    assert far_leg.legTransportMode == "transit"
+    assert far_leg.legDurationSec == 1200
+    assert far_leg.legGuidance == "600번 · 온양온천역 → 신정호"
+    walked = [p for p in result.optimizedRoute[1:] if p.legTransportMode == "walk"]
+    assert walked and all(p.legGuidance is None for p in walked)
+    assert result.transportMode == "mixed"
+
+
+def test_place_route_only_looks_up_buses_for_legs_too_long_to_walk(buses):
+    _place_route([NEAR_A, NEAR_B])
+
+    assert buses == []
+
+
+def test_place_route_is_an_open_path_between_the_places_only(buses):
+    result = _place_route([NEAR_A, FAR, NEAR_B])
+
+    assert result.routeType == "placeToPlace"
+    assert [p.type for p in result.optimizedRoute] == ["place", "place", "place"]
+    assert result.optimizedRoute[0].legDurationSec is None
+    assert result.optimizedRoute[0].legTransportMode is None
+    # The far place is at an end: visiting it in the middle would mean
+    # riding out and back again.
+    assert result.optimizedRoute[1].name != "Far"
+    # The total is exactly the legs shown -- no hidden trip to a centre point.
+    assert result.totalDurationSec == sum(p.legDurationSec for p in result.optimizedRoute[1:])
+
+
+def test_place_route_walks_a_long_leg_when_there_is_no_bus(monkeypatch):
+    async def no_bus(client, origin, dest):
+        return None
+
+    monkeypatch.setattr(svc, "_bus_leg", no_bus)
+
+    result = _place_route([NEAR_A, FAR])
+
+    # Never an invented bus: without a real route the leg stays on foot.
+    assert result.optimizedRoute[1].legTransportMode == "walk"
+    assert result.transportMode == "walk"
+
+
+def test_place_route_that_is_all_walkable_is_a_walking_route(buses):
+    result = _place_route([NEAR_A, NEAR_B])
+
+    assert result.transportMode == "walk"
+    assert result.optimizedRoute[1].legTransportMode == "walk"
+
+
+def test_leg_choice_takes_the_bus_only_when_walking_is_long_and_the_bus_is_quicker():
+    bus = (3500.0, 1200.0, "600번")
+    assert svc._leg_choice((3000.0, 2000.0), bus) == (3500.0, 1200.0, "transit", "600번")
+    assert svc._leg_choice((3000.0, 1100.0), (3500.0, 1500.0, "600번")) == (3000.0, 1100.0, "walk", None)
+    assert svc._leg_choice((500.0, 400.0), bus) == (500.0, 400.0, "walk", None)
+    assert svc._leg_choice((3000.0, 2000.0), None) == (3000.0, 2000.0, "walk", None)
+
+
+def test_transit_guidance_names_the_buses_and_the_stops():
+    route = {
+        "steps": [
+            {"properties": {"type": "WALK"}},
+            {"properties": {"type": "BUS", "vehicles": [{"name": "600"}, {"name": "610"}],
+                            "stops": [{"name": "온양온천역 신한은행"}, {"name": "백련암"}]}},
+            {"properties": {"type": "BUS", "vehicles": [{"name": "12"}],
+                            "stops": [{"name": "백련암"}, {"name": "신정호관광지 건너"}]}},
+        ]
+    }
+
+    assert svc._transit_guidance(route) == "600번 → 12번 · 온양온천역 신한은행 → 신정호관광지 건너"
+
+
+def test_bus_leg_is_none_without_an_api_key():
+    # The autouse fixture removes the key: no straight-line "bus" is invented.
+    assert asyncio.run(svc._bus_leg(None, {"latitude": 1, "longitude": 1}, {"latitude": 2, "longitude": 2})) is None

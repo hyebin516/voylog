@@ -24,6 +24,26 @@ MOOD_SEARCH_KEYWORDS: Dict[str, List[str]] = {
     "로컬스러운": ["노포", "로컬 맛집", "동네 카페"],
 }
 
+# Kakao category groups that are never a stop on a walk. Keyword searches
+# return whatever matches the words, so "시장" also brought back the market's
+# parking lot ("제주동문시장 주차장") as a course stop.
+NON_DESTINATION_GROUP_CODES = {
+    "PK6",  # 주차장
+    "OL7",  # 주유소·충전소
+    "SW8",  # 지하철역
+    "BK9",  # 은행
+    "CS2",  # 편의점
+    "MT1",  # 대형마트
+    "PS3",  # 어린이집·유치원
+    "SC4",  # 학교
+    "AC5",  # 학원
+    "AG2",  # 중개업소
+    "PO3",  # 공공기관
+    "HP8",  # 병원
+    "PM9",  # 약국
+    "AD5",  # 숙박
+}
+
 # Kakao's fixed category-group codes, mapped to the same free-text category
 # strings this app already uses for LLM-extracted places (see
 # recommendation_scoring_policy.py's _TIME_OF_DAY_CATEGORY_HINTS) so these
@@ -61,6 +81,8 @@ async def _search_category(client: httpx.AsyncClient, code: str, category: str, 
 
     candidates = []
     for doc in data.get("documents", []):
+        if doc.get("category_group_code") in NON_DESTINATION_GROUP_CODES:
+            continue
         candidates.append(
             NearbyPlaceCandidate(
                 placeId=f"kakao:{doc['id']}",
@@ -98,6 +120,8 @@ async def _search_keyword(
 
     candidates = []
     for doc in data.get("documents", []):
+        if doc.get("category_group_code") in NON_DESTINATION_GROUP_CODES:
+            continue
         candidates.append(
             NearbyPlaceCandidate(
                 placeId=f"kakao:{doc['id']}",

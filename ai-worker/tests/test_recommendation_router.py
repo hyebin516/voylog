@@ -13,8 +13,8 @@ def test_nearby_score_returns_sorted_recommendations():
         "radiusMeters": 2000,
         "limit": 20,
         "candidates": [
-            {"placeId": "p1", "name": "Place 1", "latitude": 37.5005, "longitude": 127.0},
-            {"placeId": "p2", "name": "Place 2", "latitude": 37.501, "longitude": 127.0},
+            {"placeId": "p1", "name": "북촌서점", "latitude": 37.5005, "longitude": 127.0},
+            {"placeId": "p2", "name": "연남공방", "latitude": 37.501, "longitude": 127.0},
         ],
     }
 

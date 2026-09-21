@@ -82,3 +82,31 @@ def test_a_failing_category_call_does_not_fail_the_others(monkeypatch):
     result = asyncio.run(kakao_places_service.search_nearby_by_category(37.5, 127.0, 1500))
 
     assert [c.placeId for c in result] == ["kakao:1"]
+
+
+class FakeKeywordClient:
+    def __init__(self, documents):
+        self._documents = documents
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def get(self, url, headers=None, params=None):
+        return FakeResponse({"documents": self._documents})
+
+
+def test_mood_search_skips_parking_lots_and_other_non_destinations(monkeypatch):
+    monkeypatch.setattr(kakao_places_service, "KAKAO_REST_API_KEY", "fake-key")
+    documents = [
+        {**_doc("1", "제주동문시장", "126.52", "33.51"), "category_group_code": ""},
+        {**_doc("2", "제주동문시장 주차장", "126.52", "33.51"), "category_group_code": "PK6"},
+        {**_doc("3", "동문시장 편의점", "126.52", "33.51"), "category_group_code": "CS2"},
+    ]
+    monkeypatch.setattr(kakao_places_service.httpx, "AsyncClient", lambda **kwargs: FakeKeywordClient(documents))
+
+    result = asyncio.run(kakao_places_service.search_nearby_by_mood(33.51, 126.52, 1000, "활기찬"))
+
+    assert {c.name for c in result} == {"제주동문시장"}

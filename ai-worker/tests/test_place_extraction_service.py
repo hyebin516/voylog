@@ -246,7 +246,7 @@ def test_extract_places_runs_on_screen_text_fallback_even_when_metadata_already_
     same metadata plus screen text, replaces the metadata-only pass)."""
     calls = {"n": 0}
 
-    def fake_extract_places(prompt, provider):
+    def fake_extract_places(prompt, provider, thorough=False):
         calls["n"] += 1
         if calls["n"] == 1:
             return LlmPlaceExtractionResult(
@@ -283,7 +283,7 @@ def test_extract_places_runs_on_screen_text_fallback_even_when_metadata_already_
 def test_extract_places_runs_on_screen_text_fallback_when_transcript_is_missing_and_metadata_found_nothing(monkeypatch):
     calls = {"n": 0}
 
-    def fake_extract_places(prompt, provider):
+    def fake_extract_places(prompt, provider, thorough=False):
         calls["n"] += 1
         if calls["n"] == 1:
             return LlmPlaceExtractionResult(places=[])
@@ -322,7 +322,7 @@ def test_extract_places_runs_on_screen_text_fallback_when_transcript_is_missing_
 def test_extract_places_does_not_retry_when_the_on_screen_text_fallback_finds_no_readable_text(monkeypatch):
     calls = {"n": 0}
 
-    def fake_extract_places(prompt, provider):
+    def fake_extract_places(prompt, provider, thorough=False):
         calls["n"] += 1
         return LlmPlaceExtractionResult(places=[])
 
@@ -367,7 +367,7 @@ def test_extract_places_sanitizes_a_hallucinated_on_screen_text_source_when_the_
 def test_extract_places_forwards_the_requested_llm_provider(monkeypatch):
     seen = {}
 
-    def fake_extract(prompt, provider):
+    def fake_extract(prompt, provider, thorough=False):
         seen["provider"] = provider
         return LlmPlaceExtractionResult(places=[])
 
@@ -504,7 +504,7 @@ def test_extract_places_runs_the_screen_text_pass_when_the_caller_forces_it(monk
     video that already has a transcript."""
     calls = {"count": 0}
 
-    def fake_extract(prompt, provider):
+    def fake_extract(prompt, provider, thorough=False):
         calls["count"] += 1
         if calls["count"] == 1:
             return LlmPlaceExtractionResult(
@@ -558,3 +558,128 @@ def test_extract_places_does_not_run_the_screen_text_pass_by_default(monkeypatch
     result = asyncio.run(place_extraction_service.extract_places(make_request()))
 
     assert len(result.places) == 1
+
+
+# --- auto-generated captions: cross-checking heard names ---------------
+
+
+def _heard(name, alternatives, source="transcript"):
+    return PlaceCandidate(name=name, source=source, confidence=0.8, alternativeNames=alternatives)
+
+
+def test_resolve_location_tries_the_written_spelling_when_the_heard_name_is_not_on_the_map(monkeypatch):
+    queries = []
+
+    async def fake_search(query, size):
+        queries.append(query)
+        if "소베" in query:
+            return [{"name": "소베", "address": "대구 중구 중앙대로79길 6", "latitude": 35.86, "longitude": 128.59}]
+        return []
+
+    monkeypatch.setattr(place_extraction_service, "search_places", fake_search)
+    monkeypatch.setattr(
+        place_extraction_service.llm_service, "match_place", lambda prompt, provider: PlaceMatchResult(index=0)
+    )
+
+    result = asyncio.run(place_extraction_service._resolve_location(_heard("소배", ["소베"]), "대구", "auto"))
+
+    assert queries == ["대구 소배", "소배", "대구 소베"]
+    assert result["name"] == "소베"
+    assert result["address"] == "대구 중구 중앙대로79길 6"
+
+
+def test_resolve_location_keeps_the_heard_name_when_it_is_found_first(monkeypatch):
+    async def fake_search(query, size):
+        return [{"name": "따끈따끈베이커리", "address": "대구 중구 중앙대로 395", "latitude": 35.86, "longitude": 128.59}]
+
+    monkeypatch.setattr(place_extraction_service, "search_places", fake_search)
+    monkeypatch.setattr(
+        place_extraction_service.llm_service, "match_place", lambda prompt, provider: PlaceMatchResult(index=0)
+    )
+
+    result = asyncio.run(
+        place_extraction_service._resolve_location(_heard("따끈따끈베이커리", ["따끈따끈 베이커리"]), "대구", "auto")
+    )
+
+    assert result["name"] == "따끈따끈베이커리"
+
+
+def test_an_unmatched_heard_name_gives_way_to_the_written_spelling_only_for_auto_captions():
+    heard = _heard("바카", ["vaca"])
+
+    assert place_extraction_service._display_name(heard, None, transcript_auto_generated=True) == "vaca"
+    assert place_extraction_service._display_name(heard, None, transcript_auto_generated=False) == "바카"
+    assert place_extraction_service._display_name(_heard("히오리", []), None, True) == "히오리"
+    assert place_extraction_service._display_name(heard, {"name": "바카"}, True) == "바카"
+
+
+def test_extract_places_names_each_place_by_the_spelling_that_matched(monkeypatch):
+    candidates = LlmPlaceExtractionResult(region="대구", places=[_heard("소배", ["소베"])])
+    monkeypatch.setattr(place_extraction_service.llm_service, "extract_places", lambda prompt, provider: candidates)
+
+    async def fake_geocode(candidate, region, provider):
+        return {"name": "소베", "latitude": 35.86, "longitude": 128.59, "address": "대구 중구"}
+
+    monkeypatch.setattr(place_extraction_service, "_resolve_location", fake_geocode)
+
+    result = asyncio.run(place_extraction_service.extract_places(make_request(transcriptAutoGenerated=True)))
+
+    assert [p.name for p in result.places] == ["소베"]
+
+
+def test_extraction_prompt_marks_an_auto_generated_transcript():
+    from app.prompts.place_extraction_prompt import build_user_prompt
+
+    auto = build_user_prompt("t", "d", [], [{"text": "소배 가요", "timestampSec": 3}], transcript_auto_generated=True)
+    manual = build_user_prompt("t", "d", [], [{"text": "소베 가요", "timestampSec": 3}])
+
+    assert "auto-generated speech recognition" in auto
+    assert "auto-generated" not in manual
+
+
+def test_extract_places_tries_a_sound_alike_from_the_title_for_auto_captions(monkeypatch):
+    # The model didn't list the title's "소베" itself.
+    candidates = LlmPlaceExtractionResult(region="대구", places=[_heard("소배", [])])
+    monkeypatch.setattr(place_extraction_service.llm_service, "extract_places", lambda prompt, provider: candidates)
+    tried = []
+
+    async def fake_resolve_name(name, candidate, region, provider):
+        tried.append(name)
+        return {"name": name, "latitude": 35.86, "longitude": 128.59, "address": "대구 중구"} if name == "소베" else None
+
+    monkeypatch.setattr(place_extraction_service, "_resolve_name", fake_resolve_name)
+    request = make_request(
+        video=VideoMeta(videoId="v1", youtubeUrl="https://youtu.be/x", title="대구 당일치기 소베,히오리", hashtags=[]),
+        transcriptAutoGenerated=True,
+    )
+
+    result = asyncio.run(place_extraction_service.extract_places(request))
+
+    assert tried == ["소배", "소베"]
+    assert result.places[0].name == "소베"
+    assert result.places[0].address == "대구 중구"
+
+
+def test_sound_alikes_are_not_added_for_creator_provided_captions(monkeypatch):
+    candidates = LlmPlaceExtractionResult(region="대구", places=[_heard("소배", [])])
+    monkeypatch.setattr(place_extraction_service.llm_service, "extract_places", lambda prompt, provider: candidates)
+    tried = []
+
+    async def fake_resolve_name(name, candidate, region, provider):
+        tried.append(name)
+        return None
+
+    monkeypatch.setattr(place_extraction_service, "_resolve_name", fake_resolve_name)
+    request = make_request(video=VideoMeta(videoId="v1", youtubeUrl="https://youtu.be/x", title="소베", hashtags=[]))
+
+    asyncio.run(place_extraction_service.extract_places(request))
+
+    assert tried == ["소배"]
+
+
+def test_bare_tag_codes_from_the_llm_are_kept_instead_of_failing_the_extraction():
+    result = LlmPlaceExtractionResult(
+        places=[{"name": "소베", "source": "transcript", "confidence": 0.9, "tags": ["베이커리 카페", {"code": "소금빵", "confidence": 0.8}]}]
+    )
+
+    assert [(t.code, t.confidence) for t in result.places[0].tags] == [("베이커리 카페", 0.6), ("소금빵", 0.8)]

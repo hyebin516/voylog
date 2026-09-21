@@ -17,6 +17,14 @@ Rules:
   unmistakably.
 - If the extracted name looks like misheard speech, a generic word, or a
   fragment rather than a real business/landmark name, return null.
+- The candidate's own name must be the same business name, allowing only
+  a branch or location suffix ("몬도카츠" = "몬도카츠 범어점") or the same
+  name in another script ("vaca" = "바카"). A different business whose
+  name merely contains or resembles the extracted one is a different
+  place: "vaca" is NOT "보카바카 현대백화점 대구점", "소베" is NOT
+  "소베이커리". Also reject a candidate whose kind clearly contradicts the
+  extracted category (a clothing store for a place extracted as a 소품샵
+  is only acceptable when the names match exactly).
 - If no candidate is clearly the right place, return null. Returning null
   is much better than guessing: a wrong pick puts a wrong pin on the
   user's map.

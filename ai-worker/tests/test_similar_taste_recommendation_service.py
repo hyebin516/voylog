@@ -86,3 +86,20 @@ def test_respects_the_limit():
     result = svc.score_similar_taste(request)
 
     assert len(result.recommendations) == 2
+
+
+def test_a_similar_taste_recommendation_carries_the_place_address():
+    from app.schemas.request_schema import SimilarTastePlaceCandidate, SimilarTasteRequest, SimilarTasteUserInput
+    from app.services import similar_taste_recommendation_service as svc
+
+    place = SimilarTastePlaceCandidate(
+        placeId="p1", name="소베", latitude=37.5, longitude=127.0, address="대구 중구 중앙대로79길 6"
+    )
+    request = SimilarTasteRequest(
+        userEmbedding=[1.0, 0.0],
+        otherUsers=[SimilarTasteUserInput(userId="u2", embedding=[1.0, 0.0], bookmarkedPlaces=[place])],
+    )
+
+    result = svc.score_similar_taste(request)
+
+    assert result.recommendations[0].address == "대구 중구 중앙대로79길 6"

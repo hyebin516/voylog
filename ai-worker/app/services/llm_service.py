@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 import time
 
 from anthropic import Anthropic
@@ -22,12 +23,21 @@ def _parse_json(raw_text: str) -> LlmPlaceExtractionResult:
     return LlmPlaceExtractionResult(**data)
 
 
-def _call_openai(user_prompt: str) -> LlmPlaceExtractionResult:
+# Place extraction model, for both the first pass (while the user waits)
+# and the background on-screen-text pass. gpt-4.1-mini found places
+# gpt-4o-mini missed in 3 of 3 runs on the same vlog (a shop only named on
+# screen as "@vaca"), so the first pass now uses it too instead of leaving
+# those places for the background pass to fill in minutes later.
+_OPENAI_EXTRACTION_MODEL = "gpt-4.1-mini"
+_OPENAI_THOROUGH_EXTRACTION_MODEL = _OPENAI_EXTRACTION_MODEL
+
+
+def _call_openai(user_prompt: str, model: str = _OPENAI_EXTRACTION_MODEL) -> LlmPlaceExtractionResult:
     if not _openai_client:
         raise RuntimeError("OpenAI client is not configured")
 
     response = _openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=model,
         response_format={"type": "json_object"},
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
@@ -50,36 +60,72 @@ def _call_claude(user_prompt: str) -> LlmPlaceExtractionResult:
     return _parse_json(response.content[0].text)
 
 
-# A rate-limited call retried immediately just fails again inside the same
-# minute window. Providers report these as 429 and ask for a short wait, so
-# the retry backs off instead of burning its only second chance.
-_RATE_LIMIT_BACKOFF_SECONDS = 3
+# Rate limits are per minute. The on-screen-text pass alone can use a whole
+# minute's token budget (each sampled frame is thousands of tokens), and the
+# place-matching calls right after it used to fail both of their tries within
+# a few seconds -- every place of a video lost its location, silently, since
+# there is often no second provider to fall back to. So a rate-limited call
+# waits the time the provider asks for (or backs off) and tries again, up to
+# a total wait budget; ordinary failures still get just one retry.
+_RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS = 60
+_RATE_LIMIT_MIN_WAIT_SECONDS = 1
+_RATE_LIMIT_MAX_WAIT_SECONDS = 20
+_RETRY_AFTER_PATTERN = re.compile(r"try again in ([\d.]+)\s*(ms|s)", re.IGNORECASE)
 
 
 def _is_rate_limit(exc: Exception) -> bool:
     return "rate_limit" in str(exc).lower() or "429" in str(exc)
 
 
-def _call_with_retry(call_fn, user_prompt: str, provider_name: str) -> LlmPlaceExtractionResult:
-    for attempt in range(2):
+def _rate_limit_wait_seconds(exc: Exception, rate_limited_so_far: int) -> float:
+    match = _RETRY_AFTER_PATTERN.search(str(exc))
+    if match:
+        wait = float(match.group(1)) / (1000 if match.group(2).lower() == "ms" else 1)
+    else:
+        wait = 2 ** rate_limited_so_far
+    return min(max(wait, _RATE_LIMIT_MIN_WAIT_SECONDS), _RATE_LIMIT_MAX_WAIT_SECONDS)
+
+
+def _retry(call_fn, argument, provider_name: str, label: str = ""):
+    failures = 0
+    rate_limited = 0
+    waited = 0.0
+    while True:
         try:
-            return call_fn(user_prompt)
+            return call_fn(argument)
         except Exception as exc:
-            logger.warning("%s attempt %d failed: %s", provider_name, attempt + 1, exc)
-            if attempt == 0 and _is_rate_limit(exc):
-                time.sleep(_RATE_LIMIT_BACKOFF_SECONDS)
-    raise AiProviderError(f"{provider_name} failed after retry")
+            logger.warning("%s%s attempt failed: %s", provider_name, label, exc)
+            if _is_rate_limit(exc):
+                wait = _rate_limit_wait_seconds(exc, rate_limited)
+                if waited + wait <= _RATE_LIMIT_MAX_TOTAL_WAIT_SECONDS:
+                    rate_limited += 1
+                    waited += wait
+                    time.sleep(wait)
+                    continue
+            failures += 1
+            if failures >= 2:
+                break
+    raise AiProviderError(f"{provider_name}{label} failed after retry")
 
 
-def extract_places(user_prompt: str, provider: str = "auto") -> LlmPlaceExtractionResult:
+def _call_with_retry(call_fn, user_prompt: str, provider_name: str) -> LlmPlaceExtractionResult:
+    return _retry(call_fn, user_prompt, provider_name)
+
+
+def extract_places(user_prompt: str, provider: str = "auto", thorough: bool = False) -> LlmPlaceExtractionResult:
+    def call_openai(prompt):
+        if thorough:
+            return _call_openai(prompt, model=_OPENAI_THOROUGH_EXTRACTION_MODEL)
+        return _call_openai(prompt)
+
     if provider == "openai":
-        return _call_with_retry(_call_openai, user_prompt, "openai")
+        return _call_with_retry(call_openai, user_prompt, "openai")
 
     if provider == "claude":
         return _call_with_retry(_call_claude, user_prompt, "claude")
 
     try:
-        return _call_with_retry(_call_openai, user_prompt, "openai")
+        return _call_with_retry(call_openai, user_prompt, "openai")
     except AiProviderError:
         logger.info("Falling back to Claude after OpenAI failure")
         return _call_with_retry(_call_claude, user_prompt, "claude")
@@ -111,13 +157,22 @@ def _image_content_block_openai(frame: bytes) -> dict:
     }
 
 
+# Reading on-screen text. gpt-4o-mini bills a low-detail frame as ~2,800
+# tokens, so one video's 120 frames (~340k tokens) exceeded the 200k
+# tokens-per-minute limit on their own and starved the calls after them.
+# Measured on the same 24 frames of a Korean vlog: gpt-4o-mini 68k tokens
+# ($0.010), gpt-4.1-mini 13k tokens ($0.006) and it read the shop handles
+# correctly ("@보흔바", "@데코와") where gpt-4o-mini wrote "테코와".
+_OPENAI_VISION_MODEL = "gpt-4.1-mini"
+
+
 def _call_openai_vision(frames: list[bytes]) -> str:
     if not _openai_client:
         raise RuntimeError("OpenAI client is not configured")
 
     content = [{"type": "text", "text": _SCREEN_TEXT_PROMPT}] + [_image_content_block_openai(f) for f in frames]
     response = _openai_client.chat.completions.create(
-        model="gpt-4o-mini",
+        model=_OPENAI_VISION_MODEL,
         messages=[{"role": "user", "content": content}],
     )
     return (response.choices[0].message.content or "").strip()
@@ -142,12 +197,7 @@ def _call_claude_vision(frames: list[bytes]) -> str:
 
 
 def _call_with_retry_text(call_fn, frames: list[bytes], provider_name: str) -> str:
-    for attempt in range(2):
-        try:
-            return call_fn(frames)
-        except Exception as exc:
-            logger.warning("%s vision attempt %d failed: %s", provider_name, attempt + 1, exc)
-    raise AiProviderError(f"{provider_name} vision failed after retry")
+    return _retry(call_fn, frames, provider_name, label=" vision")
 
 
 def extract_screen_text(frames: list[bytes], provider: str = "auto") -> str:

@@ -1,5 +1,4 @@
 import random
-import re
 from typing import List, Optional
 
 from app.constants.tag_catalog import WALKING_COURSE_MOOD_TAG_MAP
@@ -13,6 +12,7 @@ from app.schemas.request_schema import (
 from app.schemas.response_schema import NearbyRecommendation, WalkingCourseResponse
 from app.services import kakao_places_service, nearby_recommendation_service, route_optimization_service
 from app.utils.distance import haversine_distance_m
+from app.utils.place_similarity import SAME_PLACE_MAX_DISTANCE_M, is_same_spot, normalized_name
 
 MIN_COURSE_PLACES = 2
 MAX_COURSE_PLACES = 10
@@ -63,6 +63,13 @@ def _dwell_minutes(category: Optional[str]) -> int:
 # against the same quota because they read the same way to a user.
 _CAFE_LIKE_CATEGORIES = {"cafe", "bakery", "dessert"}
 MAX_CAFE_LIKE_STOPS = 2
+
+# Meal stops. Store listings made restaurants the bulk of every candidate
+# pool, and a walk with three or four 식당 in a row means skipping most of
+# them once you're full. One meal per outing, two (lunch and dinner) for a
+# 반나절 day; bars count too since they're an eat-and-drink stop.
+_MEAL_CATEGORIES = {"restaurant", "bar"}
+MAX_MEAL_STOPS = 1
 
 # Things to actually do, which is what a walking course is for. These get a
 # score nudge so they win ties against the sea of nearby cafes.
@@ -118,11 +125,12 @@ def _preference_sort_key(
 # dwell estimates above (~30min/stop), so the two can't contradict each
 # other -- 4 stops never fit in an hour.
 _DURATION_PROFILES = {
-    "1시간 이내": {"targetPlaces": 2, "maxTotalMinutes": 75},
-    "2~3시간": {"targetPlaces": 4, "maxTotalMinutes": 180},
+    "1시간 이내": {"targetPlaces": 2, "maxTotalMinutes": 75, "maxMealStops": MAX_MEAL_STOPS},
+    "2~3시간": {"targetPlaces": 4, "maxTotalMinutes": 180, "maxMealStops": MAX_MEAL_STOPS},
     # A full day out: ~8 hours of walking plus time at each stop, which at
-    # these dwell estimates fills the 10-stop ceiling.
-    "반나절": {"targetPlaces": MAX_COURSE_PLACES, "maxTotalMinutes": 480},
+    # these dwell estimates fills the 10-stop ceiling. Long enough for
+    # lunch and dinner.
+    "반나절": {"targetPlaces": MAX_COURSE_PLACES, "maxTotalMinutes": 480, "maxMealStops": 2},
 }
 
 
@@ -140,19 +148,6 @@ def _dedupe_by_place_id(candidates):
     return unique
 
 
-# Two listings with the same normalized name this close are one place seen
-# by two sources (Kakao's listing and a 상가정보/TourAPI row). A shop's two
-# points differ by meters, but a large site's don't: Kakao and TourAPI put
-# 경복궁 at different spots on the grounds, and at 50m it showed up twice in
-# one course. Names carry the branch ("스타벅스 판교점"), so two genuinely
-# different places sharing a full name this close together are rare.
-SAME_PLACE_MAX_DISTANCE_M = 300
-
-
-def _normalized_name(name: str) -> str:
-    return re.sub(r"[^0-9a-z가-힣]", "", (name or "").lower())
-
-
 def _dedupe_same_place(candidates):
     """Keeps the first of each real-world place across sources. Callers order
     candidates by preference (bookmarked, stored, then Kakao), so the kept
@@ -160,9 +155,9 @@ def _dedupe_same_place(candidates):
     visit the same cafe twice under two ids."""
     kept = []
     for candidate in candidates:
-        name = _normalized_name(candidate.name)
+        name = normalized_name(candidate.name)
         is_duplicate = name and any(
-            _normalized_name(other.name) == name
+            normalized_name(other.name) == name
             and haversine_distance_m(candidate.latitude, candidate.longitude, other.latitude, other.longitude)
             <= SAME_PLACE_MAX_DISTANCE_M
             for other in kept
@@ -186,7 +181,7 @@ def _brand_key(name: str) -> str:
     tokens = (name or "").split()
     if len(tokens) >= 2 and len(tokens[-1]) >= 2 and tokens[-1].endswith("점"):
         tokens = tokens[:-1]
-    return _normalized_name(" ".join(tokens))
+    return normalized_name(" ".join(tokens))
 
 
 def _same_brand_as_selected(candidate: NearbyRecommendation, selected: List[NearbyRecommendation]) -> bool:
@@ -195,6 +190,22 @@ def _same_brand_as_selected(candidate: NearbyRecommendation, selected: List[Near
     first, so whichever branch ranks higher is the one kept."""
     brand = _brand_key(candidate.name)
     return bool(brand) and any(_brand_key(s.name) == brand for s in selected)
+
+
+def _same_spot_as_selected(candidate: NearbyRecommendation, selected: List[NearbyRecommendation]) -> bool:
+    """A chosen stop listed again under another name (see is_same_spot) --
+    a market complex listed three ways once filled a whole course.
+    Candidates are visited best first, so the kept listing is the
+    higher-ranked one."""
+    return any(is_same_spot(candidate, s) for s in selected)
+
+
+def _duplicates_a_selected_stop(candidate: NearbyRecommendation, selected: List[NearbyRecommendation]) -> bool:
+    return (
+        _too_close_to_selected(candidate, selected)
+        or _same_brand_as_selected(candidate, selected)
+        or _same_spot_as_selected(candidate, selected)
+    )
 
 
 def _too_close_to_selected(candidate: NearbyRecommendation, selected: List[NearbyRecommendation]) -> bool:
@@ -211,6 +222,7 @@ def _select_walkable_cluster(
     rng: Optional[random.Random] = None,
     mood_place_ids: frozenset = frozenset(),
     avoid_place_ids: frozenset = frozenset(),
+    max_meal_stops: int = MAX_MEAL_STOPS,
 ) -> List[NearbyRecommendation]:
     """Greedily builds a mutually-walkable cluster from candidates already
     sorted by score (descending): a seed is drawn from the top-scoring
@@ -230,6 +242,7 @@ def _select_walkable_cluster(
     selected: List[NearbyRecommendation] = []
     accumulated_minutes = 0.0
     cafe_like_count = 0
+    meal_count = 0
     chooser = rng or random
 
     sort_keys = {
@@ -253,8 +266,11 @@ def _select_walkable_cluster(
         is_cafe_like = (candidate.category or "") in _CAFE_LIKE_CATEGORIES
         if is_cafe_like and cafe_like_count >= MAX_CAFE_LIKE_STOPS:
             continue
+        is_meal = (candidate.category or "") in _MEAL_CATEGORIES
+        if is_meal and meal_count >= max_meal_stops:
+            continue
 
-        if _too_close_to_selected(candidate, selected) or _same_brand_as_selected(candidate, selected):
+        if _duplicates_a_selected_stop(candidate, selected):
             continue
 
         if not selected:
@@ -262,6 +278,8 @@ def _select_walkable_cluster(
             accumulated_minutes += _dwell_minutes(candidate.category)
             if is_cafe_like:
                 cafe_like_count += 1
+            if is_meal:
+                meal_count += 1
             continue
 
         nearest_leg_m = min(
@@ -278,6 +296,8 @@ def _select_walkable_cluster(
         selected.append(candidate)
         if is_cafe_like:
             cafe_like_count += 1
+        if is_meal:
+            meal_count += 1
 
     # A budget tight enough to fit fewer than two stops (two 60-minute
     # restaurants against a 75-minute budget) would otherwise return no
@@ -302,7 +322,7 @@ def _top_up_to_minimum(selected: List[NearbyRecommendation], ordered: List[Nearb
         if not selected:
             selected.append(candidate)
             continue
-        if _too_close_to_selected(candidate, selected) or _same_brand_as_selected(candidate, selected):
+        if _duplicates_a_selected_stop(candidate, selected):
             continue
 
         nearest_leg_m = min(
@@ -364,6 +384,10 @@ async def generate_walking_course(request: WalkingCourseRequest) -> WalkingCours
             radiusMeters=request.radiusMeters,
             limit=len(all_candidates),
             candidates=all_candidates,
+            # The course collapses look-alikes itself while picking stops,
+            # after mood bonuses -- collapsing here would keep whichever
+            # listing had the higher base score instead.
+            collapseSameSpots=False,
             userEmbedding=request.userEmbedding,
             userTagScores=effective_tag_scores,
         )
@@ -376,6 +400,7 @@ async def generate_walking_course(request: WalkingCourseRequest) -> WalkingCours
         max_total_minutes=duration_profile["maxTotalMinutes"] if duration_profile else None,
         mood_place_ids=mood_place_ids,
         avoid_place_ids=frozenset(request.avoidPlaceIds),
+        max_meal_stops=duration_profile["maxMealStops"] if duration_profile else MAX_MEAL_STOPS,
     )
     if len(selected) < MIN_COURSE_PLACES:
         return WalkingCourseResponse(course=None, recommendations=selected)

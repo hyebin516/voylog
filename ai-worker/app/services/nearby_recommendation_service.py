@@ -6,6 +6,7 @@ from app.schemas.response_schema import NearbyRecommendation, NearbyScoreRespons
 from app.services import recommendation_scoring_policy as policy
 from app.utils.business_hours import is_open_now
 from app.utils.distance import haversine_distance_m
+from app.utils.place_similarity import collapse_same_spots
 from app.utils.vector_math import cosine_similarity
 
 
@@ -123,6 +124,10 @@ def score_nearby(request: NearbyScoreRequest) -> NearbyScoreResponse:
                 name=candidate.name,
                 latitude=candidate.latitude,
                 longitude=candidate.longitude,
+                address=candidate.address,
+                businessHours=candidate.businessHours,
+                businessHoursIsEstimated=candidate.businessHoursIsEstimated,
+                tags=[tag.code for tag in candidate.tags],
                 distanceMeters=round(distance_m),
                 category=candidate.category,
                 isOpen=is_open,
@@ -135,4 +140,8 @@ def score_nearby(request: NearbyScoreRequest) -> NearbyScoreResponse:
         )
 
     scored.sort(key=lambda r: r.score, reverse=True)
+    if request.collapseSameSpots:
+        # Before the limit, so a collapsed duplicate frees its slot for
+        # another place rather than shortening the list.
+        scored = collapse_same_spots(scored)
     return NearbyScoreResponse(recommendations=scored[: request.limit])

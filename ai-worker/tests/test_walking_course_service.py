@@ -140,7 +140,10 @@ def test_generate_walking_course_boosts_a_place_tagged_with_the_selected_mood(mo
     # ties exactly and Python's stable sort keeps this original order.
     # "moody" is listed last, so without the mood boost it's the one
     # target_places=4 would cut.
-    plain_places = [_candidate(f"plain-{i}", f"평범한곳{i}", 0.004, 0.001 * i) for i in range(4)]
+    # Distinct names: numbered look-alikes ("평범한곳0", "평범한곳1") would be
+    # merged as one listing by _same_spot_as_selected.
+    plain_names = ["북촌서점", "연남공방", "성수갤러리", "망원책방"]
+    plain_places = [_candidate(f"plain-{i}", plain_names[i], 0.004, 0.001 * i) for i in range(4)]
     moody_place = NearbyPlaceCandidate(
         placeId="moody-1",
         name="힙한곳",
@@ -757,3 +760,59 @@ def test_a_course_keeps_only_the_higher_ranked_branch_of_a_chain():
     selected = svc._select_walkable_cluster([lower, higher, other], target_places=3, rng=random.Random(0))
 
     assert {s.placeId for s in selected} == {"hanbok-gyeongbokgung", "palace"}
+
+
+def test_a_course_includes_at_most_one_meal_stop_by_default():
+    scored = [
+        _rec("restaurant-1", 0.001, score=0.95, category="restaurant"),
+        _rec("restaurant-2", 0.002, score=0.94, category="restaurant"),
+        _rec("bar-1", 0.003, score=0.93, category="bar"),
+        _rec("museum", 0.004, score=0.60, category="museum"),
+        _rec("shop", 0.005, score=0.55, category="shopping"),
+    ]
+
+    selected = svc._select_walkable_cluster(scored, target_places=5, rng=random.Random(0))
+
+    meals = [s.placeId for s in selected if s.category in {"restaurant", "bar"}]
+    assert meals == ["restaurant-1"]
+    assert {"museum", "shop"} <= {s.placeId for s in selected}
+
+
+def test_a_half_day_course_allows_two_meal_stops():
+    scored = [_rec(f"restaurant-{i}", 0.001 * (i + 1), score=0.9 - i * 0.01, category="restaurant") for i in range(4)]
+
+    selected = svc._select_walkable_cluster(scored, target_places=10, rng=random.Random(0), max_meal_stops=2)
+
+    assert len(selected) == 2
+    assert svc._DURATION_PROFILES["반나절"]["maxMealStops"] == 2
+
+
+def _named(place_id, name, lat_offset_deg, score, category):
+    rec = _rec(place_id, lat_offset_deg, score=score, category=category)
+    rec.name = name
+    return rec
+
+
+def test_a_course_keeps_one_listing_of_a_place_listed_under_overlapping_names():
+    scored = [
+        _named("market-main", "제주동문시장", 0.0010, 0.95, "other"),
+        _named("market-public", "제주동문공설시장", 0.0012, 0.90, "other"),
+        _named("market-fish", "제주동문수산시장", 0.0014, 0.85, "other"),
+        _named("market-cafe", "동문시장 과일모찌 운화당", 0.0016, 0.80, "cafe"),
+        _named("gallery", "갤러리 세이브", 0.0030, 0.60, "museum"),
+    ]
+
+    selected = svc._select_walkable_cluster(scored, target_places=5, rng=random.Random(0))
+
+    assert {s.placeId for s in selected} == {"market-main", "market-cafe", "gallery"}
+
+
+def test_overlapping_names_far_apart_stay_separate_stops():
+    scored = [
+        _named("bowling-a", "케이락", 0.0010, 0.9, "attraction"),
+        _named("bowling-b", "케이락볼링장", 0.0100, 0.8, "attraction"),  # ~1.1km away
+    ]
+
+    selected = svc._select_walkable_cluster(scored, target_places=2, rng=random.Random(0))
+
+    assert len(selected) == 2

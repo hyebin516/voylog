@@ -67,8 +67,10 @@ def test_open_business_hours_score_higher_than_closed():
 
 
 def test_respects_the_limit():
+    # Distinct names: look-alikes ("Place 0", "Place 1") collapse into one spot.
+    names = ["북촌서점", "연남공방", "성수갤러리", "망원책방", "서촌카페"]
     candidates = [
-        NearbyPlaceCandidate(placeId=f"p{i}", name=f"Place {i}", latitude=37.5 + i * 0.0001, longitude=127.0)
+        NearbyPlaceCandidate(placeId=f"p{i}", name=names[i], latitude=37.5 + i * 0.0001, longitude=127.0)
         for i in range(5)
     ]
 
@@ -184,7 +186,7 @@ def test_a_tag_match_outscores_no_match_at_the_same_distance():
     )
     no_match = NearbyPlaceCandidate(
         placeId="no_match",
-        name="No match",
+        name="Other",
         latitude=37.5005,
         longitude=127.001,
         tags=[{"code": "야경", "confidence": 1.0}],
@@ -250,3 +252,41 @@ def test_reason_omits_a_category_without_a_korean_label():
     result = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate]))
 
     assert "other" not in result.recommendations[0].reason
+
+
+def test_nearby_list_shows_one_card_per_spot_and_backfills_the_slot():
+    candidates = [
+        NearbyPlaceCandidate(placeId="a", name="케이락", latitude=37.5005, longitude=127.0, category="attraction"),
+        NearbyPlaceCandidate(placeId="b", name="케이락볼링장", latitude=37.5006, longitude=127.0, category="attraction"),
+        NearbyPlaceCandidate(placeId="c", name="갤러리", latitude=37.5010, longitude=127.0, category="gallery"),
+    ]
+
+    result = nearby_recommendation_service.score_nearby(make_request(candidates=candidates, limit=2))
+
+    ids = [rec.placeId for rec in result.recommendations]
+    assert len(ids) == 2
+    assert "c" in ids
+    assert not {"a", "b"} <= set(ids)
+
+
+def test_a_recommendation_carries_the_place_address_hours_and_tags_for_its_detail_screen():
+    candidate = NearbyPlaceCandidate(
+        placeId="p1",
+        name="소베",
+        latitude=37.5005,
+        longitude=127.0,
+        address="대구 중구 중앙대로79길 6",
+        category="bakery",
+        businessHours={"mon": {"open": "09:00", "close": "21:00"}},
+        businessHoursIsEstimated=True,
+        tags=[{"code": "소금빵", "confidence": 0.9}],
+    )
+
+    rec = nearby_recommendation_service.score_nearby(make_request(candidates=[candidate])).recommendations[0]
+
+    assert rec.address == "대구 중구 중앙대로79길 6"
+    assert rec.businessHours["mon"].open == "09:00"
+    # The detail screen only labels hours as an estimate when the place's own
+    # row says so -- carried instead of re-guessed from the hours' presence.
+    assert rec.businessHoursIsEstimated is True
+    assert rec.tags == ["소금빵"]

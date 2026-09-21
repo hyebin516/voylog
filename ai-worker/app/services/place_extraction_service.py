@@ -8,6 +8,7 @@ from app.schemas.response_schema import GeocodedPlace, PlaceExtractionResponse, 
 from app.prompts import place_match_prompt
 from app.services import frame_extraction_service, llm_service
 from app.services.geocoding_service import search_places
+from app.utils.korean_similarity import names_plausibly_same, similar_written_words
 from app.utils.logger import logger
 
 # How many map-search candidates to put in front of the LLM. Enough to
@@ -67,7 +68,7 @@ async def _extract_on_screen_text(youtube_url: str, llm_provider: str, thorough:
         return ""
 
 
-async def _resolve_location(candidate, region: str | None, llm_provider: str) -> dict | None:
+async def _resolve_name(name: str, candidate, region: str | None, llm_provider: str) -> dict | None:
     """Finds the real place an extracted name refers to.
 
     A bare keyword search on the name alone is what used to put a 대전 vlog's
@@ -80,7 +81,7 @@ async def _resolve_location(candidate, region: str | None, llm_provider: str) ->
     The LLM only *chooses among* real Kakao results -- coordinates still
     come solely from Kakao, never from the model.
     """
-    queries = [f"{region} {candidate.name}", candidate.name] if region else [candidate.name]
+    queries = [f"{region} {name}", name] if region else [name]
 
     results = []
     for query in queries:
@@ -92,7 +93,7 @@ async def _resolve_location(candidate, region: str | None, llm_provider: str) ->
         return None
 
     user_prompt = place_match_prompt.build_user_prompt(
-        place_name=candidate.name,
+        place_name=name,
         candidates=results,
         region=region,
         category=candidate.category,
@@ -101,15 +102,72 @@ async def _resolve_location(candidate, region: str | None, llm_provider: str) ->
     match = await asyncio.to_thread(llm_service.match_place, user_prompt, llm_provider)
 
     if match.index is None or not (0 <= match.index < len(results)):
-        logger.info("No confident map match for '%s' (region=%s)", candidate.name, region)
+        logger.info("No confident map match for '%s' (region=%s)", name, region)
         return None
 
     chosen = results[match.index]
+    if not names_plausibly_same(name, chosen["name"]):
+        logger.info("Rejected map match '%s' for '%s': the names are different places", chosen["name"], name)
+        return None
     return {
+        "name": name,
         "latitude": chosen["latitude"],
         "longitude": chosen["longitude"],
         "address": chosen["address"],
     }
+
+
+def _names_to_try(candidate) -> list[str]:
+    names = []
+    for name in [candidate.name, *candidate.alternativeNames]:
+        name = (name or "").strip()
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
+async def _resolve_location(candidate, region: str | None, llm_provider: str) -> dict | None:
+    """Resolves the name as extracted first, then each written spelling of
+    the same place from the title/description/on-screen text. Auto-generated
+    captions heard "소베" as "소배", which no map search finds; the title's
+    spelling does. The returned `name` is the spelling that matched, so the
+    place is shown under its real name."""
+    for name in _names_to_try(candidate):
+        location = await _resolve_name(name, candidate, region, llm_provider)
+        if location:
+            return location
+    return None
+
+
+def _with_written_sound_alikes(candidate, written_text: str):
+    """Adds words from the title/description/hashtags/on-screen text that
+    sound like a name heard in auto-generated captions ("소배" -> the
+    title's "소베") as spellings to try. The model is asked to list these
+    itself but often doesn't, so this makes the fallback dependable; a wrong
+    sound-alike is harmless, since it still has to be found on the map and
+    confirmed there."""
+    if candidate.source != "transcript":
+        return candidate
+    extra = [
+        word
+        for word in similar_written_words(candidate.name, written_text)
+        if word not in candidate.alternativeNames
+    ]
+    if not extra:
+        return candidate
+    return candidate.model_copy(update={"alternativeNames": [*candidate.alternativeNames, *extra]})
+
+
+def _display_name(candidate, geo: dict | None, transcript_auto_generated: bool) -> str:
+    """The spelling that found the place on the map. When nothing matched,
+    a name heard by speech recognition gives way to one the creator wrote
+    ("바카" in the captions, "@vaca" on screen); otherwise the extracted
+    name stays."""
+    if geo and geo.get("name"):
+        return geo["name"]
+    if transcript_auto_generated and candidate.source == "transcript" and candidate.alternativeNames:
+        return candidate.alternativeNames[0]
+    return candidate.name
 
 
 async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResponse:
@@ -118,12 +176,14 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
         description=request.video.description,
         hashtags=request.video.hashtags,
         transcript=[segment.model_dump() for segment in request.transcript],
+        transcript_auto_generated=request.transcriptAutoGenerated,
     )
 
     llm_result = await asyncio.to_thread(llm_service.extract_places, user_prompt, request.llmProvider)
 
     transcript_available = len(request.transcript) > 0
     screen_text_available = False
+    screen_text = ""
 
     # Any video with no official transcript may still have places only
     # visible as burned-in captions/overlays -- metadata alone finding a
@@ -151,22 +211,32 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
                 # on-screen text alone can't provide.
                 transcript=[segment.model_dump() for segment in request.transcript],
                 screen_text=screen_text,
+                transcript_auto_generated=request.transcriptAutoGenerated,
             )
-            llm_result = await asyncio.to_thread(llm_service.extract_places, user_prompt, request.llmProvider)
+            llm_result = await asyncio.to_thread(
+                llm_service.extract_places, user_prompt, request.llmProvider, request.forceScreenText
+            )
+
+    candidates = llm_result.places
+    if request.transcriptAutoGenerated:
+        written_text = " ".join(
+            [request.video.title or "", request.video.description or "", " ".join(request.video.hashtags), screen_text]
+        )
+        candidates = [_with_written_sound_alikes(candidate, written_text) for candidate in candidates]
 
     region = llm_result.region
     geocode_results = await asyncio.gather(
-        *(_resolve_location(candidate, region, request.llmProvider) for candidate in llm_result.places)
+        *(_resolve_location(candidate, region, request.llmProvider) for candidate in candidates)
     )
 
     places = []
-    for candidate, geo in zip(llm_result.places, geocode_results):
+    for candidate, geo in zip(candidates, geocode_results):
         source, timestamp_sec = _sanitize_source_and_timestamp(
             candidate.source, candidate.timestampSec, transcript_available, screen_text_available
         )
         places.append(
             GeocodedPlace(
-                name=candidate.name,
+                name=_display_name(candidate, geo, request.transcriptAutoGenerated),
                 timestampSec=timestamp_sec,
                 latitude=geo["latitude"] if geo else None,
                 longitude=geo["longitude"] if geo else None,
