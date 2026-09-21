@@ -1,8 +1,10 @@
 jest.mock('../../src/repositories/bookmark-folder.repository');
 jest.mock('../../src/repositories/bookmark.repository');
+jest.mock('../../src/services/aiWorkerClient');
 
 const folderRepository = require('../../src/repositories/bookmark-folder.repository');
 const bookmarkRepository = require('../../src/repositories/bookmark.repository');
+const { callAiWorker } = require('../../src/services/aiWorkerClient');
 const bookmarkFolderService = require('../../src/services/bookmark-folder.service');
 
 const USER_ID = 'user-1';
@@ -93,5 +95,86 @@ describe('listBookmarksInFolder', () => {
     const bookmarks = await bookmarkFolderService.listBookmarksInFolder(USER_ID, FOLDER_ID);
 
     expect(bookmarks).toEqual([{ bookmark_id: BOOKMARK_ID }]);
+  });
+});
+
+describe('createRouteFromFolder', () => {
+  function bookmarkedPlace(id, latitude, longitude) {
+    return { bookmark_id: `b-${id}`, place_id: id, name: id, latitude, longitude };
+  }
+
+  beforeEach(() => {
+    folderRepository.findById.mockResolvedValue({ folder_id: FOLDER_ID, user_id: USER_ID, name: '부산 코스' });
+    callAiWorker.mockResolvedValue({ routeType: 'placeToPlace', transportMode: 'mixed', optimizedRoute: [] });
+  });
+
+  it('asks for the quickest place-to-place route, with no hotel or centre point', async () => {
+    folderRepository.findBookmarksInFolder.mockResolvedValue([
+      bookmarkedPlace('p1', '35.10', '129.00'),
+      bookmarkedPlace('p2', '35.12', '129.04'),
+    ]);
+
+    const result = await bookmarkFolderService.createRouteFromFolder(USER_ID, FOLDER_ID);
+
+    // Only the places go to the optimizer: it picks the first and last stop
+    // and whether each leg is walked or driven.
+    expect(callAiWorker).toHaveBeenCalledWith(
+      '/optimize-place-route',
+      {
+        places: [
+          { placeId: 'p1', name: 'p1', latitude: 35.1, longitude: 129.0 },
+          { placeId: 'p2', name: 'p2', latitude: 35.12, longitude: 129.04 },
+        ],
+      },
+      30000
+    );
+    expect(result).toEqual({
+      course: { routeType: 'placeToPlace', transportMode: 'mixed', optimizedRoute: [] },
+      recommendations: [],
+    });
+  });
+
+  it('leaves out bookmarks that never got coordinates', async () => {
+    folderRepository.findBookmarksInFolder.mockResolvedValue([
+      bookmarkedPlace('p1', '35.10', '129.00'),
+      bookmarkedPlace('p2', null, null),
+      bookmarkedPlace('p3', '35.12', '129.04'),
+    ]);
+
+    await bookmarkFolderService.createRouteFromFolder(USER_ID, FOLDER_ID);
+
+    expect(callAiWorker.mock.calls[0][1].places.map((p) => p.placeId)).toEqual(['p1', 'p3']);
+  });
+
+  it('refuses when fewer than 2 places can be routed', async () => {
+    folderRepository.findBookmarksInFolder.mockResolvedValue([
+      bookmarkedPlace('p1', '35.10', '129.00'),
+      bookmarkedPlace('p2', null, null),
+    ]);
+
+    await expect(bookmarkFolderService.createRouteFromFolder(USER_ID, FOLDER_ID)).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'INVALID_REQUEST',
+    });
+    expect(callAiWorker).not.toHaveBeenCalled();
+  });
+
+  it('caps the route at the 10 places the optimizer takes', async () => {
+    folderRepository.findBookmarksInFolder.mockResolvedValue(
+      Array.from({ length: 14 }, (_, i) => bookmarkedPlace(`p${i}`, '35.10', '129.00'))
+    );
+
+    await bookmarkFolderService.createRouteFromFolder(USER_ID, FOLDER_ID);
+
+    expect(callAiWorker.mock.calls[0][1].places).toHaveLength(10);
+  });
+
+  it("refuses another user's folder", async () => {
+    folderRepository.findById.mockResolvedValue({ folder_id: FOLDER_ID, user_id: 'someone-else' });
+
+    await expect(bookmarkFolderService.createRouteFromFolder(USER_ID, FOLDER_ID)).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'FOLDER_NOT_FOUND',
+    });
   });
 });

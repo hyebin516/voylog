@@ -65,4 +65,13 @@ async function listBookmarks(req, res, next) {
   }
 }
 
-module.exports = { create, list, remove, addBookmark, removeBookmark, listBookmarks };
+async function createRoute(req, res, next) {
+  try {
+    const course = await bookmarkFolderService.createRouteFromFolder(req.user.userId, req.params.id);
+    return success(res, course);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, list, remove, addBookmark, removeBookmark, listBookmarks, createRoute };

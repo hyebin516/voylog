@@ -209,8 +209,8 @@ describe('publishItinerary', () => {
       title: '제주 3박4일 여행',
       transportMode: 'car',
       routeData: [
-        { order: 0, type: 'place', placeId: 'p1', name: 'Place 1', legDistanceM: null, legDurationSec: null },
-        { order: 1, type: 'place', placeId: 'p2', name: 'Place 2', legDistanceM: 400, legDurationSec: 200 },
+        { order: 0, type: 'place', placeId: 'p1', name: 'Place 1', latitude: null, longitude: null, legDistanceM: null, legDurationSec: null },
+        { order: 1, type: 'place', placeId: 'p2', name: 'Place 2', latitude: null, longitude: null, legDistanceM: 400, legDurationSec: 200 },
       ],
       totalDistanceM: 400,
       totalDurationSec: 200,

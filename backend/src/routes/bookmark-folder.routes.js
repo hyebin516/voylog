@@ -17,6 +17,7 @@ router.get('/', bookmarkFolderController.list);
 router.delete('/:id', validateFolderId, bookmarkFolderController.remove);
 router.get('/:id/bookmarks', validateFolderId, bookmarkFolderController.listBookmarks);
 router.post('/:id/bookmarks', validateFolderId, validateFolderBookmarkBody, bookmarkFolderController.addBookmark);
+router.post('/:id/route', validateFolderId, bookmarkFolderController.createRoute);
 router.delete(
   '/:id/bookmarks/:bookmarkId',
   validateFolderId,

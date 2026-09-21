@@ -2,7 +2,7 @@ const { validateUpdateNotificationSettings } = require('../../src/validators/not
 const { mockReq, mockRes } = require('../helpers/mockExpress');
 const AppError = require('../../src/utils/AppError');
 
-const VALID_BODY = { newVlogAlerts: true, routeCompleteAlerts: false, marketingAlerts: true, nightSilent: false };
+const VALID_BODY = { tripStartAlerts: true, routeCompleteAlerts: false, marketingAlerts: true, nightSilent: false };
 
 describe('validateUpdateNotificationSettings', () => {
   it('passes when all four fields are booleans', () => {
@@ -21,7 +21,7 @@ describe('validateUpdateNotificationSettings', () => {
   it('rejects when a field is not a boolean', () => {
     const next = jest.fn();
     validateUpdateNotificationSettings(
-      mockReq({ body: { ...VALID_BODY, newVlogAlerts: 'yes' } }),
+      mockReq({ body: { ...VALID_BODY, tripStartAlerts: 'yes' } }),
       mockRes(),
       next
     );

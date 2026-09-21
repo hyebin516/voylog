@@ -1,8 +1,10 @@
 const AppError = require('../utils/AppError');
 const isUuid = require('../utils/isUuid');
 
-const VALID_ROUTE_TYPES = ['roundTrip', 'hotelToHotel'];
-const VALID_TRANSPORT_MODES = ['car', 'walk', 'transit'];
+// 'placeToPlace' + 'mixed': a bookmark-folder route (FR-11) -- no hotel,
+// each leg walked or driven (migration 028).
+const VALID_ROUTE_TYPES = ['roundTrip', 'hotelToHotel', 'placeToPlace'];
+const VALID_TRANSPORT_MODES = ['car', 'walk', 'transit', 'mixed'];
 
 function validateCreateSavedCourse(req, res, next) {
   const { region, routeType, transportMode, totalDistanceM, totalDurationSec, routeData } = req.body;
@@ -11,10 +13,10 @@ function validateCreateSavedCourse(req, res, next) {
     return next(new AppError(400, 'INVALID_REQUEST', 'A non-empty region is required'));
   }
   if (!VALID_ROUTE_TYPES.includes(routeType)) {
-    return next(new AppError(400, 'INVALID_REQUEST', "routeType must be 'roundTrip' or 'hotelToHotel'"));
+    return next(new AppError(400, 'INVALID_REQUEST', `routeType must be one of: ${VALID_ROUTE_TYPES.join(', ')}`));
   }
   if (!VALID_TRANSPORT_MODES.includes(transportMode)) {
-    return next(new AppError(400, 'INVALID_REQUEST', "transportMode must be 'car', 'walk', or 'transit'"));
+    return next(new AppError(400, 'INVALID_REQUEST', `transportMode must be one of: ${VALID_TRANSPORT_MODES.join(', ')}`));
   }
   if (totalDistanceM !== undefined && totalDistanceM !== null && typeof totalDistanceM !== 'number') {
     return next(new AppError(400, 'INVALID_REQUEST', 'totalDistanceM must be a number when provided'));

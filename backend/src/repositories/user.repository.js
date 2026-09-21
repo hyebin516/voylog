@@ -23,6 +23,20 @@ async function create(user) {
   return rows[0];
 }
 
+/**
+ * Refreshes what Kakao owns on a returning user's row -- never the nickname,
+ * which the user can rename in this app.
+ */
+async function updateKakaoProfile(userId, { email, profileImage }) {
+  const { rows } = await pool.query(
+    `UPDATE users SET email = $1, profile_image = $2, updated_at = now()
+     WHERE user_id = $3 AND deleted_at IS NULL
+     RETURNING *`,
+    [email, profileImage, userId]
+  );
+  return rows[0];
+}
+
 async function softDelete(userId) {
   await pool.query('UPDATE users SET deleted_at = now() WHERE user_id = $1', [userId]);
 }
@@ -65,6 +79,7 @@ async function createEmailUser({ email, passwordHash, nickname }) {
 
 module.exports = {
   findByProviderId,
+  updateKakaoProfile,
   findById,
   create,
   softDelete,

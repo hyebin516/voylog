@@ -86,4 +86,25 @@ async function findFeed({ viewerUserId, limit }) {
   return rows;
 }
 
-module.exports = { create, findById, updateTitle, softDelete, findFeed, findActiveBySource };
+async function findAllActive() {
+  const { rows } = await pool.query('SELECT * FROM shared_routes WHERE deleted_at IS NULL ORDER BY created_at');
+  return rows;
+}
+
+async function updateRouteData(sharedRouteId, routeData) {
+  await pool.query('UPDATE shared_routes SET route_data = $2, updated_at = now() WHERE shared_route_id = $1', [
+    sharedRouteId,
+    JSON.stringify(routeData),
+  ]);
+}
+
+module.exports = {
+  create,
+  findById,
+  updateTitle,
+  softDelete,
+  findFeed,
+  findActiveBySource,
+  findAllActive,
+  updateRouteData,
+};

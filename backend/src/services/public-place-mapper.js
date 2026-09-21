@@ -121,6 +121,7 @@ const SEMAS_COLUMNS = {
   name: '상호명',
   branch: '지점명',
   subcategoryCode: '상권업종소분류코드',
+  standardIndustryCode: '표준산업분류코드',
   roadAddress: '도로명주소',
   lotAddress: '지번주소',
   longitude: '경도',
@@ -149,10 +150,13 @@ function semasColumnIndex(headerFields) {
  * @returns {object | null} a place row, or null when the row isn't usable
  */
 function semasRowToPlace(fields, columnIndex) {
-  const classification = classifySemasRow(fields[columnIndex.subcategoryCode]);
+  const baseName = cleanText(fields[columnIndex.name]);
+  const classification = classifySemasRow(fields[columnIndex.subcategoryCode], {
+    standardIndustryCode: fields[columnIndex.standardIndustryCode],
+    name: baseName || '',
+  });
   if (!classification) return null;
 
-  const baseName = cleanText(fields[columnIndex.name]);
   const branch = cleanText(fields[columnIndex.branch]);
   const latitude = toCoordinate(fields[columnIndex.latitude]);
   const longitude = toCoordinate(fields[columnIndex.longitude]);

@@ -127,8 +127,56 @@ async function removeDatasetPlaces(placeIds) {
   return rowCount;
 }
 
+/**
+ * Soft-deletes places a previous import created from rows that the current
+ * classification rules no longer accept, so tightening the rules and
+ * re-running an import actually removes them. Bookmarked places are kept.
+ *
+ * @returns {Promise<number>} places removed
+ */
+async function removeByExternalIds(source, externalIds) {
+  if (externalIds.length === 0) return 0;
+  const { rowCount } = await pool.query(
+    `UPDATE places p SET deleted_at = now(), updated_at = now()
+     WHERE p.source = $1 AND p.external_id = ANY($2::varchar[]) AND p.deleted_at IS NULL
+       AND NOT EXISTS (SELECT 1 FROM bookmarks b WHERE b.place_id = p.place_id)`,
+    [source, externalIds]
+  );
+  return rowCount;
+}
+
+/**
+ * Soft-deletes places of a dataset that the refresh starting at `since` did
+ * not write -- they're no longer in the data (a shop that closed, a listing
+ * TourAPI withdrew). Works because every import upsert, changed or not,
+ * sets updated_at. Bookmarked places are kept.
+ *
+ * @returns {Promise<number>} places removed
+ */
+async function removeStaleDatasetPlaces(source, since) {
+  const { rowCount } = await pool.query(
+    `UPDATE places p SET deleted_at = now(), updated_at = now()
+     WHERE p.source = $1 AND p.external_id IS NOT NULL AND p.deleted_at IS NULL
+       AND p.updated_at < $2
+       AND NOT EXISTS (SELECT 1 FROM bookmarks b WHERE b.place_id = p.place_id)`,
+    [source, since]
+  );
+  return rowCount;
+}
+
+async function countActive(source) {
+  const { rows } = await pool.query(
+    'SELECT COUNT(*)::int AS count FROM places WHERE source = $1 AND external_id IS NOT NULL AND deleted_at IS NULL',
+    [source]
+  );
+  return rows[0].count;
+}
+
 module.exports = {
   upsertMany,
+  removeByExternalIds,
+  removeStaleDatasetPlaces,
+  countActive,
   removeDuplicateDatasetPlaces,
   findDatasetPlacesWithSuspectNames,
   removeDatasetPlaces,

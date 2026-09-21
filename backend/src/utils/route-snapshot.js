@@ -11,10 +11,13 @@
 // place's leg fields are reset to null (that leg used to run from the now-
 // removed hotel, so keeping it would leak a hotel-to-place distance).
 //
-// `placeId` IS kept for place points (unlike hotelId/coordinates) -- a
-// place id isn't private the way a hotel address is, and shared-route.service
-// needs it to resolve each place's embedding/tags when someone likes the
-// route (see FR-21's like -> taste-weight integration).
+// `placeId` and each place's coordinates ARE kept -- a place is a public
+// spot, not private the way a hotel address is. shared-route.service needs
+// the id to resolve each place's embedding/tags when someone likes the route
+// (FR-21's like -> taste-weight integration), and the route detail screen
+// needs the coordinates to draw the route on a map. Snapshots published
+// before coordinates were kept are filled in by
+// scripts/backfill-shared-route-coordinates.js.
 function buildPublicRouteSnapshot(routeData) {
   const placePoints = [...routeData]
     .filter((point) => point.type === 'place')
@@ -25,8 +28,19 @@ function buildPublicRouteSnapshot(routeData) {
     type: 'place',
     placeId: point.placeId ?? null,
     name: point.name,
+    latitude: point.latitude ?? null,
+    longitude: point.longitude ?? null,
     legDistanceM: index === 0 ? null : point.legDistanceM,
     legDurationSec: index === 0 ? null : point.legDurationSec,
+    // Walked or by bus, only on a bookmark-folder route that mixes the two --
+    // without it a published 20-minute bus ride would read as a walk. The
+    // guidance says which bus, between which stops.
+    ...(point.legTransportMode !== undefined && {
+      legTransportMode: index === 0 ? null : point.legTransportMode,
+    }),
+    ...(point.legGuidance !== undefined && {
+      legGuidance: index === 0 ? null : point.legGuidance,
+    }),
   }));
 
   const distances = snapshot.map((p) => p.legDistanceM).filter((d) => d != null);

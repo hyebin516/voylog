@@ -1,9 +1,9 @@
 const AppError = require('../utils/AppError');
 
 function validateUpdateNotificationSettings(req, res, next) {
-  const { newVlogAlerts, routeCompleteAlerts, marketingAlerts, nightSilent } = req.body;
+  const { tripStartAlerts, routeCompleteAlerts, marketingAlerts, nightSilent } = req.body;
   if (
-    typeof newVlogAlerts !== 'boolean' ||
+    typeof tripStartAlerts !== 'boolean' ||
     typeof routeCompleteAlerts !== 'boolean' ||
     typeof marketingAlerts !== 'boolean' ||
     typeof nightSilent !== 'boolean'
@@ -12,7 +12,7 @@ function validateUpdateNotificationSettings(req, res, next) {
       new AppError(
         400,
         'INVALID_REQUEST',
-        'newVlogAlerts, routeCompleteAlerts, marketingAlerts, and nightSilent must all be booleans'
+        'tripStartAlerts, routeCompleteAlerts, marketingAlerts, and nightSilent must all be booleans'
       )
     );
   }

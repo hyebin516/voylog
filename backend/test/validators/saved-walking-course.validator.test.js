@@ -23,6 +23,22 @@ describe('validateCreateSavedCourse', () => {
     expect(next).toHaveBeenCalledWith();
   });
 
+  it('passes a bookmark-folder route: place to place, walked and by bus', () => {
+    const next = jest.fn();
+    const body = {
+      ...VALID_BODY,
+      region: '부산 코스',
+      routeType: 'placeToPlace',
+      transportMode: 'mixed',
+      routeData: [
+        { order: 0, type: 'place', placeId: 'p1', name: 'A', latitude: 35.1, longitude: 129.0 },
+        { order: 1, type: 'place', placeId: 'p2', name: 'B', latitude: 35.2, longitude: 129.1, legTransportMode: 'transit', legGuidance: '1003번 · A → B' },
+      ],
+    };
+    validateCreateSavedCourse(mockReq({ body }), mockRes(), next);
+    expect(next).toHaveBeenCalledWith();
+  });
+
   it('rejects a missing region', () => {
     const next = jest.fn();
     validateCreateSavedCourse(mockReq({ body: { ...VALID_BODY, region: undefined } }), mockRes(), next);

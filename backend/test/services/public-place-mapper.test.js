@@ -45,6 +45,32 @@ describe('classifySemasRow', () => {
     expect(classifySemasRow('R10407')).toBeNull(); // 노래방
     expect(classifySemasRow('')).toBeNull();
   });
+
+  it('leaves out 전자 게임장 and 기타 오락장 entirely', () => {
+    expect(classifySemasRow('R10404', { standardIndustryCode: 'R91221', name: '하나게임장' })).toBeNull();
+    expect(classifySemasRow('R10405', { standardIndustryCode: 'R91229', name: '돌아이뽑기방' })).toBeNull();
+  });
+
+  it('requires a non-food row to carry the matching standard industry code', () => {
+    expect(classifySemasRow('R10309', { standardIndustryCode: 'R91134', name: '스트라이크볼링센터' })).toEqual({
+      category: 'attraction',
+      tags: [],
+    });
+    expect(classifySemasRow('R10309', { standardIndustryCode: 'L68129', name: '볼링빌딩' })).toBeNull();
+    expect(classifySemasRow('R10309', { name: '스트라이크볼링센터' })).toBeNull();
+  });
+
+  it('rejects company-named non-food rows but not company-named food rows', () => {
+    expect(classifySemasRow('R10309', { standardIndustryCode: 'R91134', name: '킴스코퍼레이션' })).toBeNull();
+    expect(classifySemasRow('G21801', { standardIndustryCode: 'G47841', name: '아담즈아트컨설팅' })).toBeNull();
+    expect(classifySemasRow('G21802', { standardIndustryCode: 'G47842', name: '한신종합상사' })).toBeNull();
+    expect(classifySemasRow('I21201', { name: '커피빈코리아' })).toEqual({ category: 'cafe', tags: [] });
+  });
+
+  it('keeps real bookstores but not learning-material sellers', () => {
+    expect(classifySemasRow('G21301', { standardIndustryCode: 'G47611', name: '심리서점쓰담' })).not.toBeNull();
+    expect(classifySemasRow('G21301', { standardIndustryCode: 'G47611', name: '키즈엠교육' })).toBeNull();
+  });
 });
 
 describe('tourApiItemToPlace', () => {
@@ -95,7 +121,7 @@ describe('parseCsvLine', () => {
 
 describe('semasRowToPlace', () => {
   const header = [
-    '상가업소번호', '상호명', '지점명', '상권업종소분류코드', '지번주소', '도로명주소', '경도', '위도',
+    '상가업소번호', '상호명', '지점명', '상권업종소분류코드', '지번주소', '도로명주소', '경도', '위도', '표준산업분류코드',
   ];
   const index = semasColumnIndex(header);
   const row = ['MA0101', '스타벅스', '판교점', 'I21201', '성남시 백현동 1', '성남시 판교역로 1', '127.11', '37.39'];
@@ -152,7 +178,7 @@ describe('broken names', () => {
   });
 
   it('skips SEMAS rows with a broken name or branch at import', () => {
-    const header = ['상가업소번호', '상호명', '지점명', '상권업종소분류코드', '지번주소', '도로명주소', '경도', '위도'];
+    const header = ['상가업소번호', '상호명', '지점명', '상권업종소분류코드', '지번주소', '도로명주소', '경도', '위도', '표준산업분류코드'];
     const index = semasColumnIndex(header);
     expect(semasRowToPlace(['A1', '스타벅스', '대', 'I21201', '', '서울', '127.1', '37.5'], index)).toBeNull();
     expect(semasRowToPlace(['A2', '비어링(세계맥', '', 'I21103', '', '서울', '127.1', '37.5'], index)).toBeNull();

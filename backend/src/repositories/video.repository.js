@@ -58,6 +58,21 @@ async function createPlaces(client, videoId, places) {
   return inserted;
 }
 
+/**
+ * Gives an already-saved place the name and location a later extraction
+ * pass found for it -- the id (and anything that references it, like a
+ * bookmark) is kept.
+ */
+async function locatePlace(client, placeId, { name, address, latitude, longitude }) {
+  const { rows } = await client.query(
+    `UPDATE places SET name = $2, address = $3, latitude = $4, longitude = $5, updated_at = now()
+     WHERE place_id = $1
+     RETURNING *`,
+    [placeId, name, address, latitude, longitude]
+  );
+  return rows[0];
+}
+
 async function setEnrichmentStatus(videoId, status) {
   await pool.query('UPDATE videos SET enrichment_status = $1, updated_at = now() WHERE video_id = $2', [
     status,
@@ -76,5 +91,6 @@ module.exports = {
   findPlacesByVideoId,
   createVideo,
   createPlaces,
+  locatePlace,
   setEnrichmentStatus,
 };

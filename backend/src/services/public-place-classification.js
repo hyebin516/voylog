@@ -163,23 +163,49 @@ const SEMAS_RULES = {
   I21104: { category: 'bar', tags: [] }, // 요리 주점
   // 카페
   I21201: { category: 'cafe', tags: [] },
-  // 놀거리 (노래방, PC방, 헬스장, 독서실, 복권방 등은 제외)
-  R10309: { category: 'attraction', tags: ['활기찬 분위기'] }, // 볼링장
-  R10404: { category: 'attraction', tags: ['활기찬 분위기'] }, // 전자 게임장
-  R10405: { category: 'attraction', tags: ['이색적인 곳'] }, // 기타 오락장 (방탈출, VR 등)
-  R10409: { category: 'attraction', tags: [] }, // 수상/해양 레저업
-  // 소품샵 · 서점
-  G21301: { category: 'shopping', tags: ['조용한 분위기'] }, // 서점
-  G21801: { category: 'shopping', tags: ['감성적인 분위기'] }, // 예술품 소매업
-  G21802: { category: 'shopping', tags: ['로컬스러운 분위기'] }, // 기념품점
+  // 놀거리 · 소품샵 · 서점 -- stricter than food, see NON_FOOD_RULE_NOTE.
+  // 노래방, PC방, 헬스장, 독서실, 복권방 are never included. 전자 게임장
+  // (R10404) and 기타 오락장 (R10405) are left out too: sampled nationwide
+  // they were almost all 오락실, 인형뽑기방, 홀덤·마작, PC방 -- nothing a
+  // walking course or a nearby list should send someone to.
+  // No mood tag: with one, a "활기찬" course in 서면 became five bowling alleys.
+  R10309: { category: 'attraction', tags: [], standardIndustry: 'R91134' }, // 볼링장
+  R10409: { category: 'attraction', tags: [], standardIndustry: 'R91239' }, // 수상/해양 레저업
+  G21301: {
+    category: 'shopping',
+    tags: ['조용한 분위기'],
+    standardIndustry: 'G47611',
+    // Book distributors and learning-material sellers share the code.
+    excludedNamePattern: /교육|에듀|학습|신문|출판|닷컴/,
+  }, // 서점
+  G21801: { category: 'shopping', tags: ['감성적인 분위기'], standardIndustry: 'G47841' }, // 예술품 소매업
+  G21802: { category: 'shopping', tags: ['로컬스러운 분위기'], standardIndustry: 'G47842' }, // 기념품점
 };
+
+// NON_FOOD_RULE_NOTE: for non-food codes the listing's name is all a user
+// sees, and these codes are full of registrations that aren't a place to
+// visit -- "킴스코퍼레이션" and "케이에스티엘산업" filed as 볼링장, consulting
+// firms as 예술품 소매업. So a non-food row must (1) also carry the matching
+// 표준산업분류 code, not just the 상권업종 code, and (2) not be named like a
+// company. Food rows skip the name check: there a corporate prefix is
+// usually a real franchise operator ("커피빈코리아").
+const COMPANY_NAME_PATTERN =
+  /코퍼레이션|컴퍼니|상사|산업|인베스트|글로벌|인터내셔널|유통|무역|엔터프라이즈|엔터테인먼트|주식회사|\(주\)|㈜|협동조합|컨설팅|수산|개발|건설|홀딩스|에이전시|이엔티$|코리아$/;
 
 /**
  * @param {string} subcategoryCode 상권업종소분류코드
+ * @param {{standardIndustryCode?: string, name?: string}} [row]
  * @returns {{category: string, tags: string[]} | null}
  */
-function classifySemasRow(subcategoryCode) {
-  return SEMAS_RULES[subcategoryCode] || null;
+function classifySemasRow(subcategoryCode, { standardIndustryCode, name = '' } = {}) {
+  const rule = SEMAS_RULES[subcategoryCode];
+  if (!rule) return null;
+  if (rule.standardIndustry) {
+    if (standardIndustryCode !== rule.standardIndustry) return null;
+    if (COMPANY_NAME_PATTERN.test(name)) return null;
+    if (rule.excludedNamePattern && rule.excludedNamePattern.test(name)) return null;
+  }
+  return { category: rule.category, tags: rule.tags };
 }
 
 /**

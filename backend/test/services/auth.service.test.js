@@ -35,6 +35,55 @@ describe('kakaoLogin', () => {
     expect(jwt.verify(token, process.env.JWT_SECRET)).toMatchObject({ userId: 'u1' });
   });
 
+  it('fills in an email a returning user signed up without', async () => {
+    // The Kakao app's 동의항목 for email can be added after someone already
+    // signed up, so their row was created with email null.
+    axios.get.mockResolvedValue(kakaoProfileResponse);
+    userRepository.findByProviderId.mockResolvedValue({
+      user_id: 'u1',
+      email: null,
+      nickname: '내가정한이름',
+      profile_image: null,
+    });
+    userRepository.updateKakaoProfile.mockResolvedValue({ user_id: 'u1', email: 'a@b.com', nickname: '내가정한이름' });
+
+    const { user } = await authService.kakaoLogin('kakao-token');
+
+    expect(userRepository.updateKakaoProfile).toHaveBeenCalledWith('u1', {
+      email: 'a@b.com',
+      profileImage: 'http://img',
+    });
+    // The nickname is this app's once the account exists -- a rename here
+    // must survive every later Kakao login.
+    expect(user.nickname).toBe('내가정한이름');
+  });
+
+  it('leaves a returning user alone when Kakao has nothing new', async () => {
+    axios.get.mockResolvedValue(kakaoProfileResponse);
+    userRepository.findByProviderId.mockResolvedValue({
+      user_id: 'u1',
+      email: 'a@b.com',
+      profile_image: 'http://img',
+    });
+
+    await authService.kakaoLogin('kakao-token');
+
+    expect(userRepository.updateKakaoProfile).not.toHaveBeenCalled();
+  });
+
+  it('still logs the user in when the profile sync fails', async () => {
+    axios.get.mockResolvedValue(kakaoProfileResponse);
+    userRepository.findByProviderId.mockResolvedValue({ user_id: 'u1', email: null, profile_image: null });
+    userRepository.updateKakaoProfile.mockRejectedValue(new Error('duplicate key value violates uq_users_email'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const { token, user } = await authService.kakaoLogin('kakao-token');
+
+    expect(user.user_id).toBe('u1');
+    expect(jwt.verify(token, process.env.JWT_SECRET)).toMatchObject({ userId: 'u1' });
+    warn.mockRestore();
+  });
+
   it('creates a new user on first login and issues a JWT for them', async () => {
     axios.get.mockResolvedValue(kakaoProfileResponse);
     userRepository.findByProviderId.mockResolvedValue(null);
@@ -69,9 +118,27 @@ describe('kakaoLogin', () => {
 
   it('wraps a failed Kakao token verification in a 503 AppError', async () => {
     axios.get.mockRejectedValue(new Error('401 from kakao'));
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
 
     await expect(authService.kakaoLogin('bad-token')).rejects.toBeInstanceOf(AppError);
     await expect(authService.kakaoLogin('bad-token')).rejects.toMatchObject({ statusCode: 503 });
+
+    warn.mockRestore();
+  });
+
+  it("logs Kakao's own error code for a rejected token, never the token itself", async () => {
+    axios.get.mockRejectedValue({
+      response: { status: 401, data: { code: -401, msg: 'this access token does not exist' } },
+    });
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await expect(authService.kakaoLogin('bad-token')).rejects.toBeInstanceOf(AppError);
+
+    const logged = warn.mock.calls[0][0];
+    expect(logged).toContain('status=401');
+    expect(logged).toContain('code=-401');
+    expect(logged).not.toContain('bad-token');
+    warn.mockRestore();
   });
 
   it('appends a numeric suffix when the Kakao nickname is already taken', async () => {

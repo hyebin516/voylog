@@ -46,8 +46,12 @@ function toCandidate(place) {
     name: place.name,
     latitude: Number(place.latitude),
     longitude: Number(place.longitude),
+    // Carried so a recommendation card can open the place's detail screen
+    // with its address/hours/tags instead of a name and a map pin alone.
+    address: place.address,
     category: place.category,
     businessHours: place.business_hours,
+    businessHoursIsEstimated: place.business_hours_is_estimated || false,
     embedding: place.embedding,
     tags: place.tags || [],
   };
@@ -211,6 +215,7 @@ function toSimilarTasteCandidate(place) {
     name: place.name,
     latitude: Number(place.latitude),
     longitude: Number(place.longitude),
+    address: place.address,
     category: place.category,
   };
 }

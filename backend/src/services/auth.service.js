@@ -20,6 +20,15 @@ async function fetchKakaoProfile(kakaoAccessToken) {
       profileImage: data.kakao_account?.profile?.profile_image_url ?? null,
     };
   } catch (err) {
+    // Kakao's own reason (KOE101 unregistered app/key hash, -401 expired
+    // token, ...) is the only thing that says why a login failed; without
+    // it every failure reaches the app as one opaque message. The access
+    // token itself is never logged.
+    const kakao = err.response?.data;
+    console.warn(
+      `Kakao profile lookup failed: status=${err.response?.status ?? 'none'} ` +
+        `code=${kakao?.code ?? '-'} msg=${kakao?.msg ?? err.message}`
+    );
     throw new AppError(503, 'AI_PROVIDER_ERROR', 'Failed to verify Kakao access token');
   }
 }
@@ -42,6 +51,31 @@ async function resolveUniqueNickname(baseNickname) {
   return candidate;
 }
 
+/**
+ * Pulls Kakao's email and profile image onto a returning user's row when
+ * they changed -- typically when a consent item was only added to the Kakao
+ * app later, so the account was created without them. The nickname is left
+ * alone: it's ours once created (renameable in the app, unique per user).
+ *
+ * Best-effort. A sync failure -- most plausibly another account already
+ * holding that email -- must not stop someone from logging in.
+ */
+async function refreshKakaoProfile(user, profile) {
+  const emailChanged = profile.email != null && profile.email !== user.email;
+  const imageChanged = profile.profileImage != null && profile.profileImage !== user.profile_image;
+  if (!emailChanged && !imageChanged) return null;
+
+  try {
+    return await userRepository.updateKakaoProfile(user.user_id, {
+      email: emailChanged ? profile.email : user.email,
+      profileImage: imageChanged ? profile.profileImage : user.profile_image,
+    });
+  } catch (err) {
+    console.warn(`Kakao profile sync skipped for user ${user.user_id}: ${err.message}`);
+    return null;
+  }
+}
+
 async function kakaoLogin(kakaoAccessToken) {
   const profile = await fetchKakaoProfile(kakaoAccessToken);
 
@@ -49,6 +83,8 @@ async function kakaoLogin(kakaoAccessToken) {
   if (!user) {
     const nickname = await resolveUniqueNickname(profile.nickname);
     user = await userRepository.create({ ...profile, nickname });
+  } else {
+    user = (await refreshKakaoProfile(user, profile)) || user;
   }
 
   const token = issueJwt(user);

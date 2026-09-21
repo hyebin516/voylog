@@ -4,7 +4,8 @@ const { success } = require('../utils/response');
 async function analyze(req, res, next) {
   try {
     const { youtubeUrl } = req.body;
-    const result = await videoService.analyzeVideo(youtubeUrl);
+    // Optional auth: guests can analyze too, they just get no push.
+    const result = await videoService.analyzeVideo(youtubeUrl, req.user ? req.user.userId : null);
     return success(res, result);
   } catch (err) {
     return next(err);

@@ -42,4 +42,34 @@ async function updateDates(tripId, startDate, endDate) {
   return rows[0];
 }
 
-module.exports = { create, findAllByUser, findById, countDaysByTrip, softDelete, updateDates };
+/**
+ * Trips that start on [date] (a YYYY-MM-DD string in the app's time zone,
+ * worked out by the caller) and haven't had their reminder sent yet.
+ * `start_date` is a DATE column, so it is compared as a plain calendar day
+ * -- no time zone conversion happens here.
+ */
+async function findStartingOnWithoutAlert(date) {
+  const { rows } = await pool.query(
+    `SELECT * FROM trips
+      WHERE deleted_at IS NULL
+        AND start_date = $1
+        AND start_alert_sent_at IS NULL`,
+    [date]
+  );
+  return rows;
+}
+
+async function markStartAlertSent(tripId) {
+  await pool.query('UPDATE trips SET start_alert_sent_at = now() WHERE trip_id = $1', [tripId]);
+}
+
+module.exports = {
+  create,
+  findAllByUser,
+  findById,
+  countDaysByTrip,
+  softDelete,
+  updateDates,
+  findStartingOnWithoutAlert,
+  markStartAlertSent,
+};
