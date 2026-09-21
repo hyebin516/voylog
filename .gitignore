@@ -6,3 +6,12 @@ Thumbs.db
 # Bulk public place datasets (SEMAS 상가정보 zip/CSV, TourAPI dumps) -- too large
 # for git and subject to each dataset's license terms; kept locally only.
 database/seed-data/
+
+# Local dev-server logs (backend/ai-worker run output)
+*_dev.log
+backend/logs/
+
+# Editor workspace file and the design-handoff archive (the unpacked
+# "Voylog UI/" folder is what the repo actually uses)
+travel_youtube_app.code-workspace
+Voylog UI.zip

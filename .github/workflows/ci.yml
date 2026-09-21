@@ -52,3 +52,24 @@ jobs:
       - run: cp .env.example .env # mirrors local setup; .env is a declared pubspec asset
       - run: flutter analyze
       - run: flutter test
+
+  # iOS can only be compiled on macOS, and nobody on the team develops on
+  # one -- so CI is the only place the iOS target is ever built. Runs
+  # without signing (no certificates in CI) and without Firebase: the
+  # Kakao key (ios/Flutter/KakaoKeys.xcconfig) and GoogleService-Info.plist
+  # are git-ignored, and both are optional includes so the build works
+  # without them. It catches broken plugin/pod setup, not runtime behavior.
+  ios-build:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: travel_youtube_app
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.44.4'
+          channel: 'stable'
+      - run: flutter pub get
+      - run: cp .env.example .env
+      - run: flutter build ios --no-codesign
