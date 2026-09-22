@@ -12,6 +12,7 @@ const {
   validateResetPassword,
 } = require('../validators/auth.validator');
 const authenticate = require('../middlewares/auth');
+const { uploadProfileImage } = require('../middlewares/profileImageUpload');
 
 const router = express.Router();
 
@@ -27,6 +28,8 @@ router.patch('/password', authenticate, validateChangePassword, authController.c
 router.post('/password/reset/request-otp', validateRequestOtp, authController.requestPasswordResetOtp);
 router.post('/password/reset/verify-otp', validateVerifyOtp, authController.verifyPasswordResetOtp);
 router.post('/password/reset', validateResetPassword, authController.resetPassword);
+router.put('/profile/image', authenticate, uploadProfileImage, authController.updateProfileImage);
+router.delete('/profile/image', authenticate, authController.removeProfileImage);
 router.delete('/profile', authenticate, authController.deleteAccount);
 
 module.exports = router;

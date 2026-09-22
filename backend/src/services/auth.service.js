@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const env = require('../config/env');
 const userRepository = require('../repositories/user.repository');
+const profileImageService = require('./profile-image.service');
 const emailOtpRepository = require('../repositories/email-otp.repository');
 const emailService = require('../services/email.service');
 const AppError = require('../utils/AppError');
@@ -13,11 +14,26 @@ async function fetchKakaoProfile(kakaoAccessToken) {
     const { data } = await axios.get('https://kapi.kakao.com/v2/user/me', {
       headers: { Authorization: `Bearer ${kakaoAccessToken}` },
     });
+    // Kakao answers 200 with the field simply absent when the user hasn't
+    // consented, which is indistinguishable from "this account has none"
+    // unless you read the companion *_needs_agreement flag. Without this
+    // line a missing photo or email looks like a bug in our mapping.
+    const account = data.kakao_account ?? {};
+    const withheld = ['email', 'profile_image', 'profile_nickname']
+      .filter((field) => account[`${field}_needs_agreement`] === true);
+    if (withheld.length > 0) {
+      console.warn(
+        `Kakao withheld ${withheld.join(', ')} for this login: the user has not agreed to ` +
+          'those consent items (Kakao only re-asks for optional items through loginWithNewScopes, ' +
+          'or on a fresh consent after the app is unlinked)'
+      );
+    }
+
     return {
       providerId: String(data.id),
-      email: data.kakao_account?.email ?? null,
-      nickname: data.kakao_account?.profile?.nickname ?? 'Kakao User',
-      profileImage: data.kakao_account?.profile?.profile_image_url ?? null,
+      email: account.email ?? null,
+      nickname: account.profile?.nickname ?? 'Kakao User',
+      profileImage: account.profile?.profile_image_url ?? null,
     };
   } catch (err) {
     // Kakao's own reason (KOE101 unregistered app/key hash, -401 expired
@@ -52,23 +68,27 @@ async function resolveUniqueNickname(baseNickname) {
 }
 
 /**
- * Pulls Kakao's email and profile image onto a returning user's row when
- * they changed -- typically when a consent item was only added to the Kakao
- * app later, so the account was created without them. The nickname is left
- * alone: it's ours once created (renameable in the app, unique per user).
+ * Pulls Kakao's email onto a returning user's row when it changed --
+ * typically when the email consent item was only added to the Kakao app
+ * later, so the account was created without it.
+ *
+ * Two fields are deliberately NOT synced. The nickname is ours once created
+ * (renameable in the app, unique per user). The profile photo is the user's
+ * own: they set it from their gallery, so re-syncing Kakao's would silently
+ * undo that on the next login. Kakao's photo is still used as the starting
+ * value when the account is first created.
  *
  * Best-effort. A sync failure -- most plausibly another account already
  * holding that email -- must not stop someone from logging in.
  */
 async function refreshKakaoProfile(user, profile) {
   const emailChanged = profile.email != null && profile.email !== user.email;
-  const imageChanged = profile.profileImage != null && profile.profileImage !== user.profile_image;
-  if (!emailChanged && !imageChanged) return null;
+  if (!emailChanged) return null;
 
   try {
     return await userRepository.updateKakaoProfile(user.user_id, {
-      email: emailChanged ? profile.email : user.email,
-      profileImage: imageChanged ? profile.profileImage : user.profile_image,
+      email: profile.email,
+      profileImage: user.profile_image,
     });
   } catch (err) {
     console.warn(`Kakao profile sync skipped for user ${user.user_id}: ${err.message}`);
@@ -245,7 +265,23 @@ async function login(email, password) {
   return { token, user };
 }
 
+/**
+ * FR-08/FR-14 프로필 사진. The photo the user picked from their own gallery
+ * replaces whatever was there, including a Kakao one.
+ */
+async function replaceProfileImage(userId, file) {
+  const user = await getProfile(userId);
+  return profileImageService.replaceProfileImage(user, file);
+}
+
+async function clearProfileImage(userId) {
+  const user = await getProfile(userId);
+  return profileImageService.clearProfileImage(user);
+}
+
 module.exports = {
+  replaceProfileImage,
+  clearProfileImage,
   kakaoLogin,
   getProfile,
   deleteAccount,

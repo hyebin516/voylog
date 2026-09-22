@@ -51,11 +51,28 @@ describe('kakaoLogin', () => {
 
     expect(userRepository.updateKakaoProfile).toHaveBeenCalledWith('u1', {
       email: 'a@b.com',
-      profileImage: 'http://img',
+      profileImage: null,
     });
     // The nickname is this app's once the account exists -- a rename here
     // must survive every later Kakao login.
     expect(user.nickname).toBe('내가정한이름');
+  });
+
+  it('never overwrites the photo the user chose from their own gallery', async () => {
+    // Kakao's photo seeds a brand-new account, but after that the user's own
+    // upload is the source of truth -- syncing would undo it every login.
+    axios.get.mockResolvedValue(kakaoProfileResponse);
+    userRepository.findByProviderId.mockResolvedValue({
+      user_id: 'u1',
+      email: 'a@b.com',
+      nickname: '내가정한이름',
+      profile_image: '/uploads/profile-images/u1-abc123.jpg',
+    });
+
+    const { user } = await authService.kakaoLogin('kakao-token');
+
+    expect(userRepository.updateKakaoProfile).not.toHaveBeenCalled();
+    expect(user.profile_image).toBe('/uploads/profile-images/u1-abc123.jpg');
   });
 
   it('leaves a returning user alone when Kakao has nothing new', async () => {

@@ -59,6 +59,8 @@ describe('protected routes require a Bearer token', () => {
     ['PUT', '/api/v1/notification-settings'],
     ['POST', '/api/v1/device-tokens'],
     ['DELETE', '/api/v1/device-tokens/fcm-token'],
+    ['PUT', '/api/v1/auth/profile/image'],
+    ['DELETE', '/api/v1/auth/profile/image'],
     ['GET', '/api/v1/support-inquiries'],
     ['GET', '/api/v1/taste-preferences'],
     ['PUT', '/api/v1/taste-preferences'],

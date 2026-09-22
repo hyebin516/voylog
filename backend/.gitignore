@@ -5,3 +5,4 @@ npm-debug.log
 
 # FR-12 push notifications: Firebase service account key (never commit)
 firebase-service-account.json
+uploads/

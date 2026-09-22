@@ -49,6 +49,14 @@ async function updateNickname(userId, nickname) {
   return rows[0];
 }
 
+async function updateProfileImage(userId, profileImage) {
+  const { rows } = await pool.query(
+    'UPDATE users SET profile_image = $1, updated_at = now() WHERE user_id = $2 AND deleted_at IS NULL RETURNING *',
+    [profileImage, userId]
+  );
+  return rows[0];
+}
+
 async function findByEmail(email) {
   const { rows } = await pool.query('SELECT * FROM users WHERE email = $1 AND deleted_at IS NULL', [email]);
   return rows[0] || null;
@@ -87,5 +95,6 @@ module.exports = {
   findByNickname,
   createEmailUser,
   updateNickname,
+  updateProfileImage,
   updatePasswordHash,
 };

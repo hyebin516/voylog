@@ -1,12 +1,15 @@
 const authService = require('../services/auth.service');
+const profileImageService = require('../services/profile-image.service');
 const { success } = require('../utils/response');
 
-function toUserResponse(user) {
+// [req] resolves an uploaded photo's stored path against the host the client
+// reached us on; a Kakao photo is already absolute and passes through.
+function toUserResponse(user, req) {
   return {
     userId: user.user_id,
     email: user.email,
     nickname: user.nickname,
-    profileImage: user.profile_image,
+    profileImage: profileImageService.toPublicUrl(user.profile_image, req),
     provider: user.provider,
   };
 }
@@ -14,7 +17,7 @@ function toUserResponse(user) {
 async function kakaoLogin(req, res, next) {
   try {
     const { token, user } = await authService.kakaoLogin(req.body.kakaoAccessToken);
-    return success(res, { token, user: toUserResponse(user) });
+    return success(res, { token, user: toUserResponse(user, req) });
   } catch (err) {
     return next(err);
   }
@@ -23,7 +26,7 @@ async function kakaoLogin(req, res, next) {
 async function profile(req, res, next) {
   try {
     const user = await authService.getProfile(req.user.userId);
-    return success(res, toUserResponse(user));
+    return success(res, toUserResponse(user, req));
   } catch (err) {
     return next(err);
   }
@@ -41,7 +44,7 @@ async function deleteAccount(req, res, next) {
 async function updateProfile(req, res, next) {
   try {
     const user = await authService.updateNickname(req.user.userId, req.body.nickname);
-    return success(res, toUserResponse(user));
+    return success(res, toUserResponse(user, req));
   } catch (err) {
     return next(err);
   }
@@ -77,7 +80,7 @@ async function verifyOtp(req, res, next) {
 async function signup(req, res, next) {
   try {
     const { token, user } = await authService.signup(req.body.email, req.body.password, req.body.nickname);
-    return success(res, { token, user: toUserResponse(user) }, 201);
+    return success(res, { token, user: toUserResponse(user, req) }, 201);
   } catch (err) {
     return next(err);
   }
@@ -86,7 +89,7 @@ async function signup(req, res, next) {
 async function login(req, res, next) {
   try {
     const { token, user } = await authService.login(req.body.email, req.body.password);
-    return success(res, { token, user: toUserResponse(user) });
+    return success(res, { token, user: toUserResponse(user, req) });
   } catch (err) {
     return next(err);
   }
@@ -128,7 +131,28 @@ async function resetPassword(req, res, next) {
   }
 }
 
+
+async function updateProfileImage(req, res, next) {
+  try {
+    const user = await authService.replaceProfileImage(req.user.userId, req.file);
+    return success(res, toUserResponse(user, req));
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function removeProfileImage(req, res, next) {
+  try {
+    const user = await authService.clearProfileImage(req.user.userId);
+    return success(res, toUserResponse(user, req));
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
+  updateProfileImage,
+  removeProfileImage,
   kakaoLogin,
   profile,
   deleteAccount,
