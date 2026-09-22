@@ -15,3 +15,6 @@ backend/logs/
 # "Voylog UI/" folder is what the repo actually uses)
 travel_youtube_app.code-workspace
 Voylog UI.zip
+
+# Word/Excel lock files created while a document is open
+~$*
