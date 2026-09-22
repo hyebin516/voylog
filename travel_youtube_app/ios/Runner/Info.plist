@@ -56,8 +56,12 @@
 	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- Required by geolocator for "내 주변 추천" (nearby recommendations).
-	     UNVERIFIED: not build-tested (this repo's dev machine is Windows). -->
+	<!-- image_picker: iOS kills the app on the spot if a usage description
+	     is missing when the picker opens. Only the photo library is used;
+	     the camera is never opened, so no NSCameraUsageDescription. -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>프로필 사진으로 사용할 사진을 선택하기 위해 사진 접근 권한이 필요합니다.</string>
+	<!-- Required by geolocator for "내 주변 추천" (nearby recommendations). -->
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>내 주변 여행지를 추천해 드리기 위해 위치 정보가 필요합니다.</string>
 	<!-- Required by kakao_map_plugin / webview_flutter to load the Kakao Maps SDK -->
