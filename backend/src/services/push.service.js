@@ -41,11 +41,15 @@ function getMessaging() {
     return null;
   }
   // Required lazily so a machine without the SDK installed still boots.
-  const admin = require('firebase-admin');
-  const app = admin.apps.length
-    ? admin.app()
-    : admin.initializeApp({ credential: admin.credential.cert(JSON.parse(fs.readFileSync(keyPath, 'utf8'))) });
-  messaging = admin.messaging(app);
+  // firebase-admin 14 dropped the old namespaced surface (admin.credential,
+  // admin.messaging(), admin.apps) for these per-feature entry points.
+  const { initializeApp, getApp, getApps, cert } = require('firebase-admin/app');
+  const { getMessaging } = require('firebase-admin/messaging');
+
+  const app = getApps().length
+    ? getApp()
+    : initializeApp({ credential: cert(JSON.parse(fs.readFileSync(keyPath, 'utf8'))) });
+  messaging = getMessaging(app);
   return messaging;
 }
 

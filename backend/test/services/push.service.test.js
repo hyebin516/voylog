@@ -21,12 +21,18 @@ function loadService({ configured = true, keyExists = true, sendResult } = {}) {
   const sendEachForMulticast = jest
     .fn()
     .mockResolvedValue(sendResult || { successCount: 1, responses: [{ success: true }] });
-  jest.doMock('firebase-admin', () => ({
-    apps: [],
-    app: jest.fn(),
+  // Mirrors firebase-admin 14's per-feature entry points. The shape matters:
+  // mocking the old namespaced surface (admin.credential / admin.messaging)
+  // let a service written against v11 pass every test and throw on the first
+  // real send -- the contract test at the bottom of this file guards that.
+  jest.doMock('firebase-admin/app', () => ({
     initializeApp: jest.fn(() => ({})),
-    credential: { cert: jest.fn() },
-    messaging: () => ({ sendEachForMulticast }),
+    getApp: jest.fn(() => ({})),
+    getApps: jest.fn(() => []),
+    cert: jest.fn(),
+  }));
+  jest.doMock('firebase-admin/messaging', () => ({
+    getMessaging: () => ({ sendEachForMulticast }),
   }));
 
   const deviceTokenRepository = { findByUser: jest.fn().mockResolvedValue([{ token: 'tok-1' }]), remove: jest.fn() };
@@ -170,5 +176,27 @@ describe('sendToUser failure handling', () => {
     expect(sendEachForMulticast).toHaveBeenCalledWith(
       expect.objectContaining({ data: { kind: 'analysisComplete', videoId: 'v1', count: '3' } })
     );
+  });
+});
+
+describe('the firebase-admin API this service is written against', () => {
+  // Not mocked on purpose. Every other test in this file stubs the SDK, so a
+  // version bump that moves or renames these would otherwise stay invisible
+  // until a real notification failed -- which is exactly what happened on the
+  // v14 upgrade (admin.credential.cert / admin.messaging() were removed).
+  it('exposes the app functions the service calls', () => {
+    const app = jest.requireActual('firebase-admin/app');
+
+    expect(typeof app.initializeApp).toBe('function');
+    expect(typeof app.getApp).toBe('function');
+    expect(typeof app.getApps).toBe('function');
+    expect(typeof app.cert).toBe('function');
+  });
+
+  it('exposes getMessaging, and its client can send to many tokens at once', () => {
+    const { getMessaging, Messaging } = jest.requireActual('firebase-admin/messaging');
+
+    expect(typeof getMessaging).toBe('function');
+    expect(typeof Messaging.prototype.sendEachForMulticast).toBe('function');
   });
 });
