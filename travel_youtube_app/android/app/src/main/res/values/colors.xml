@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- FR-12: the accent Android tints a notification's icon and app name
+         with. Matches AppColors.primary in lib/core/theme/app_theme.dart. -->
+    <color name="notification_accent">#3D9FDB</color>
+</resources>

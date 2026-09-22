@@ -51,6 +51,21 @@
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <!-- FR-12: the channel MainActivity creates. Without this FCM uses
+             its own fallback channel, shown as "기타" in system settings. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="voylog_default" />
+        <!-- Android draws a status-bar icon from its alpha channel only, so
+             this is a white silhouette of the Voylog route mark. Without it
+             FCM falls back to the launcher icon, which renders as a white
+             blob. Generated from assets/icon/app_icon_foreground.png. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_notification" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
