@@ -261,3 +261,36 @@ def test_thorough_extraction_uses_the_stronger_openai_model(monkeypatch):
     llm_service.extract_places("prompt", "openai", thorough=True)
 
     assert models == [llm_service._OPENAI_EXTRACTION_MODEL, llm_service._OPENAI_THOROUGH_EXTRACTION_MODEL]
+
+
+def test_claude_model_is_not_a_retired_one():
+    """The previous value, claude-3-5-sonnet-latest, was retired on
+    2025-10-28 -- every fallback that reached it returned a 404, and nothing
+    in the suite noticed because the Claude call is always mocked."""
+    assert llm_service._CLAUDE_MODEL == "claude-opus-5"
+
+
+def test_first_text_block_skips_thinking_blocks():
+    """Current Claude models think by default, so content[0] is often a
+    thinking block with empty text -- reading index 0 fed the JSON parser an
+    empty string."""
+
+    class Block:
+        def __init__(self, type_, text):
+            self.type = type_
+            self.text = text
+
+    class Response:
+        stop_reason = "end_turn"
+        content = [Block("thinking", ""), Block("text", '{"places": []}')]
+
+    assert llm_service._first_text_block(Response()) == '{"places": []}'
+
+
+def test_first_text_block_raises_on_refusal():
+    class Response:
+        stop_reason = "refusal"
+        content = []
+
+    with pytest.raises(RuntimeError, match="declined"):
+        llm_service._first_text_block(Response())

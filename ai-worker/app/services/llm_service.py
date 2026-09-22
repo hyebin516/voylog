@@ -28,6 +28,10 @@ def _parse_json(raw_text: str) -> LlmPlaceExtractionResult:
 # gpt-4o-mini missed in 3 of 3 runs on the same vlog (a shop only named on
 # screen as "@vaca"), so the first pass now uses it too instead of leaving
 # those places for the background pass to fill in minutes later.
+# Claude Sonnet 3.5 (the previous value here) was retired on 2025-10-28, so
+# the fallback returned a 404 for every call that reached it.
+_CLAUDE_MODEL = "claude-opus-5"
+
 _OPENAI_EXTRACTION_MODEL = "gpt-4.1-mini"
 _OPENAI_THOROUGH_EXTRACTION_MODEL = _OPENAI_EXTRACTION_MODEL
 
@@ -47,17 +51,36 @@ def _call_openai(user_prompt: str, model: str = _OPENAI_EXTRACTION_MODEL) -> Llm
     return _parse_json(response.choices[0].message.content)
 
 
+def _first_text_block(response) -> str:
+    """The response's answer text.
+
+    Not `content[0]`: current Claude models think by default, so the first
+    block is often a `thinking` block whose text is empty -- reading index 0
+    silently handed an empty string to the JSON parser.
+    """
+    if response.stop_reason == "refusal":
+        raise RuntimeError("Claude declined this request")
+    for block in response.content:
+        if getattr(block, "type", None) == "text":
+            return block.text
+    raise RuntimeError(f"Claude returned no text block (stop_reason={response.stop_reason})")
+
+
 def _call_claude(user_prompt: str) -> LlmPlaceExtractionResult:
     if not _anthropic_client:
         raise RuntimeError("Claude client is not configured")
 
     response = _anthropic_client.messages.create(
-        model="claude-3-5-sonnet-latest",
-        max_tokens=2048,
+        model=_CLAUDE_MODEL,
+        max_tokens=8192,
+        # Extraction is a mechanical read of the transcript, not a reasoning
+        # problem, and thinking tokens come out of max_tokens -- at low effort
+        # the budget goes to the JSON instead of to deliberation.
+        output_config={"effort": "low"},
         system=SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
     )
-    return _parse_json(response.content[0].text)
+    return _parse_json(_first_text_block(response))
 
 
 # Rate limits are per minute. The on-screen-text pass alone can use a whole
@@ -189,11 +212,12 @@ def _call_claude_vision(frames: list[bytes]) -> str:
 
     content = [_image_content_block_claude(f) for f in frames] + [{"type": "text", "text": _SCREEN_TEXT_PROMPT}]
     response = _anthropic_client.messages.create(
-        model="claude-3-5-sonnet-latest",
-        max_tokens=1024,
+        model=_CLAUDE_MODEL,
+        max_tokens=4096,
+        output_config={"effort": "low"},
         messages=[{"role": "user", "content": content}],
     )
-    return response.content[0].text.strip()
+    return _first_text_block(response).strip()
 
 
 def _call_with_retry_text(call_fn, frames: list[bytes], provider_name: str) -> str:
