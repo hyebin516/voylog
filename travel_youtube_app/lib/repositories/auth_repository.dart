@@ -94,6 +94,28 @@ class AuthRepository {
     }
   }
 
+  /// Uploads a photo the user picked from their own gallery. [filePath] is
+  /// what `image_picker` returned -- already downscaled on the device, so
+  /// this is tens of KB rather than a full-resolution camera shot.
+  Future<UserModel> uploadProfileImage(String filePath) async {
+    try {
+      final form = FormData.fromMap({'image': await MultipartFile.fromFile(filePath)});
+      final response = await _dio.put('/auth/profile/image', data: form);
+      return UserModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
+  Future<UserModel> removeProfileImage() async {
+    try {
+      final response = await _dio.delete('/auth/profile/image');
+      return UserModel.fromJson(response.data['data'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
   Future<void> changePassword({required String currentPassword, required String newPassword}) async {
     try {
       await _dio.patch('/auth/password', data: {'currentPassword': currentPassword, 'newPassword': newPassword});

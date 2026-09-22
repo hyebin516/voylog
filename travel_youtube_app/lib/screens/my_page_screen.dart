@@ -7,16 +7,23 @@ import '../providers/auth_provider.dart';
 import '../providers/bookmark_folder_provider.dart';
 import '../providers/trip_provider.dart';
 import '../routes/app_routes.dart';
+import '../services/image_picker_service.dart';
 import '../widgets/auth_backdrop.dart';
+import '../widgets/profile_avatar.dart';
 
 class MyPageScreen extends StatefulWidget {
-  const MyPageScreen({super.key});
+  /// Injectable so widget tests can pick a photo without the gallery.
+  const MyPageScreen({super.key, this.imagePicker = const GalleryImagePickerService()});
+
+  final ImagePickerService imagePicker;
 
   @override
   State<MyPageScreen> createState() => _MyPageScreenState();
 }
 
 class _MyPageScreenState extends State<MyPageScreen> {
+  bool _savingPhoto = false;
+
   @override
   void initState() {
     super.initState();
@@ -131,6 +138,67 @@ class _MyPageScreenState extends State<MyPageScreen> {
     return user.isKakaoAccount ? '카카오 계정으로 로그인' : '로그인 중';
   }
 
+  Future<void> _openPhotoSheet() async {
+    final hasPhoto = context.read<AuthProvider>().currentUser?.profileImage != null;
+
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.white,
+      barrierColor: AppColors.overlay,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(2))),
+            const SizedBox(height: 12),
+            ListTile(
+              key: const Key('pickPhotoTile'),
+              leading: const Icon(Icons.photo_library_rounded, color: AppColors.primary),
+              title: const Text('앨범에서 선택', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink)),
+              onTap: () => Navigator.of(sheetContext).pop('pick'),
+            ),
+            if (hasPhoto)
+              ListTile(
+                key: const Key('removePhotoTile'),
+                leading: const Icon(Icons.delete_outline_rounded, color: AppColors.danger),
+                title: const Text('기본 이미지로 변경', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.danger)),
+                onTap: () => Navigator.of(sheetContext).pop('remove'),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (!mounted || action == null) return;
+    if (action == 'pick') {
+      await _pickAndUploadPhoto();
+    } else {
+      await _applyPhotoChange(() => context.read<AuthProvider>().removeProfileImage(), '기본 이미지로 바꿨어요.');
+    }
+  }
+
+  Future<void> _pickAndUploadPhoto() async {
+    final path = await widget.imagePicker.pickFromGallery();
+    // Null means the user closed the gallery without choosing -- not a failure.
+    if (path == null || !mounted) return;
+    await _applyPhotoChange(() => context.read<AuthProvider>().updateProfileImage(path), '프로필 사진을 바꿨어요.');
+  }
+
+  Future<void> _applyPhotoChange(Future<bool> Function() change, String successMessage) async {
+    setState(() => _savingPhoto = true);
+    final ok = await change();
+    if (!mounted) return;
+    setState(() => _savingPhoto = false);
+
+    final provider = context.read<AuthProvider>();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? successMessage : provider.errorMessage ?? '프로필 사진을 바꾸지 못했어요.')),
+    );
+  }
+
   Future<void> _openEditNickname(String currentNickname) async {
     final controller = TextEditingController(text: currentNickname);
     final newNickname = await showDialog<String>(
@@ -145,16 +213,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 64,
-                height: 64,
-                alignment: Alignment.center,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.person_rounded, size: 30, color: Colors.white),
-              ),
+              ProfileAvatar(imageUrl: context.read<AuthProvider>().currentUser?.profileImage, size: 64),
               const SizedBox(height: 14),
               const Text('프로필 수정', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.ink)),
               const SizedBox(height: 14),
@@ -216,17 +275,47 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     const SizedBox(height: AppSpacing.md),
                     Row(
                       children: [
-                        Container(
-                          width: 60,
-                          height: 60,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
-                            shape: BoxShape.circle,
-                            boxShadow: AppColors.floatingButtonShadow(),
+                        // Guests have no profile to change.
+                        if (user == null)
+                          const ProfileAvatar(imageUrl: null, shadow: true)
+                        else
+                          Semantics(
+                            button: true,
+                            label: '프로필 사진 변경',
+                            child: InkWell(
+                              key: const Key('profileAvatarButton'),
+                              onTap: _openPhotoSheet,
+                              customBorder: const CircleBorder(),
+                              child: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  ProfileAvatar(imageUrl: user.profileImage, shadow: true),
+                                  if (_savingPhoto)
+                                    const Positioned.fill(
+                                      child: DecoratedBox(
+                                        decoration: BoxDecoration(color: AppColors.overlay, shape: BoxShape.circle),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: AppColors.divider),
+                                    ),
+                                    child: const Icon(Icons.photo_camera_rounded, size: 12, color: AppColors.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                          child: const Icon(Icons.person_rounded, size: 28, color: Colors.white),
-                        ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(

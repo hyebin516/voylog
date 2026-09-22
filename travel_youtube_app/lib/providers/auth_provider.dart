@@ -169,6 +169,33 @@ class AuthProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Returns whether it stuck, so the screen can confirm or show the error.
+  Future<bool> updateProfileImage(String filePath) async {
+    try {
+      _currentUser = await _repository.uploadProfileImage(filePath);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> removeProfileImage() async {
+    try {
+      _currentUser = await _repository.removeProfileImage();
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    notifyListeners();
+    return true;
+  }
+
   Future<bool> updateNickname(String nickname) async {
     try {
       _currentUser = await _repository.updateNickname(nickname);
