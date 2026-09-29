@@ -73,6 +73,11 @@ class PlaceInput(BaseModel):
     name: str
     latitude: float
     longitude: float
+    # Carried through to the route so a place the backend has to write into
+    # `places` (a Kakao search result kept as part of a course) arrives with
+    # its category -- without one it never shows up in 내 주변 추천's
+    # 음식점/카페/놀거리 tabs, which filter on exactly this column.
+    category: Optional[str] = None
 
 
 class RouteOptimizationRequest(BaseModel):

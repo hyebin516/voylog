@@ -6,6 +6,15 @@ class RoutePointModel {
   final String name;
   final double? latitude;
   final double? longitude;
+
+  /// What kind of place this is (cafe/restaurant/attraction/...).
+  ///
+  /// Sent back when the course is saved so the backend can store it with any
+  /// Kakao-search place it has to create -- without a category such a place
+  /// never appears in 내 주변 추천's 음식점/카페/놀거리 tabs, which filter on
+  /// exactly that column.
+  final String? category;
+
   // Distance/duration of the leg arriving at this point from the previous
   // point in the route -- null for the first point (order 0).
   final int? legDistanceM;
@@ -35,6 +44,7 @@ class RoutePointModel {
     required this.name,
     required this.latitude,
     required this.longitude,
+    this.category,
     this.legDistanceM,
     this.legDurationSec,
     this.legPath,
@@ -82,6 +92,7 @@ class RoutePointModel {
       name: json['name'] as String,
       latitude: (json['latitude'] as num?)?.toDouble(),
       longitude: (json['longitude'] as num?)?.toDouble(),
+      category: json['category'] as String?,
       legDistanceM: json['legDistanceM'] as int?,
       legDurationSec: json['legDurationSec'] as int?,
       legPath: (json['legPath'] as List<dynamic>?)
@@ -103,6 +114,7 @@ class RoutePointModel {
         'name': name,
         'latitude': latitude,
         'longitude': longitude,
+        if (category != null) 'category': category,
         'legDistanceM': legDistanceM,
         'legDurationSec': legDurationSec,
         if (legTransportMode != null) 'legTransportMode': legTransportMode,

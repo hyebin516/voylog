@@ -205,6 +205,11 @@ class RoutePoint(BaseModel):
     name: str
     latitude: Optional[float] = None
     longitude: Optional[float] = None
+    # What kind of place this is (cafe/restaurant/attraction/...), when the
+    # request carried one. The backend stores it with any Kakao place it has
+    # to create for a kept course, so the place can be found again by
+    # category in 내 주변 추천.
+    category: Optional[str] = None
     # Distance/duration of the leg arriving at this point from the previous
     # point in the optimized route -- null for the first point (order 0),
     # which has no preceding leg. Lets the UI show real per-stop "도보 N분"

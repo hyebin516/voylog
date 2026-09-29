@@ -428,7 +428,16 @@ async def generate_walking_course(request: WalkingCourseRequest) -> WalkingCours
         RouteOptimizationRequest(
             startHotel=center_point,
             endHotel=center_point,
-            places=[PlaceInput(placeId=c.placeId, name=c.name, latitude=c.latitude, longitude=c.longitude) for c in selected],
+            places=[
+                PlaceInput(
+                    placeId=c.placeId,
+                    name=c.name,
+                    latitude=c.latitude,
+                    longitude=c.longitude,
+                    category=c.category,
+                )
+                for c in selected
+            ],
             routeType="roundTrip",
             optimizationPriority="duration",
             transportMode="walk",
