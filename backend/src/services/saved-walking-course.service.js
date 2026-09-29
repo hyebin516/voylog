@@ -1,6 +1,7 @@
 const savedWalkingCourseRepository = require('../repositories/saved-walking-course.repository');
 const sharedRouteRepository = require('../repositories/shared-route.repository');
 const { buildPublicRouteSnapshot } = require('../utils/route-snapshot');
+const { materializeRoutePlaces } = require('./kakao-place.service');
 const AppError = require('../utils/AppError');
 
 async function getOwnedCourse(userId, savedCourseId) {
@@ -12,7 +13,11 @@ async function getOwnedCourse(userId, savedCourseId) {
 }
 
 async function saveCourse(userId, course) {
-  return savedWalkingCourseRepository.create(userId, course);
+  // Keeping a course is what makes its Kakao-search places worth a row in
+  // `places` -- without one they cannot be bookmarked from the course, and
+  // a like on the published version would learn nothing from them.
+  const routeData = await materializeRoutePlaces(course.routeData);
+  return savedWalkingCourseRepository.create(userId, { ...course, routeData });
 }
 
 async function listCourses(userId) {
@@ -32,7 +37,9 @@ async function publishCourse(userId, savedCourseId, title) {
     throw new AppError(409, 'ALREADY_PUBLISHED', 'This course is already published');
   }
 
-  const snapshot = buildPublicRouteSnapshot(course.route_data);
+  // Courses saved before this ran still hold "kakao:" ids, so publishing
+  // resolves them too rather than carrying them into the public feed.
+  const snapshot = buildPublicRouteSnapshot(await materializeRoutePlaces(course.route_data));
   return sharedRouteRepository.create(userId, {
     sourceType: 'saved_walking_course',
     sourceId: course.saved_course_id,

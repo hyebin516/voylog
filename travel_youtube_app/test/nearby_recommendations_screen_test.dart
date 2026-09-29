@@ -21,7 +21,7 @@ import 'fakes/fake_map_widget.dart';
 const LocationResult _location = LocationResult(latitude: 37.5, longitude: 127.0);
 
 const NearbyRecommendationModel _rec = NearbyRecommendationModel(
-  placeId: 'p1',
+  placeId: 'b4e01fd9-a17c-4fec-bee6-24184eff96ee',
   name: '예시 베이커리 카페',
   latitude: 37.5,
   longitude: 127.0,

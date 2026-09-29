@@ -37,9 +37,18 @@ class BookmarkProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Drops a message a screen has already shown, so the next bookmark
+  /// isn't judged by the previous one's failure.
+  void clearError() {
+    if (_errorMessage == null) return;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   Future<void> toggleBookmark(String placeId) async {
     final matches = _bookmarks.where((b) => b.placeId == placeId);
     final existing = matches.isEmpty ? null : matches.first;
+    _errorMessage = null;
 
     try {
       if (existing != null) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/bookmark_provider.dart';
+import '../utils/place_id.dart';
 import 'bookmark_folder_sheet.dart';
 
 class BookmarkButton extends StatelessWidget {
@@ -19,6 +20,11 @@ class BookmarkButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A place with no row in `places` can never be bookmarked -- the API
+    // rejects the id outright. The button used to render anyway and fail
+    // silently, so tapping it looked like the app was broken.
+    if (!isBookmarkablePlaceId(placeId)) return const SizedBox.shrink();
+
     return Consumer<BookmarkProvider>(
       builder: (context, bookmarkProvider, _) {
         final bookmarked = bookmarkProvider.isBookmarked(placeId);
@@ -28,10 +34,21 @@ class BookmarkButton extends StatelessWidget {
           onPressed: () async {
             final wasBookmarked = bookmarked;
             await bookmarkProvider.toggleBookmark(placeId);
+            if (!context.mounted) return;
+
+            // Whatever went wrong, say so: a bookmark that quietly does
+            // nothing reads as a broken button.
+            final error = bookmarkProvider.errorMessage;
+            if (error != null) {
+              bookmarkProvider.clearError();
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(error)));
+              return;
+            }
             if (wasBookmarked) return;
 
             onBookmarked?.call();
-            if (!context.mounted) return;
             final matches = bookmarkProvider.bookmarks.where((b) => b.placeId == placeId);
             if (matches.isEmpty) return;
             await showBookmarkFolderSheet(context, bookmarkId: matches.first.bookmarkId);
