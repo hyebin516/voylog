@@ -19,18 +19,26 @@ import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
-import '../widgets/custom_option_field.dart';
 import '../widgets/dashed_border_container.dart';
 import '../widgets/error_view.dart';
 import '../widgets/nav_icons.dart';
 import '../widgets/saved_routes_fab.dart';
 import '../utils/place_category_label.dart';
 
-const List<Color> _authorInitialColors = [
-  AppColors.surfaceTint3,
-  Color(0xFFFDF1EE),
-  Color(0xFFEFF6E7),
-  Color(0xFFF3EEFB),
+/// Avatar tints for feed authors: the handoff pairs each background with a
+/// matching ink, rather than putting one fixed colour on every tint.
+class _AuthorPalette {
+  const _AuthorPalette(this.background, this.foreground);
+
+  final Color background;
+  final Color foreground;
+}
+
+const List<_AuthorPalette> _authorPalettes = [
+  _AuthorPalette(AppColors.surfaceTint3Alt, AppColors.primary),
+  _AuthorPalette(Color(0xFFFDF1EE), AppColors.accentCoral),
+  _AuthorPalette(Color(0xFFEFF6E7), Color(0xFF5F8A3A)),
+  _AuthorPalette(Color(0xFFF3EEFB), Color(0xFF7059A6)),
 ];
 
 const Map<String, String> _transportModeLabels = {
@@ -298,19 +306,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                           ),
-                        // Not in the v2 spec, which lists only the five
-                        // chips -- kept because dropping it would take away
-                        // searching a tag of your own, which is a feature,
-                        // not a style.
-                        CustomOptionField(
-                          key: const Key('customHashtagField'),
-                          hintText: '직접 입력',
-                          icon: Icons.tag_rounded,
-                          submitLabel: '검색',
-                          submitIcon: Icons.search_rounded,
-                          compactWidth: 140,
-                          onSubmitted: (tag) => _onHashtagTap(videoProvider, tag),
-                        ),
                       ],
                     ),
                     if (similarTaste.result?.hasPreference == true &&
@@ -324,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 2),
                       const Text(
                         '나와 취향 일치율이 높은 사용자가 저장한 장소예요',
-                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.textMuted),
                       ),
                       const SizedBox(height: 12),
                       // Full-bleed carousel: the negative padding undoes the
@@ -360,7 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 2),
                     const Text(
                       '직접 다녀오고 좋았던 동선을 공유한 사람들이에요',
-                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w500, color: AppColors.textMuted),
                     ),
                     const SizedBox(height: 12),
                     if (sharedRoute.isLoading && sharedRoute.routes.isEmpty)
@@ -699,80 +694,183 @@ class _SharedRouteCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final authorName = route.authorNickname ?? '알 수 없음';
     final authorInitial = authorName.characters.isEmpty ? '?' : authorName.characters.first;
-    final authorColor = _authorInitialColors[authorName.hashCode.abs() % _authorInitialColors.length];
+    final palette = _authorPalettes[authorName.hashCode.abs() % _authorPalettes.length];
+    final isOwner = route.isOwner;
 
     return AppCard(
       onTap: onTap,
       padding: const EdgeInsets.fromLTRB(15, 14, 15, 14),
+      // Your own post is marked out by the emphasis border, not only by a
+      // label. It also keeps the stronger `sh-card` shadow.
+      borderColor: isOwner ? AppColors.selectedBorder : null,
+      shadow: isOwner ? AppColors.cardShadow() : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
+          // Author row: avatar, name, then either the "내 추천" badge or the
+          // like button at the far end.
           Row(
             children: [
               Container(
                 width: 28,
                 height: 28,
                 alignment: Alignment.center,
-                decoration: BoxDecoration(color: authorColor, shape: BoxShape.circle),
-                child: Text(authorInitial, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong)),
+                decoration: BoxDecoration(
+                  color: isOwner ? AppColors.primary : palette.background,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  authorInitial,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: isOwner ? Colors.white : palette.foreground,
+                  ),
+                ),
               ),
               const SizedBox(width: 9),
               Expanded(
                 child: Text(
-                  route.isOwner ? '$authorName (나)' : authorName,
+                  authorName,
                   style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textTertiary),
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              if (route.isOwner) ...[
-                GestureDetector(
-                  onTap: onEditTap,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.edit_outlined, size: 16, color: AppColors.textTertiary),
+              if (isOwner)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceTint3,
+                    borderRadius: BorderRadius.circular(AppRadius.pill),
                   ),
-                ),
-                GestureDetector(
-                  onTap: onDeleteTap,
-                  child: const Padding(
-                    padding: EdgeInsets.all(4),
-                    child: Icon(Icons.delete_outline_rounded, size: 17, color: AppColors.danger),
+                  child: const Text(
+                    '내 추천',
+                    style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary),
                   ),
-                ),
-              ] else
+                )
+              else
                 GestureDetector(
                   onTap: onLikeTap,
-                  child: Row(
-                    children: [
-                      Icon(
-                        route.likedByMe ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                        size: 14,
-                        color: AppColors.danger,
-                      ),
-                      const SizedBox(width: 4),
-                      Text('${route.likeCount}', style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.danger)),
-                    ],
+                  behavior: HitTestBehavior.opaque,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+                    child: Row(
+                      children: [
+                        HeartGlyphIcon(
+                          size: 16,
+                          filled: route.likedByMe,
+                          // An unliked heart is an outline in the muted text
+                          // colour; only a liked one goes red.
+                          color: route.likedByMe ? AppColors.danger : AppColors.textMuted,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${route.likeCount}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: route.likedByMe ? AppColors.danger : AppColors.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          Text(route.title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
+          // Title row: on your own card the edit/delete buttons sit here,
+          // beside the title and under the "내 추천" badge.
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  route.title,
+                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.ink),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (isOwner) ...[
+                const SizedBox(width: 6),
+                _CardIconButton(
+                  glyph: const PencilGlyphIcon(size: 15, color: AppColors.primary),
+                  background: AppColors.surfaceTint2,
+                  tooltip: '제목 수정',
+                  onTap: onEditTap,
+                ),
+                const SizedBox(width: 6),
+                _CardIconButton(
+                  glyph: const TrashGlyphIcon(size: 15, color: AppColors.danger),
+                  background: AppColors.dangerBg,
+                  tooltip: '추천 취소',
+                  onTap: onDeleteTap,
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 4),
-          Text(_formatSharedRouteMeta(route), style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          Text(
+            _formatSharedRouteMeta(route),
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+          ),
           if (route.matchPercent != null) ...[
             const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-              decoration: BoxDecoration(color: AppColors.surfaceTint2, borderRadius: BorderRadius.circular(999)),
-              child: Text(
-                '취향 일치 ${route.matchPercent}%',
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+            // A chip in the row the handoff fills with mood tags. We have no
+            // such tags -- nothing in the data backs them -- so the match
+            // percentage stands alone here.
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceTint2,
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  '취향 일치 ${route.matchPercent}%',
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                ),
               ),
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+/// The 30x30 boxed buttons on your own feed card (제목 수정 / 추천 취소).
+class _CardIconButton extends StatelessWidget {
+  const _CardIconButton({
+    required this.glyph,
+    required this.background,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final Widget glyph;
+  final Color background;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          width: 30,
+          height: 30,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: background,
+            borderRadius: BorderRadius.circular(AppRadius.xxs),
+          ),
+          child: glyph,
+        ),
       ),
     );
   }

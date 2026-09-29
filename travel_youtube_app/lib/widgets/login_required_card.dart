@@ -33,7 +33,7 @@ class LoginRequiredCard extends StatelessWidget {
               height: 60,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
+                color: AppColors.primary,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [BoxShadow(color: AppColors.primaryStrong.withValues(alpha: 0.3), blurRadius: 22, offset: const Offset(0, 10))],
               ),

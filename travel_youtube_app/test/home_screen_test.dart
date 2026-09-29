@@ -121,25 +121,9 @@ void main() {
     expect(find.text('route:${AppRoutes.recommendationResults}'), findsOneWidget);
   });
 
-  testWidgets('a typed hashtag is searched for, with or without the #', (tester) async {
-    usePhoneViewport(tester);
-    final videoRepository = FakeVideoRepository();
-    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
-    await tester.pumpAndSettle();
-
-    // 통영여행 is not one of the five offered chips.
-    await tester.ensureVisible(find.byKey(const Key('customHashtagField')));
-    await tester.enterText(find.byKey(const Key('customHashtagField')), '#통영여행 ');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(videoRepository.lastHashtag, '통영여행');
-    expect(find.text('route:${AppRoutes.recommendationResults}'), findsOneWidget);
-  });
-
-  testWidgets('the 내 여행 shortcut steps aside while the keyboard is open', (tester) async {
+    testWidgets('the 내 여행 shortcut steps aside while the keyboard is open', (tester) async {
     // The Scaffold lifts its FAB above the keyboard, which parked it right
-    // on top of the hashtag field's search button.
+    // on top of whatever sits at the bottom of the sheet.
     usePhoneViewport(tester);
     await tester.pumpWidget(_wrap(videoRepository: FakeVideoRepository()));
     await tester.pumpAndSettle();
@@ -152,22 +136,7 @@ void main() {
     expect(find.byTooltip('내 여행'), findsNothing);
   });
 
-  testWidgets('a blank hashtag searches for nothing', (tester) async {
-    usePhoneViewport(tester);
-    final videoRepository = FakeVideoRepository();
-    await tester.pumpWidget(_wrap(videoRepository: videoRepository));
-    await tester.pumpAndSettle();
-
-    await tester.ensureVisible(find.byKey(const Key('customHashtagField')));
-    await tester.enterText(find.byKey(const Key('customHashtagField')), '  # ');
-    await tester.testTextInput.receiveAction(TextInputAction.done);
-    await tester.pumpAndSettle();
-
-    expect(videoRepository.lastHashtag, isNull);
-    expect(find.text('route:${AppRoutes.recommendationResults}'), findsNothing);
-  });
-
-  testWidgets('더보기 resets the recommendation wizard and opens its first step', (tester) async {
+    testWidgets('더보기 resets the recommendation wizard and opens its first step', (tester) async {
     usePhoneViewport(tester);
     final wizard = RecommendationWizardProvider()..toggleRegion('제주');
     await tester.pumpWidget(_wrap(videoRepository: FakeVideoRepository(), wizard: wizard));

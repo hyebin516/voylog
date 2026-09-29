@@ -34,6 +34,16 @@ class RecommendationRegionScreen extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.primary.withValues(alpha: 0.55)),
               ),
               const SizedBox(height: AppSpacing.md),
+              // Above the chips, as in the handoff -- a typed region becomes
+              // a chip in the list below, so the field reads as a way to add
+              // to that list rather than an afterthought under it.
+              CustomOptionField(
+                key: const Key('customRegionField'),
+                hintText: '찾는 지역을 직접 입력하세요',
+                icon: Icons.edit_location_alt_outlined,
+                onSubmitted: wizard.addRegion,
+              ),
+              const SizedBox(height: AppSpacing.md),
               Wrap(
                 spacing: AppSpacing.sm,
                 runSpacing: AppSpacing.sm,
@@ -55,17 +65,16 @@ class RecommendationRegionScreen extends StatelessWidget {
                       ),
                       selected: wizard.selectedRegions.contains(region),
                       selectedColor: AppColors.primary,
-                      checkmarkColor: Colors.white,
+                      // The handoff marks a picked chip with an ×, not a
+                      // checkmark -- it also says how to unpick it.
+                      showCheckmark: false,
+                      onDeleted: wizard.selectedRegions.contains(region)
+                          ? () => wizard.toggleRegion(region)
+                          : null,
+                      deleteIcon: const Icon(Icons.close_rounded, size: 15, color: Colors.white),
                       onSelected: (_) => wizard.toggleRegion(region),
                     ),
                 ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              CustomOptionField(
-                key: const Key('customRegionField'),
-                hintText: '찾는 지역이 없다면 직접 입력 (예: 통영)',
-                icon: Icons.edit_location_alt_outlined,
-                onSubmitted: wizard.addRegion,
               ),
               const SizedBox(height: AppSpacing.xl),
               PrimaryButton(

@@ -216,12 +216,7 @@ class _TripListScreenState extends State<TripListScreen> {
                         height: 36,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [
-                              AppColors.accentCyan,
-                              AppColors.primaryStrong,
-                            ],
-                          ),
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(

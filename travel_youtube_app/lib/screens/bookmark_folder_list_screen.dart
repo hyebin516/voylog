@@ -194,8 +194,7 @@ class _RoundIconButton extends StatelessWidget {
         height: 36,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: gradient ? null : bg,
-          gradient: gradient ? const LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]) : null,
+          color: gradient ? AppColors.primary : bg,
           borderRadius: BorderRadius.circular(12),
           boxShadow: gradient
               ? [BoxShadow(color: AppColors.primaryStrong.withValues(alpha: 0.3), blurRadius: 14, offset: const Offset(0, 6))]

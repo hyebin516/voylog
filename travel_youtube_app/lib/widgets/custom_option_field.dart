@@ -16,7 +16,6 @@ class CustomOptionField extends StatefulWidget {
     required this.onSubmitted,
     this.submitLabel = '추가',
     this.submitIcon = Icons.add_rounded,
-    this.compactWidth,
   });
 
   final String hintText;
@@ -30,10 +29,6 @@ class CustomOptionField extends StatefulWidget {
   /// Matches [submitLabel]: a plus where the entry joins a selection, a
   /// magnifier where submitting searches immediately.
   final IconData submitIcon;
-
-  /// When set, renders as a chip-sized pill of this width that sits inside
-  /// the chip row itself, instead of a full-width field under it.
-  final double? compactWidth;
 
   @override
   State<CustomOptionField> createState() => _CustomOptionFieldState();
@@ -60,69 +55,55 @@ class _CustomOptionFieldState extends State<CustomOptionField> {
   Widget build(BuildContext context) {
     final hasText = _controller.text.trim().isNotEmpty;
 
-    final width = widget.compactWidth;
-    if (width != null) {
-      return Container(
-        width: width,
-        height: 34,
-        padding: const EdgeInsets.only(left: 12),
-        decoration: BoxDecoration(
-          color: AppColors.surfaceTint2,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          children: [
-            Icon(widget.icon, size: 14, color: AppColors.textTertiary),
-            const SizedBox(width: 4),
-            Expanded(
-              child: TextField(
-                controller: _controller,
-                textInputAction: TextInputAction.done,
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => _submit(),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryStrong),
-                decoration: InputDecoration(
-                  hintText: widget.hintText,
-                  hintStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textTertiary),
-                  isDense: true,
-                  filled: false,
-                  border: InputBorder.none,
-                  enabledBorder: InputBorder.none,
-                  focusedBorder: InputBorder.none,
-                  contentPadding: EdgeInsets.zero,
-                ),
+    // The handoff shows a labelled pill here ("추가"), not a bare icon --
+    // an icon alone left it unclear that typing had to be confirmed.
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 6, 6, 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceTint2,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        children: [
+          Icon(widget.icon, size: 17, color: AppColors.textTertiary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              textInputAction: TextInputAction.done,
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => _submit(),
+              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.ink),
+              decoration: InputDecoration(
+                hintText: widget.hintText,
+                hintStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textMuted),
+                isDense: true,
+                filled: false,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
-            SizedBox(
-              width: 32,
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: hasText ? _submit : null,
+            child: Container(
               height: 34,
-              child: IconButton(
-                padding: EdgeInsets.zero,
-                icon: Icon(widget.submitIcon, size: 16),
-                color: hasText ? AppColors.primary : AppColors.textTertiary,
-                tooltip: widget.submitLabel,
-                onPressed: hasText ? _submit : null,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: hasText ? AppColors.primary : AppColors.borderStrong,
+                borderRadius: BorderRadius.circular(AppRadius.pill),
+              ),
+              child: Text(
+                widget.submitLabel,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white),
               ),
             ),
-          ],
-        ),
-      );
-    }
-
-    return TextField(
-      controller: _controller,
-      textInputAction: TextInputAction.done,
-      onChanged: (_) => setState(() {}),
-      onSubmitted: (_) => _submit(),
-      decoration: InputDecoration(
-        hintText: widget.hintText,
-        prefixIcon: Icon(widget.icon),
-        suffixIcon: IconButton(
-          icon: Icon(widget.submitIcon, size: 20),
-          color: hasText ? AppColors.primary : AppColors.textTertiary,
-          tooltip: widget.submitLabel,
-          onPressed: hasText ? _submit : null,
-        ),
+          ),
+        ],
       ),
     );
   }

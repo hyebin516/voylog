@@ -131,7 +131,7 @@ class _AnalysisTabScreenState extends State<AnalysisTabScreen> {
                           height: 38,
                           alignment: Alignment.center,
                           decoration: const BoxDecoration(
-                            gradient: LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
+                            color: AppColors.primary,
                             shape: BoxShape.circle,
                           ),
                           child: videoProvider.isLoading

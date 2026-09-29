@@ -199,11 +199,7 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
                         padding: const EdgeInsets.symmetric(horizontal: 18),
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [AppColors.accentCyan, AppColors.primaryStrong],
-                          ),
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: _creatingFolder
@@ -287,11 +283,7 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
                 borderRadius: BorderRadius.circular(999),
                 child: Ink(
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [AppColors.accentCyan, AppColors.primaryStrong],
-                    ),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(999),
                   ),
                   padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),

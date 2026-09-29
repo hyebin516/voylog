@@ -325,6 +325,36 @@ class AppTheme {
         shape: const StadiumBorder(),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       ),
+      // Material 3 tints a dialog's surface with the seed colour, which
+      // came out a murky green next to the rest of the app. The handoff has
+      // no dialog of its own, so these follow its sheet/card values: white,
+      // radius 20, an 800/18 title.
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.card)),
+        titleTextStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+          color: AppColors.ink,
+        ),
+        contentTextStyle: const TextStyle(
+          fontFamily: fontFamily,
+          fontSize: 14,
+          fontWeight: FontWeight.w500,
+          height: 1.5,
+          color: AppColors.textTertiary,
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surfacePage,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        ),
+      ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: AppColors.toast,
         behavior: SnackBarBehavior.floating,
@@ -348,4 +378,27 @@ class AppSpacing {
 
   /// The handoff's screen side margin (the home sheet and header use 24).
   static const double screenGutter = 20;
+}
+
+/// Bounds the OS text-size setting the app honours.
+///
+/// The setting scales text and nothing else -- icons, avatars and the
+/// fixed-size badges the handoff specifies stay put -- so past a point the
+/// labels outgrow the rows they sit in and the type/icon ratio no longer
+/// matches the design. Clamping keeps a larger setting readable without
+/// letting the layout come apart, and still gives someone who needs bigger
+/// text most of what they asked for.
+class AppTextScaling {
+  AppTextScaling._();
+
+  static const double min = 0.9;
+  static const double max = 1.15;
+
+  /// Drop-in for `MaterialApp.builder`.
+  static Widget wrap(BuildContext context, Widget? child) =>
+      MediaQuery.withClampedTextScaling(
+        minScaleFactor: min,
+        maxScaleFactor: max,
+        child: child ?? const SizedBox.shrink(),
+      );
 }

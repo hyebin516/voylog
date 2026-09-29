@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
-/// The app's shared primary CTA -- matches the design handoff's `.btn-primary`
-/// class exactly: `linear-gradient(135deg, #5fc2e8, #2f8fd0)` fill, pill
-/// shape, white bold label. Built by hand (not `ElevatedButton`) because
-/// `ElevatedButton`'s `backgroundColor` only accepts a solid [Color], not a
-/// [Gradient] -- using it here silently flattened every primary button in
-/// the app to a solid color instead of the design's gradient.
+/// The app's shared primary CTA -- the handoff's `.btn-primary`: a solid
+/// `primary-600` pill with a white bold label and `sh-cta` beneath it.
+///
+/// v1 filled this with a gradient, which is why it is built by hand rather
+/// than from `ElevatedButton` (whose `backgroundColor` takes only a solid
+/// [Color]). v2 drops the gradient, but the hand-built version stays: it
+/// also carries the exact shadow and the 52px height the handoff specifies.
 class PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onPressed;
@@ -38,20 +39,8 @@ class PrimaryButton extends StatelessWidget {
         clipBehavior: Clip.antiAlias,
         child: Ink(
           decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [AppColors.accentCyan, AppColors.primaryStrong],
-            ),
-            boxShadow: disabled
-                ? null
-                : [
-                    BoxShadow(
-                      color: AppColors.primaryStrong.withValues(alpha: 0.35),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+            color: AppColors.primary,
+            boxShadow: disabled ? null : AppColors.ctaShadow(),
           ),
           child: InkWell(
             onTap: disabled ? null : onPressed,

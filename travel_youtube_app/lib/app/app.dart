@@ -64,6 +64,7 @@ class TravelYoutubeApp extends StatelessWidget {
         ],
         initialRoute: AppRoutes.splash,
         onGenerateRoute: AppRoutes.onGenerateRoute,
+        builder: AppTextScaling.wrap,
       ),
     );
   }

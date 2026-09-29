@@ -58,7 +58,7 @@ class _SavedRoutesFabState extends State<SavedRoutesFab> with WidgetsBindingObse
             height: 56,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
+              color: AppColors.primary,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [BoxShadow(color: AppColors.primaryStrong.withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 12))],
             ),

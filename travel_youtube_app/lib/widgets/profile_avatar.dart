@@ -33,7 +33,7 @@ class ProfileAvatar extends StatelessWidget {
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
+        color: AppColors.primary,
         shape: BoxShape.circle,
         boxShadow: shadow ? AppColors.floatingButtonShadow() : null,
       ),

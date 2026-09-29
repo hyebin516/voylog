@@ -443,3 +443,150 @@ class _FolderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _FolderPainter oldDelegate) => oldDelegate.color != color;
 }
+
+/// The handoff's pencil for "제목 수정" -- a plain diagonal nib, traced from
+/// `M4 20h4L19 9l-4-4L4 16v4Z` plus the `M13.5 6.5l4 4` ferrule line. Not
+/// Material's `edit`, whose nib sits at a different angle and carries a
+/// baseline stroke.
+class PencilGlyphIcon extends StatelessWidget {
+  const PencilGlyphIcon({super.key, required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: Size(size, size), painter: _PencilPainter(color));
+}
+
+class _PencilPainter extends CustomPainter {
+  _PencilPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24;
+    Offset pt(double x, double y) => Offset(x * scale, y * scale);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.9 * scale
+      ..strokeJoin = StrokeJoin.round;
+
+    final body = Path()
+      ..moveTo(pt(4, 20).dx, pt(4, 20).dy)
+      ..lineTo(pt(8, 20).dx, pt(8, 20).dy)
+      ..lineTo(pt(19, 9).dx, pt(19, 9).dy)
+      ..lineTo(pt(15, 5).dx, pt(15, 5).dy)
+      ..lineTo(pt(4, 16).dx, pt(4, 16).dy)
+      ..close();
+    canvas.drawPath(body, paint);
+
+    canvas.drawLine(pt(13.5, 6.5), pt(17.5, 10.5), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PencilPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// The handoff's bin for "추천 취소" -- lid bar, handle, tapered body and two
+/// inner lines, traced from
+/// `M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6`. Material's
+/// `delete_outline` is a single rounded shape with no separate lid.
+class TrashGlyphIcon extends StatelessWidget {
+  const TrashGlyphIcon({super.key, required this.size, required this.color});
+
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => CustomPaint(size: Size(size, size), painter: _TrashPainter(color));
+}
+
+class _TrashPainter extends CustomPainter {
+  _TrashPainter(this.color);
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24;
+    Offset pt(double x, double y) => Offset(x * scale, y * scale);
+    final paint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.9 * scale
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    canvas.drawLine(pt(4, 7), pt(20, 7), paint);
+
+    final handle = Path()
+      ..moveTo(pt(9, 7).dx, pt(9, 7).dy)
+      ..lineTo(pt(9, 4).dx, pt(9, 4).dy)
+      ..lineTo(pt(15, 4).dx, pt(15, 4).dy)
+      ..lineTo(pt(15, 7).dx, pt(15, 7).dy);
+    canvas.drawPath(handle, paint);
+
+    final body = Path()
+      ..moveTo(pt(6, 7).dx, pt(6, 7).dy)
+      ..lineTo(pt(7, 20).dx, pt(7, 20).dy)
+      ..lineTo(pt(17, 20).dx, pt(17, 20).dy)
+      ..lineTo(pt(18, 7).dx, pt(18, 7).dy);
+    canvas.drawPath(body, paint);
+
+    canvas.drawLine(pt(10, 11), pt(10, 17), paint);
+    canvas.drawLine(pt(14, 11), pt(14, 17), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrashPainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// The handoff's heart for the feed's like button, traced from
+/// `M12 20s-7-4.6-7-9.3A4.2 4.2 0 0 1 12 7.6a4.2 4.2 0 0 1 7 3.1c0 4.7-7 9.3-7 9.3Z`
+/// -- a rounder, wider silhouette than Material's `favorite`. [filled] swaps
+/// the outline for a solid fill, which is how a liked route reads.
+class HeartGlyphIcon extends StatelessWidget {
+  const HeartGlyphIcon({super.key, required this.size, required this.color, this.filled = false});
+
+  final double size;
+  final Color color;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(size: Size(size, size), painter: _HeartPainter(color, filled));
+}
+
+class _HeartPainter extends CustomPainter {
+  _HeartPainter(this.color, this.filled);
+  final Color color;
+  final bool filled;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 24;
+    Offset pt(double x, double y) => Offset(x * scale, y * scale);
+
+    // Two 4.2-radius lobes meeting at the top, tapering to a point at (12,20).
+    final path = Path()
+      ..moveTo(pt(12, 20).dx, pt(12, 20).dy)
+      ..cubicTo(pt(5, 15.4).dx, pt(5, 15.4).dy, pt(5, 10.7).dx, pt(5, 10.7).dy, pt(5, 10.7).dx, pt(5, 10.7).dy)
+      ..arcToPoint(pt(12, 7.6), radius: Radius.circular(4.2 * scale), clockwise: true)
+      ..arcToPoint(pt(19, 10.7), radius: Radius.circular(4.2 * scale), clockwise: true)
+      ..cubicTo(pt(19, 15.4).dx, pt(19, 15.4).dy, pt(12, 20).dx, pt(12, 20).dy, pt(12, 20).dx, pt(12, 20).dy)
+      ..close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = filled ? PaintingStyle.fill : PaintingStyle.stroke
+        ..strokeWidth = 1.8 * scale
+        ..strokeJoin = StrokeJoin.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeartPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.filled != filled;
+}
