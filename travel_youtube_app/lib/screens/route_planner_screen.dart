@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../utils/route_paths.dart';
 import '../models/map_view_types.dart';
 import '../providers/hotel_provider.dart';
 import '../providers/itinerary_provider.dart';
@@ -392,14 +393,17 @@ class RoutePlannerScreen extends StatelessWidget {
                           const SizedBox(height: AppSpacing.md),
                           Builder(
                             builder: (context) {
-                              final routeMarkers = itineraryProvider
-                                  .result!
-                                  .routeData
+                              // One list for both the pins and the line, so
+                              // a point dropped for missing coordinates never
+                              // leaves the two out of step.
+                              final routePoints = itineraryProvider.result!.routeData
                                   .where(
                                     (p) =>
                                         p.latitude != null &&
                                         p.longitude != null,
                                   )
+                                  .toList();
+                              final routeMarkers = routePoints
                                   .map(
                                     (p) => MapMarkerData(
                                       id: p.placeId ?? p.hotelId ?? p.name,
@@ -421,6 +425,7 @@ class RoutePlannerScreen extends StatelessWidget {
                                         routeMarkers.first.longitude,
                                     markers: routeMarkers,
                                     drawRoutePolyline: true,
+                                    routeLegPaths: routeLegPathsOf(routePoints),
                                   ),
                                 ),
                               );

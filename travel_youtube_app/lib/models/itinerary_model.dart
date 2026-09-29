@@ -21,6 +21,12 @@ class RoutePointModel {
   /// 신한은행 → 신정호관광지 건너".
   final String? legGuidance;
 
+  /// The road this leg actually follows, as [latitude, longitude] pairs.
+  /// Null on the first point, on legs where Kakao routing was unavailable,
+  /// and on routes saved before the geometry was captured -- the map draws a
+  /// straight line between the stops in those cases.
+  final List<List<double>>? legPath;
+
   const RoutePointModel({
     required this.order,
     required this.type,
@@ -31,6 +37,7 @@ class RoutePointModel {
     required this.longitude,
     this.legDistanceM,
     this.legDurationSec,
+    this.legPath,
     this.legTransportMode,
     this.legGuidance,
   });
@@ -77,6 +84,9 @@ class RoutePointModel {
       longitude: (json['longitude'] as num?)?.toDouble(),
       legDistanceM: json['legDistanceM'] as int?,
       legDurationSec: json['legDurationSec'] as int?,
+      legPath: (json['legPath'] as List<dynamic>?)
+          ?.map((point) => (point as List<dynamic>).map((n) => (n as num).toDouble()).toList())
+          .toList(),
       legTransportMode: json['legTransportMode'] as String?,
       legGuidance: json['legGuidance'] as String?,
     );
@@ -97,6 +107,7 @@ class RoutePointModel {
         'legDurationSec': legDurationSec,
         if (legTransportMode != null) 'legTransportMode': legTransportMode,
         if (legGuidance != null) 'legGuidance': legGuidance,
+        if (legPath != null) 'legPath': legPath,
       };
 }
 

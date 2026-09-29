@@ -23,7 +23,35 @@ ASSUMED_SPEED_MPS = {
 }
 
 
-async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict, mode: str) -> Tuple[float, float]:
+# Kakao returns the road geometry in three different shapes, one per mode,
+# all in [lng, lat] order. The app draws with LatLng(lat, lng) and must not
+# have to know which mode produced which shape (CLAUDE.md: no business logic
+# in the frontend), so every extractor below normalizes to [[lat, lng], ...].
+
+
+def _car_path(route: dict) -> List[List[float]]:
+    """`sections[].roads[].vertexes` is a flat [lng, lat, lng, lat, ...]."""
+    path: List[List[float]] = []
+    for section in route.get("sections", []):
+        for road in section.get("roads", []):
+            v = road.get("vertexes", [])
+            path += [[v[i + 1], v[i]] for i in range(0, len(v) - 1, 2)]
+    return path
+
+
+def _steps_path(steps: list) -> List[List[float]]:
+    """Walk and transit both split the line across `steps[].path.points`,
+    each point already a [lng, lat] pair."""
+    path: List[List[float]] = []
+    for step in steps:
+        for lng, lat in (step.get("path") or {}).get("points", []):
+            path.append([lat, lng])
+    return path
+
+
+async def _kakao_travel_time(
+    client: httpx.AsyncClient, origin: dict, dest: dict, mode: str
+) -> Tuple[float, float, List[List[float]]]:
     headers = {"Authorization": f"KakaoAK {KAKAO_REST_API_KEY}"}
 
     if mode in ("walk", "transit"):
@@ -46,7 +74,8 @@ async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict
 
         if mode == "walk":
             props = data["route"]["properties"]
-            return float(props["totalDistance"]), float(props["totalTime"])
+            steps = [step for leg in data["route"].get("legs", []) for step in leg.get("steps", [])]
+            return float(props["totalDistance"]), float(props["totalTime"]), _steps_path(steps)
 
         # transit: the API returns several route options (bus-only,
         # subway-only, combined transfers, ...) -- pick the fastest one,
@@ -55,7 +84,11 @@ async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict
         if not routes:
             raise ValueError("Kakao transit routing returned no routes")
         best = min(routes, key=lambda r: r["properties"]["totalTime"])
-        return float(best["properties"]["totalDistance"]), float(best["properties"]["totalTime"])
+        return (
+            float(best["properties"]["totalDistance"]),
+            float(best["properties"]["totalTime"]),
+            _steps_path(best.get("steps", [])),
+        )
 
     params = {
         "origin": f"{origin['longitude']},{origin['latitude']}",
@@ -64,36 +97,51 @@ async def _kakao_travel_time(client: httpx.AsyncClient, origin: dict, dest: dict
     response = await client.get(KAKAO_DIRECTIONS_URL["car"], headers=headers, params=params)
     response.raise_for_status()
     data = response.json()
-    summary = data["routes"][0]["summary"]
-    return float(summary["distance"]), float(summary["duration"])
+    route = data["routes"][0]
+    summary = route["summary"]
+    return float(summary["distance"]), float(summary["duration"]), _car_path(route)
 
 
-async def _travel_time(client: httpx.AsyncClient, origin: dict, dest: dict, mode: str = "car") -> Tuple[float, float]:
+async def _travel_time(
+    client: httpx.AsyncClient, origin: dict, dest: dict, mode: str = "car"
+) -> Tuple[float, float, List[List[float]]]:
     if KAKAO_REST_API_KEY:
         try:
             return await _kakao_travel_time(client, origin, dest, mode)
         except Exception as exc:
             logger.warning("Kakao API failed for mode=%s, falling back to Haversine: %s", mode, exc)
 
+    # A straight-line estimate has no road geometry to report; the app draws
+    # the fallback straight line when the path is empty.
     distance_m = haversine_distance_m(origin["latitude"], origin["longitude"], dest["latitude"], dest["longitude"])
     duration_sec = distance_m / ASSUMED_SPEED_MPS[mode]
-    return distance_m, duration_sec
+    return distance_m, duration_sec, []
 
 
-async def _build_matrices(nodes: List[dict], mode: str = "car") -> Tuple[List[List[float]], List[List[float]]]:
+async def _build_matrices(nodes: List[dict], mode: str = "car"):
+    """Returns (distance, duration, path) matrices.
+
+    The road geometry comes back on the same calls that produce the matrices,
+    so collecting it costs nothing extra -- it used to be parsed and thrown
+    away, which is why the map could only draw straight lines between stops.
+    Only the legs the optimizer picks are read later; the rest is discarded
+    with the matrices.
+    """
     n = len(nodes)
     distance_matrix = [[0.0] * n for _ in range(n)]
     duration_matrix = [[0.0] * n for _ in range(n)]
+    path_matrix: List[List[List[List[float]]]] = [[[] for _ in range(n)] for _ in range(n)]
 
     async with httpx.AsyncClient(timeout=KAKAO_TIMEOUT_SECONDS) as client:
         pairs = [(i, j) for i, j in product(range(n), range(n)) if i != j]
         results = await asyncio.gather(*(_travel_time(client, nodes[i], nodes[j], mode) for i, j in pairs))
 
-    for (i, j), (distance_m, duration_sec) in zip(pairs, results):
+    for (i, j), (distance_m, duration_sec, path) in zip(pairs, results):
         distance_matrix[i][j] = distance_m
         duration_matrix[i][j] = duration_sec
+        path_matrix[i][j] = path
 
-    return distance_matrix, duration_matrix
+    return distance_matrix, duration_matrix, path_matrix
 
 
 def _route_cost(route: List[int], matrix: List[List[float]]) -> float:
@@ -152,7 +200,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
     end_idx = len(nodes) - 1
     middle_indices = list(range(1, end_idx))
 
-    distance_matrix, duration_matrix = await _build_matrices(nodes, request.transportMode)
+    distance_matrix, duration_matrix, path_matrix = await _build_matrices(nodes, request.transportMode)
 
     initial_route = _nearest_neighbor_path(duration_matrix, start_idx, end_idx, middle_indices)
     optimized_indices = _two_opt(initial_route, duration_matrix)
@@ -167,10 +215,13 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
         if order == 0:
             leg_distance_m = None
             leg_duration_sec = None
+            leg_path = None
         else:
             prev_index = optimized_indices[order - 1]
             leg_distance_m = round(distance_matrix[prev_index][index])
             leg_duration_sec = round(duration_matrix[prev_index][index])
+            # Empty when Kakao failed and the leg fell back to Haversine.
+            leg_path = path_matrix[prev_index][index] or None
 
         if index == start_idx:
             return RoutePoint(
@@ -182,6 +233,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
                 longitude=start_hotel.longitude,
                 legDistanceM=leg_distance_m,
                 legDurationSec=leg_duration_sec,
+                legPath=leg_path,
             )
         if index == end_idx:
             return RoutePoint(
@@ -193,6 +245,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
                 longitude=end_hotel.longitude,
                 legDistanceM=leg_distance_m,
                 legDurationSec=leg_duration_sec,
+                legPath=leg_path,
             )
         place = request.places[index - 1]
         return RoutePoint(
@@ -204,6 +257,7 @@ async def optimize_route(request: RouteOptimizationRequest) -> RouteOptimization
             longitude=place.longitude,
             legDistanceM=leg_distance_m,
             legDurationSec=leg_duration_sec,
+            legPath=leg_path,
         )
 
     optimized_route = [to_route_point(order, index) for order, index in enumerate(optimized_indices)]
@@ -283,22 +337,62 @@ async def _bus_leg(client: httpx.AsyncClient, origin: dict, dest: dict):
             return None
         best = min(data["routes"], key=lambda r: r["properties"]["totalTime"])
         props = best["properties"]
-        return float(props["totalDistance"]), float(props["totalTime"]), _transit_guidance(best)
+        return (
+            float(props["totalDistance"]),
+            float(props["totalTime"]),
+            _transit_guidance(best),
+            _steps_path(best.get("steps", [])),
+        )
     except Exception as exc:
         logger.warning("Kakao transit lookup failed, leaving the leg on foot: %s", exc)
         return None
 
 
-def _leg_choice(walk: Tuple[float, float], bus) -> Tuple[float, float, str, str | None]:
-    """(distance, duration, mode, guidance) for one leg: walk it if that's
-    short enough, otherwise take the bus when there is one and it's quicker."""
-    walk_distance, walk_duration = walk
-    if walk_duration <= WALK_LEG_MAX_SEC or bus is None:
-        return walk_distance, walk_duration, "walk", None
-    bus_distance, bus_duration, guidance = bus
-    if bus_duration < walk_duration:
-        return bus_distance, bus_duration, "transit", guidance
-    return walk_distance, walk_duration, "walk", None
+async def _car_leg(client: httpx.AsyncClient, origin: dict, dest: dict):
+    """(distance, duration, path) by car, or None when Kakao can't route it.
+
+    Only used where walking is already past WALK_LEG_MAX_SEC and no bus was
+    found -- an intercity pair, where leaving the leg on foot produced a
+    "walk 56 hours" estimate from the Haversine fallback.
+    """
+    if not KAKAO_REST_API_KEY:
+        return None
+    try:
+        distance, duration, path = await _kakao_travel_time(client, origin, dest, "car")
+        return distance, duration, path
+    except Exception as exc:
+        logger.warning("Kakao car lookup failed for a leg with no bus: %s", exc)
+        return None
+
+
+def _leg_choice(walk, bus, car=None):
+    """(distance, duration, mode, guidance, path) for one leg.
+
+    Walk what's walkable, bus when it's further, car when even the bus
+    doesn't go there. Past WALK_LEG_MAX_SEC we've already decided the leg is
+    too far to walk, so falling back to walking when no bus exists produced
+    nonsense -- a 224km pair came out as "도보 3393분" (56 hours) because
+    both lookups failed and the Haversine estimate divided by walking speed.
+
+    The path is whichever option was actually chosen -- drawing the walking
+    line under a leg labelled "버스 22분" would be a lie."""
+    walk_distance, walk_duration, walk_path = walk
+    if walk_duration <= WALK_LEG_MAX_SEC:
+        return walk_distance, walk_duration, "walk", None, walk_path
+
+    if bus is not None:
+        bus_distance, bus_duration, guidance, bus_path = bus
+        if bus_duration < walk_duration:
+            return bus_distance, bus_duration, "transit", guidance, bus_path
+        return walk_distance, walk_duration, "walk", None, walk_path
+
+    if car is not None:
+        car_distance, car_duration, car_path = car
+        if car_duration < walk_duration:
+            return car_distance, car_duration, "car", None, car_path
+
+    # Nothing routed: the straight-line walking estimate is all we have.
+    return walk_distance, walk_duration, "walk", None, walk_path
 
 
 async def _build_mixed_matrices(nodes: List[dict]):
@@ -315,15 +409,22 @@ async def _build_mixed_matrices(nodes: List[dict]):
         buses = await asyncio.gather(*(_bus_leg(client, nodes[i], nodes[j]) for i, j in long_pairs))
         bus_by_pair = dict(zip(long_pairs, buses))
 
+        # Only where the bus didn't answer -- most long legs have one, and
+        # every extra pair here is another Kakao call.
+        carless_pairs = [p for p in long_pairs if bus_by_pair[p] is None]
+        cars = await asyncio.gather(*(_car_leg(client, nodes[i], nodes[j]) for i, j in carless_pairs))
+        car_by_pair = dict(zip(carless_pairs, cars))
+
     distance = [[0.0] * n for _ in range(n)]
     duration = [[0.0] * n for _ in range(n)]
     mode = [[None] * n for _ in range(n)]
     guidance = [[None] * n for _ in range(n)]
+    path = [[[] for _ in range(n)] for _ in range(n)]
     for i, j in pairs:
-        distance[i][j], duration[i][j], mode[i][j], guidance[i][j] = _leg_choice(
-            walk_by_pair[(i, j)], bus_by_pair.get((i, j))
+        distance[i][j], duration[i][j], mode[i][j], guidance[i][j], path[i][j] = _leg_choice(
+            walk_by_pair[(i, j)], bus_by_pair.get((i, j)), car_by_pair.get((i, j))
         )
-    return distance, duration, mode, guidance
+    return distance, duration, mode, guidance, path
 
 
 async def optimize_place_route(request: PlaceRouteRequest) -> RouteOptimizationResponse:
@@ -336,7 +437,7 @@ async def optimize_place_route(request: PlaceRouteRequest) -> RouteOptimizationR
     fixed-endpoint optimizer picks the best first and last stops itself.
     """
     nodes = [{"latitude": p.latitude, "longitude": p.longitude} for p in request.places]
-    distance, duration, mode, guidance = await _build_mixed_matrices(nodes)
+    distance, duration, mode, guidance, path = await _build_mixed_matrices(nodes)
 
     free = len(nodes)
     for row in (distance, duration):
@@ -370,6 +471,7 @@ async def optimize_place_route(request: PlaceRouteRequest) -> RouteOptimizationR
                 legDurationSec=round(duration[prev][index]) if prev is not None else None,
                 legTransportMode=mode[prev][index] if prev is not None else None,
                 legGuidance=guidance[prev][index] if prev is not None else None,
+                legPath=(path[prev][index] or None) if prev is not None else None,
             )
         )
 

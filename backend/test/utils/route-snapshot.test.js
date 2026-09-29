@@ -122,3 +122,37 @@ describe('buildPublicRouteSnapshot', () => {
     expect(result.routeData[0]).toMatchObject({ placeId: 'p1', latitude: 2, longitude: 2 });
   });
 });
+
+describe('legPath (실제 도로 경로)', () => {
+  it('carries the road geometry so the feed map can draw the real route', () => {
+    const { routeData } = buildPublicRouteSnapshot([
+      { order: 0, type: 'hotel', hotelId: 'h1', name: '집', latitude: 37.1, longitude: 127.1 },
+      { order: 1, type: 'place', placeId: 'p1', name: 'A', latitude: 37.2, longitude: 127.2, legDistanceM: 100, legDurationSec: 60, legPath: [[37.1, 127.1], [37.2, 127.2]] },
+      { order: 2, type: 'place', placeId: 'p2', name: 'B', latitude: 37.3, longitude: 127.3, legDistanceM: 200, legDurationSec: 120, legPath: [[37.2, 127.2], [37.3, 127.3]] },
+    ]);
+
+    expect(routeData[1].legPath).toEqual([[37.2, 127.2], [37.3, 127.3]]);
+  });
+
+  it("drops the first place's path -- it starts at the hotel's doorstep", () => {
+    // Everything else about the hotel is stripped; a line whose first
+    // coordinate is the hotel would publish the address anyway.
+    const { routeData } = buildPublicRouteSnapshot([
+      { order: 0, type: 'hotel', hotelId: 'h1', name: '집', latitude: 37.1, longitude: 127.1 },
+      { order: 1, type: 'place', placeId: 'p1', name: 'A', latitude: 37.2, longitude: 127.2, legDistanceM: 100, legDurationSec: 60, legPath: [[37.1, 127.1], [37.2, 127.2]] },
+      { order: 2, type: 'place', placeId: 'p2', name: 'B', latitude: 37.3, longitude: 127.3, legDistanceM: 200, legDurationSec: 120, legPath: [[37.2, 127.2], [37.3, 127.3]] },
+    ]);
+
+    expect(routeData[0].legPath).toBeNull();
+    expect(JSON.stringify(routeData)).not.toContain('37.1');
+  });
+
+  it('omits the field entirely for routes saved before paths were captured', () => {
+    const { routeData } = buildPublicRouteSnapshot([
+      { order: 0, type: 'place', placeId: 'p1', name: 'A', latitude: 37.2, longitude: 127.2 },
+      { order: 1, type: 'place', placeId: 'p2', name: 'B', latitude: 37.3, longitude: 127.3, legDistanceM: 200, legDurationSec: 120 },
+    ]);
+
+    expect('legPath' in routeData[1]).toBe(false);
+  });
+});

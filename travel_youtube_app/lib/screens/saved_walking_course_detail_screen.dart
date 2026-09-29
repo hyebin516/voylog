@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../utils/route_paths.dart';
 import '../models/map_view_types.dart';
 import '../models/saved_walking_course_model.dart';
 import '../providers/saved_walking_course_provider.dart';
@@ -216,6 +217,7 @@ class _SavedWalkingCourseDetailScreenState
                               initialLongitude: routeMarkers.first.longitude,
                               markers: routeMarkers,
                               drawRoutePolyline: true,
+                              routeLegPaths: routeLegPathsOf(visibleRouteData),
                               focusedMarkerId: _selectedMarkerId,
                             ),
                           ),

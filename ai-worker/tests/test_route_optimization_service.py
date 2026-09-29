@@ -25,7 +25,7 @@ def test_travel_time_uses_haversine_fallback_without_an_api_key():
     origin = {"latitude": 37.5, "longitude": 127.0}
     dest = {"latitude": 37.6, "longitude": 127.1}
 
-    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest))
+    distance_m, duration_sec, _ = asyncio.run(svc._travel_time(None, origin, dest))
 
     expected_distance = haversine_distance_m(37.5, 127.0, 37.6, 127.1)
     assert distance_m == pytest.approx(expected_distance)
@@ -42,7 +42,7 @@ def test_travel_time_falls_back_to_haversine_when_kakao_call_raises(monkeypatch)
 
     origin = {"latitude": 37.5, "longitude": 127.0}
     dest = {"latitude": 37.6, "longitude": 127.1}
-    distance_m, _ = asyncio.run(svc._travel_time(None, origin, dest))
+    distance_m, _, _ = asyncio.run(svc._travel_time(None, origin, dest))
 
     assert distance_m == pytest.approx(haversine_distance_m(37.5, 127.0, 37.6, 127.1))
 
@@ -181,7 +181,7 @@ def test_travel_time_falls_back_to_walking_speed_haversine_for_walk_mode():
     origin = {"latitude": 37.5, "longitude": 127.0}
     dest = {"latitude": 37.6, "longitude": 127.1}
 
-    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
+    distance_m, duration_sec, _ = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
 
     expected_distance = haversine_distance_m(37.5, 127.0, 37.6, 127.1)
     assert distance_m == pytest.approx(expected_distance)
@@ -214,7 +214,7 @@ def test_kakao_travel_time_calls_the_walk_endpoint_and_parses_its_response_shape
     origin = {"latitude": 37.4979, "longitude": 127.0276}
     dest = {"latitude": 37.5015, "longitude": 127.0396}
 
-    distance_m, duration_sec = asyncio.run(svc._kakao_travel_time(fake_client, origin, dest, "walk"))
+    distance_m, duration_sec, _ = asyncio.run(svc._kakao_travel_time(fake_client, origin, dest, "walk"))
 
     assert fake_client.called_url == svc.KAKAO_DIRECTIONS_URL["walk"]
     assert fake_client.called_params == {
@@ -267,7 +267,7 @@ def test_travel_time_falls_back_to_haversine_for_a_too_far_away_walk_pair(monkey
     origin = {"latitude": 37.4979, "longitude": 127.0276}
     dest = {"latitude": 37.4602, "longitude": 126.4407}  # ~50km away
 
-    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
+    distance_m, duration_sec, _ = asyncio.run(svc._travel_time(None, origin, dest, "walk"))
 
     expected_distance = haversine_distance_m(37.4979, 127.0276, 37.4602, 126.4407)
     assert distance_m == pytest.approx(expected_distance)
@@ -279,7 +279,7 @@ def test_travel_time_falls_back_to_transit_speed_haversine_for_transit_mode():
     origin = {"latitude": 37.5, "longitude": 127.0}
     dest = {"latitude": 37.6, "longitude": 127.1}
 
-    distance_m, duration_sec = asyncio.run(svc._travel_time(None, origin, dest, "transit"))
+    distance_m, duration_sec, _ = asyncio.run(svc._travel_time(None, origin, dest, "transit"))
 
     expected_distance = haversine_distance_m(37.5, 127.0, 37.6, 127.1)
     assert distance_m == pytest.approx(expected_distance)
@@ -318,7 +318,7 @@ def test_kakao_travel_time_picks_the_fastest_transit_route_among_several_options
     origin = {"latitude": 37.4979, "longitude": 127.0276}
     dest = {"latitude": 37.5015, "longitude": 127.0396}
 
-    distance_m, duration_sec = asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "transit"))
+    distance_m, duration_sec, _ = asyncio.run(svc._kakao_travel_time(FakeClient(), origin, dest, "transit"))
 
     assert distance_m == 1198.0
     assert duration_sec == 521.0
@@ -360,7 +360,7 @@ def buses(monkeypatch):
 
     async def fake_bus_leg(client, origin, dest):
         looked_up.append((origin["latitude"], dest["latitude"]))
-        return 5100.0, 1200.0, "600번 · 온양온천역 → 신정호"
+        return 5100.0, 1200.0, "600번 · 온양온천역 → 신정호", [[36.78, 127.0], [36.77, 126.98]]
 
     monkeypatch.setattr(svc, "_bus_leg", fake_bus_leg)
     return looked_up
@@ -427,11 +427,71 @@ def test_place_route_that_is_all_walkable_is_a_walking_route(buses):
 
 
 def test_leg_choice_takes_the_bus_only_when_walking_is_long_and_the_bus_is_quicker():
-    bus = (3500.0, 1200.0, "600번")
-    assert svc._leg_choice((3000.0, 2000.0), bus) == (3500.0, 1200.0, "transit", "600번")
-    assert svc._leg_choice((3000.0, 1100.0), (3500.0, 1500.0, "600번")) == (3000.0, 1100.0, "walk", None)
-    assert svc._leg_choice((500.0, 400.0), bus) == (500.0, 400.0, "walk", None)
-    assert svc._leg_choice((3000.0, 2000.0), None) == (3000.0, 2000.0, "walk", None)
+    WALK_PATH = [[36.1, 127.1], [36.2, 127.2]]
+    BUS_PATH = [[36.3, 127.3], [36.4, 127.4]]
+    bus = (3500.0, 1200.0, "600번", BUS_PATH)
+
+    assert svc._leg_choice((3000.0, 2000.0, WALK_PATH), bus) == (3500.0, 1200.0, "transit", "600번", BUS_PATH)
+    assert svc._leg_choice((3000.0, 1100.0, WALK_PATH), (3500.0, 1500.0, "600번", BUS_PATH)) == (
+        3000.0, 1100.0, "walk", None, WALK_PATH)
+    assert svc._leg_choice((500.0, 400.0, WALK_PATH), bus) == (500.0, 400.0, "walk", None, WALK_PATH)
+    assert svc._leg_choice((3000.0, 2000.0, WALK_PATH), None) == (3000.0, 2000.0, "walk", None, WALK_PATH)
+
+
+def test_leg_choice_drives_when_it_is_too_far_to_walk_and_no_bus_goes_there():
+    """A 224km bookmark pair came out as "도보 3393분" (56 hours): the bus
+    lookup found nothing, so the leg fell back to walking and the Haversine
+    estimate divided the straight line by walking speed."""
+    WALK = (224000.0, 203000.0, [])  # ~56 hours on foot
+    CAR = (240000.0, 9600.0, [[36.1, 127.1]])  # ~2h40m
+
+    distance, duration, mode, guidance, path = svc._leg_choice(WALK, None, CAR)
+
+    assert mode == "car"
+    assert duration == 9600.0
+    assert guidance is None
+    assert path == [[36.1, 127.1]]
+
+
+def test_leg_choice_prefers_the_bus_over_the_car_when_there_is_one():
+    WALK = (3000.0, 2000.0, [])
+    BUS = (3500.0, 1200.0, "600번", [[36.2, 127.2]])
+    CAR = (3400.0, 600.0, [[36.3, 127.3]])
+
+    _, _, mode, _, _ = svc._leg_choice(WALK, BUS, CAR)
+
+    assert mode == "transit"
+
+
+def test_leg_choice_still_walks_a_short_leg_even_when_a_car_is_available():
+    WALK = (500.0, 400.0, [[36.1, 127.1]])
+    CAR = (600.0, 120.0, [[36.2, 127.2]])
+
+    _, _, mode, _, _ = svc._leg_choice(WALK, None, CAR)
+
+    assert mode == "walk"
+
+
+def test_leg_choice_keeps_walking_when_nothing_else_routes():
+    """No bus, no car -- the straight-line walk is all there is. Better a
+    visibly odd number than a fabricated drive."""
+    WALK = (224000.0, 203000.0, [])
+
+    _, duration, mode, _, _ = svc._leg_choice(WALK, None, None)
+
+    assert mode == "walk"
+    assert duration == 203000.0
+
+
+def test_leg_choice_returns_the_path_of_the_mode_it_actually_picked():
+    """A leg labelled "버스 22분" drawn along the walking line would be a lie."""
+    WALK_PATH = [[36.1, 127.1]]
+    BUS_PATH = [[36.3, 127.3]]
+
+    _, _, mode, _, path = svc._leg_choice((3000.0, 2000.0, WALK_PATH), (3500.0, 1200.0, "600번", BUS_PATH))
+
+    assert mode == "transit"
+    assert path is BUS_PATH
 
 
 def test_transit_guidance_names_the_buses_and_the_stops():

@@ -2,7 +2,7 @@
 // saved walking course or a trip's day itinerary is published to the public
 // feed. Both sources produce the identical `route_data` shape (AI Worker's
 // `optimize-route` RoutePoint: order/type/hotelId/placeId/name/lat/lng/
-// legDistanceM/legDurationSec) -- see itinerary.repository.js and
+// legDistanceM/legDurationSec/legPath) -- see itinerary.repository.js and
 // saved-walking-course.repository.js, both storing that array as-is.
 //
 // Hotel points are dropped entirely (name, coordinates -- everything) since
@@ -40,6 +40,14 @@ function buildPublicRouteSnapshot(routeData) {
     }),
     ...(point.legGuidance !== undefined && {
       legGuidance: index === 0 ? null : point.legGuidance,
+    }),
+    // The road the leg follows, so the feed's map draws the real route
+    // rather than a straight line. Nulled on the first place for the same
+    // reason as its distance: that leg started at the removed hotel, and
+    // its first coordinate IS the hotel's doorstep -- keeping the line
+    // would publish the address the rest of this function strips.
+    ...(point.legPath !== undefined && {
+      legPath: index === 0 ? null : point.legPath,
     }),
   }));
 

@@ -9,6 +9,10 @@ class FakeMapWidget extends StatelessWidget {
   final double initialLatitude;
   final double initialLongitude;
   final List<MapMarkerData> markers;
+
+  /// Recorded so a test can assert the screen passed the real road geometry
+  /// through, without rendering a map.
+  final List<List<List<double>>> routeLegPaths;
   final ValueChanged<MapCenter>? onCenterChanged;
   final ValueChanged<String>? onMarkerTap;
   final String? focusedMarkerId;
@@ -18,6 +22,7 @@ class FakeMapWidget extends StatelessWidget {
     required this.initialLatitude,
     required this.initialLongitude,
     this.markers = const [],
+    this.routeLegPaths = const [],
     this.onCenterChanged,
     this.onMarkerTap,
     this.focusedMarkerId,
@@ -67,6 +72,7 @@ class FakeMapRepository extends MapRepository {
     required double initialLongitude,
     List<MapMarkerData> markers = const [],
     bool drawRoutePolyline = false,
+    List<List<List<double>>> routeLegPaths = const [],
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
     String? focusedMarkerId,
@@ -75,6 +81,7 @@ class FakeMapRepository extends MapRepository {
       initialLatitude: initialLatitude,
       initialLongitude: initialLongitude,
       markers: markers,
+      routeLegPaths: routeLegPaths,
       onCenterChanged: onCenterChanged,
       onMarkerTap: onMarkerTap,
       focusedMarkerId: focusedMarkerId,

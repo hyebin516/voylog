@@ -16,6 +16,13 @@ class KakaoMapWidget extends StatefulWidget {
   final double initialLongitude;
   final List<MapMarkerData> markers;
   final bool drawRoutePolyline;
+
+  /// The roads the route actually follows, one entry per leg, each a list of
+  /// [latitude, longitude] pairs from the AI Worker. When empty the map falls
+  /// back to straight lines between markers -- which is what routes saved
+  /// before the geometry was captured, and legs where Kakao was unavailable,
+  /// still have.
+  final List<List<List<double>>> routeLegPaths;
   final ValueChanged<MapCenter>? onCenterChanged;
   final ValueChanged<String>? onMarkerTap;
   // When set to a marker id from `markers`, zooms the camera in on that
@@ -29,6 +36,7 @@ class KakaoMapWidget extends StatefulWidget {
     required this.initialLongitude,
     this.markers = const [],
     this.drawRoutePolyline = false,
+    this.routeLegPaths = const [],
     this.onCenterChanged,
     this.onMarkerTap,
     this.focusedMarkerId,
@@ -135,19 +143,26 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
       )
       .toList();
 
-  List<kakao.Polyline>? _routePolylines(BuildContext context) =>
-      widget.drawRoutePolyline && widget.markers.length >= 2
-      ? [
-          kakao.Polyline(
-            polylineId: 'route',
-            points: widget.markers
-                .map((m) => kakao.LatLng(m.latitude, m.longitude))
-                .toList(),
-            strokeColor: Theme.of(context).colorScheme.primary,
-            strokeWidth: 4,
-          ),
-        ]
-      : null;
+  List<kakao.Polyline>? _routePolylines(BuildContext context) {
+    if (!widget.drawRoutePolyline || widget.markers.length < 2) return null;
+
+    final points = widget.routeLegPaths.isEmpty
+        // No geometry: join the stops directly, as the map always used to.
+        ? widget.markers.map((m) => kakao.LatLng(m.latitude, m.longitude)).toList()
+        : [
+            for (final leg in widget.routeLegPaths)
+              for (final point in leg) kakao.LatLng(point[0], point[1]),
+          ];
+
+    return [
+      kakao.Polyline(
+        polylineId: 'route',
+        points: points,
+        strokeColor: Theme.of(context).colorScheme.primary,
+        strokeWidth: 4,
+      ),
+    ];
+  }
 
   /// kakao_map_plugin only draws markers, overlays and polylines when the
   /// widget is *updated* (its didUpdateWidget) -- never when the map is

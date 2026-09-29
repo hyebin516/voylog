@@ -219,6 +219,12 @@ class RoutePoint(BaseModel):
     # For a transit leg: which bus to take and between which stops, e.g.
     # "600번 · 온양온천역 신한은행 → 신정호관광지 건너".
     legGuidance: Optional[str] = None
+    # The road the leg actually follows, as [[lat, lng], ...] -- Kakao returns
+    # it on the same call that gives the distance and duration. Null when the
+    # leg fell back to a straight-line estimate (Kakao unavailable), and on
+    # routes saved before this was captured; the map draws a straight line
+    # between the two stops in that case.
+    legPath: Optional[List[List[float]]] = None
 
 
 class RouteOptimizationResponse(BaseModel):

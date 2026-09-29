@@ -14,6 +14,7 @@ abstract class MapRepository {
     required double initialLongitude,
     List<MapMarkerData> markers,
     bool drawRoutePolyline,
+    List<List<List<double>>> routeLegPaths,
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
     // When set to a marker id from `markers`, pans the camera to that
@@ -33,6 +34,7 @@ class KakaoMapRepository extends MapRepository {
     required double initialLongitude,
     List<MapMarkerData> markers = const [],
     bool drawRoutePolyline = false,
+    List<List<List<double>>> routeLegPaths = const [],
     ValueChanged<MapCenter>? onCenterChanged,
     ValueChanged<String>? onMarkerTap,
     String? focusedMarkerId,
@@ -42,6 +44,7 @@ class KakaoMapRepository extends MapRepository {
       initialLongitude: initialLongitude,
       markers: markers,
       drawRoutePolyline: drawRoutePolyline,
+      routeLegPaths: routeLegPaths,
       onCenterChanged: onCenterChanged,
       onMarkerTap: onMarkerTap,
       focusedMarkerId: focusedMarkerId,

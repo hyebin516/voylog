@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
+import '../utils/route_paths.dart';
 import '../models/map_view_types.dart';
 import '../models/shared_route_model.dart';
 import '../repositories/map_repository.dart';
@@ -155,6 +156,7 @@ class _SharedRouteDetailScreenState extends State<SharedRouteDetailScreen> {
                         initialLongitude: markers.first.longitude,
                         markers: markers,
                         drawRoutePolyline: true,
+                        routeLegPaths: routeLegPathsOf(stops),
                         focusedMarkerId: _selectedMarkerId,
                       ),
                     )
