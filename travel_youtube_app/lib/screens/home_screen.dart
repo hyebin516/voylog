@@ -18,14 +18,12 @@ import '../repositories/trip_repository.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
-import '../widgets/auth_backdrop.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/custom_option_field.dart';
 import '../widgets/dashed_border_container.dart';
 import '../widgets/error_view.dart';
 import '../widgets/nav_icons.dart';
 import '../widgets/saved_routes_fab.dart';
-import '../widgets/voylog_logo.dart';
 import '../utils/place_category_label.dart';
 
 const List<Color> _authorInitialColors = [
@@ -186,266 +184,396 @@ class _HomeScreenState extends State<HomeScreen> {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
+      backgroundColor: AppColors.surfacePage,
       floatingActionButton: SavedRoutesFab(onPressed: () => Navigator.pushNamed(context, AppRoutes.savedWalkingCourses)),
-      body: AuthBackdrop(
-        child: SafeArea(
-          child: SingleChildScrollView(
-            // Bottom padding must clear the fixed `SavedRoutesFab` below --
-            // that FAB doesn't scroll with this content, so whatever ends up
-            // as the last item in this column (currently "내 동선
-            // 추천하기") needs enough trailing space that it can never land
-            // underneath the FAB's ~72dp footprint (56dp button + 16dp
-            // margin). 96 measured out to only ~27dp of actual clearance on
-            // a real device -- any content added to the shared-route feed
-            // above it would push it right under the FAB, so a tap meant
-            // for this button would hit the FAB instead (navigating to the
-            // saved walking courses list).
-            padding: const EdgeInsets.fromLTRB(AppSpacing.lg, AppSpacing.md, AppSpacing.lg, 190),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Row(
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _HomeHeader(
+              controller: _urlController,
+              isAnalyzing: videoProvider.isLoading,
+              onAnalyze: () => _onAnalyzePressed(videoProvider),
+            ),
+            // The white sheet rides 26px up over the gradient so its rounded
+            // corners sit on colour rather than on the page. Transform
+            // doesn't take part in layout, so the 26px it leaves behind ends
+            // up at the very bottom of the scroll, where the trailing
+            // padding below absorbs it.
+            Transform.translate(
+              offset: const Offset(0, -26),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: AppColors.surfacePage,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+                ),
+                // Bottom padding must clear the fixed `SavedRoutesFab`, which
+                // doesn't scroll with this content: whatever ends up last
+                // (currently "내 동선 추천하기") needs enough trailing space
+                // that it can never land underneath the FAB's ~72dp
+                // footprint. 96 measured out to only ~27dp of real clearance
+                // on a device, so a tap meant for the button hit the FAB.
+                padding: const EdgeInsets.fromLTRB(24, 24, 24, 190),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    VoylogLogoMark(size: 38),
-                    SizedBox(width: AppSpacing.sm),
-                    VoylogWordmark(fontSize: 20),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                Text(
-                  '브이로그로 동선을\n만들어드려요',
-                  style: textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '여행 브이로그 URL을 붙여넣으면\nAI가 자동으로 동선을 만들어줘요',
-                  style: textTheme.bodyMedium?.copyWith(color: AppColors.textTertiary, height: 1.5),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: const Color(0xFFD9EDF7), width: 2),
-                    borderRadius: BorderRadius.circular(999),
-                    boxShadow: AppColors.cardShadow(),
-                  ),
-                  child: Row(
-                    children: [
-                      const LinkGlyphIcon(size: 17, color: AppColors.textMuted),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: TextField(
-                          key: const Key('urlField'),
-                          controller: _urlController,
-                          keyboardType: TextInputType.url,
-                          decoration: const InputDecoration(
-                            hintText: '브이로그 URL을 붙여넣으세요',
-                            border: InputBorder.none,
-                            filled: false,
-                            contentPadding: EdgeInsets.zero,
-                            isDense: true,
+                    if (_inputError != null) ...[
+                      Text(_inputError!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    if (videoProvider.state == ViewState.error) ...[
+                      ErrorView(
+                        message: videoProvider.errorMessage ?? '분석에 실패했습니다.',
+                        onRetry: () => _onAnalyzePressed(videoProvider),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningBg,
+                        borderRadius: BorderRadius.circular(AppRadius.md),
+                      ),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.info_rounded, size: 16, color: AppColors.warningIcon),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '현재는 국내 여행 브이로그만 분석이 가능해요',
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.warningText,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    // v1 had these two side by side as cards; v2 makes them
+                    // full-width rows with a divider between.
+                    _EntryRow(
+                      glyph: const LocationPinGlyphIcon(size: 17, color: AppColors.primaryChip),
+                      label: '내 주변 추천',
+                      caption: '지금 근처 갈 만한 곳',
+                      onTap: () => Navigator.pushNamed(context, AppRoutes.nearbyRecommendations),
+                    ),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFE5EEEE)),
+                    _EntryRow(
+                      glyph: const WalkingGlyphIcon(size: 17, color: Color(0xFF2F6B5C)),
+                      label: '뚜벅이 코스',
+                      caption: '걸어서 도는 코스',
+                      onTap: () => Navigator.pushNamed(context, AppRoutes.walkingCourseRegion),
+                    ),
+                    const SizedBox(height: 26),
+                    _SectionHeading(
+                      title: '해시태그로 브이로그 찾아보기',
+                      actionLabel: '더보기',
+                      onActionTap: _onSeeMoreHashtags,
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        for (final tag in _homeHashtags)
+                          GestureDetector(
+                            onTap: () => _onHashtagTap(videoProvider, tag),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: AppColors.surfaceHashtag,
+                                border: Border.all(color: AppColors.inputBorder),
+                                borderRadius: BorderRadius.circular(AppRadius.xs),
+                              ),
+                              child: Text(
+                                tag,
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.primaryChip,
+                                ),
+                              ),
+                            ),
+                          ),
+                        // Not in the v2 spec, which lists only the five
+                        // chips -- kept because dropping it would take away
+                        // searching a tag of your own, which is a feature,
+                        // not a style.
+                        CustomOptionField(
+                          key: const Key('customHashtagField'),
+                          hintText: '직접 입력',
+                          icon: Icons.tag_rounded,
+                          submitLabel: '검색',
+                          submitIcon: Icons.search_rounded,
+                          compactWidth: 140,
+                          onSubmitted: (tag) => _onHashtagTap(videoProvider, tag),
+                        ),
+                      ],
+                    ),
+                    if (similarTaste.result?.hasPreference == true &&
+                        (similarTaste.result?.recommendations.isNotEmpty ?? false)) ...[
+                      const SizedBox(height: 26),
+                      _SectionHeading(
+                        title: '취향이 비슷한 사람들의 북마크',
+                        actionLabel: '전체보기',
+                        onActionTap: () => Navigator.pushNamed(context, AppRoutes.similarTasteRecommendations),
+                      ),
+                      const SizedBox(height: 2),
+                      const Text(
+                        '나와 취향 일치율이 높은 사용자가 저장한 장소예요',
+                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 12),
+                      // Full-bleed carousel: the negative padding undoes the
+                      // sheet's 24px side padding so cards run to the edge.
+                      SizedBox(
+                        height: 92,
+                        child: OverflowBox(
+                          maxWidth: MediaQuery.sizeOf(context).width,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            itemCount: similarTaste.result!.recommendations.length.clamp(0, 5),
+                            separatorBuilder: (_, _) => const SizedBox(width: 12),
+                            itemBuilder: (context, i) {
+                              final rec = similarTaste.result!.recommendations[i];
+                              return SizedBox(
+                                width: 272,
+                                child: _SimilarTastePlaceCard(
+                                  rec: rec,
+                                  onTap: () => _onSimilarTastePlaceTap(rec),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => _onAnalyzePressed(videoProvider),
-                        child: Container(
-                          width: 38,
-                          height: 38,
-                          alignment: Alignment.center,
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(colors: [AppColors.accentCyan, AppColors.primaryStrong]),
-                            shape: BoxShape.circle,
+                    ],
+                    const SizedBox(height: 26),
+                    Text(
+                      '다른 유저의 추천 동선',
+                      style: textTheme.titleSmall?.copyWith(fontSize: 17, fontWeight: FontWeight.w800),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      '직접 다녀오고 좋았던 동선을 공유한 사람들이에요',
+                      style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                    const SizedBox(height: 12),
+                    if (sharedRoute.isLoading && sharedRoute.routes.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+                      )
+                    else if (sharedRoute.routes.isEmpty)
+                      const Text('아직 공유된 동선이 없어요', style: TextStyle(fontSize: 12.5, color: AppColors.textMuted))
+                    else
+                      for (final route in sharedRoute.routes)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _SharedRouteCard(
+                            route: route,
+                            onTap: () => Navigator.pushNamed(context, AppRoutes.sharedRouteDetail, arguments: route),
+                            onLikeTap: () => context.read<SharedRouteProvider>().toggleLike(route.sharedRouteId),
+                            onEditTap: () => _editSharedRouteTitle(route),
+                            onDeleteTap: () => _unpublishSharedRoute(route),
                           ),
-                          child: videoProvider.isLoading
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                                )
-                              : const Icon(Icons.arrow_forward_rounded, size: 16, color: Colors.white),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                if (_inputError != null) ...[
-                  const SizedBox(height: 6),
-                  Text(_inputError!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
-                ],
-                if (videoProvider.state == ViewState.error) ...[
-                  const SizedBox(height: AppSpacing.sm),
-                  ErrorView(
-                    message: videoProvider.errorMessage ?? '분석에 실패했습니다.',
-                    onRetry: () => _onAnalyzePressed(videoProvider),
-                  ),
-                ],
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(color: const Color(0xFFFFF4D6), borderRadius: BorderRadius.circular(16)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.info_rounded, size: 16, color: AppColors.accentWarm),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '현재는 국내 여행 브이로그만 분석이 가능해요',
-                          style: TextStyle(fontSize: 12.5, color: AppColors.accentWarmAlt, height: 1.5),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _QuickEntryCard(
-                        glyph: const LocationPinGlyphIcon(size: 17, color: AppColors.primary),
-                        label: '내 주변 추천',
-                        caption: '지금 근처 갈 만한 곳',
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.nearbyRecommendations),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _QuickEntryCard(
-                        glyph: const WalkingGlyphIcon(size: 17, color: AppColors.primary),
-                        label: '뚜벅이 코스',
-                        caption: '걸어서 도는 코스',
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.walkingCourseRegion),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.lg),
-                Text('해시태그로 브이로그 찾아보기', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: AppSpacing.sm),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    for (final tag in _homeHashtags)
-                      GestureDetector(
-                        onTap: () => _onHashtagTap(videoProvider, tag),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(color: AppColors.surfaceTint3Alt, borderRadius: BorderRadius.circular(999)),
-                          child: Text(tag, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primaryStrong)),
-                        ),
-                      ),
                     GestureDetector(
-                      onTap: _onSeeMoreHashtags,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        decoration: BoxDecoration(color: AppColors.surfaceTint2, borderRadius: BorderRadius.circular(999)),
+                      onTap: _openShareRouteSheet,
+                      child: DashedBorderContainer(
+                        backgroundColor: AppColors.surfaceTint1,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Text('더보기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textTertiary)),
-                            SizedBox(width: 4),
-                            Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textTertiary),
+                            Icon(Icons.add_rounded, size: 15, color: AppColors.primary),
+                            SizedBox(width: 8),
+                            Text('내 동선 추천하기', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
                           ],
                         ),
                       ),
                     ),
-                    // A chip-sized field in the chip row itself: a
-                    // full-width one under the chips was too long.
-                    CustomOptionField(
-                      key: const Key('customHashtagField'),
-                      hintText: '직접 입력',
-                      icon: Icons.tag_rounded,
-                      submitLabel: '검색',
-                      submitIcon: Icons.search_rounded,
-                      compactWidth: 140,
-                      onSubmitted: (tag) => _onHashtagTap(videoProvider, tag),
-                    ),
                   ],
                 ),
-                if (similarTaste.result?.hasPreference == true && (similarTaste.result?.recommendations.isNotEmpty ?? false)) ...[
-                  const SizedBox(height: AppSpacing.xl),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Text('취향이 비슷한 사람들의 북마크', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                      ),
-                      GestureDetector(
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.similarTasteRecommendations),
-                        child: const Text('더보기', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '나와 취향 일치율이 높은 사용자가 저장한 장소예요',
-                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  for (final rec in similarTaste.result!.recommendations.take(3))
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _SimilarTastePlaceCard(
-                        rec: rec,
-                        onTap: () => _onSimilarTastePlaceTap(rec),
-                      ),
-                    ),
-                ],
-                const SizedBox(height: AppSpacing.xl),
-                Text('다른 유저의 추천 동선', style: textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(
-                  '직접 다녀오고 좋았던 동선을 공유한 사람들이에요',
-                  style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                if (sharedRoute.isLoading && sharedRoute.routes.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
-                    child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
-                  )
-                else if (sharedRoute.routes.isEmpty)
-                  Text('아직 공유된 동선이 없어요', style: TextStyle(fontSize: 12.5, color: AppColors.textMuted))
-                else
-                  for (final route in sharedRoute.routes)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                      child: _SharedRouteCard(
-                        route: route,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.sharedRouteDetail, arguments: route),
-                        onLikeTap: () => context.read<SharedRouteProvider>().toggleLike(route.sharedRouteId),
-                        onEditTap: () => _editSharedRouteTitle(route),
-                        onDeleteTap: () => _unpublishSharedRoute(route),
-                      ),
-                    ),
-                GestureDetector(
-                  onTap: _openShareRouteSheet,
-                  child: DashedBorderContainer(
-                    backgroundColor: AppColors.surfaceTint1,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.add_rounded, size: 15, color: AppColors.primaryStrong),
-                        SizedBox(width: 8),
-                        Text('내 동선 추천하기', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong)),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 }
 
+/// The gradient top of the home screen: headline, one-line pitch, and the
+/// link card that starts an analysis.
+class _HomeHeader extends StatelessWidget {
+  const _HomeHeader({
+    required this.controller,
+    required this.isAnalyzing,
+    required this.onAnalyze,
+  });
 
-class _QuickEntryCard extends StatelessWidget {
-  const _QuickEntryCard({required this.glyph, required this.label, required this.caption, required this.onTap});
+  final TextEditingController controller;
+  final bool isAnalyzing;
+  final VoidCallback onAnalyze;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: const BoxDecoration(gradient: AppColors.homeHeaderGradient),
+      padding: EdgeInsets.fromLTRB(24, MediaQuery.paddingOf(context).top + 24, 24, 56),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '영상 한 편이면,\n여행 동선 완성',
+            style: TextStyle(
+              fontSize: 29,
+              fontWeight: FontWeight.w800,
+              height: 1.35,
+              letterSpacing: -0.8,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'YouTube 링크만 붙여넣으세요.\n장소 추출부터 동선까지 AI가 해드려요',
+            style: TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w500,
+              height: 1.6,
+              letterSpacing: -0.3,
+              color: Colors.white.withValues(alpha: 0.92),
+            ),
+          ),
+          const SizedBox(height: 26),
+          // A translucent ring around the white card, as in the handoff.
+          Container(
+            padding: const EdgeInsets.all(5),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(26),
+            ),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(14, 7, 7, 7),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(21),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF00323C).withValues(alpha: 0.18),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  const LinkGlyphIcon(size: 18, color: AppColors.primaryChip),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: TextField(
+                      key: const Key('urlField'),
+                      controller: controller,
+                      keyboardType: TextInputType.url,
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: -0.3),
+                      decoration: const InputDecoration(
+                        hintText: 'YouTube 링크 붙여넣기',
+                        hintStyle: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          letterSpacing: -0.3,
+                          color: AppColors.textMuted,
+                        ),
+                        border: InputBorder.none,
+                        filled: false,
+                        contentPadding: EdgeInsets.zero,
+                        isDense: true,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  GestureDetector(
+                    key: const Key('analyzeButton'),
+                    onTap: onAnalyze,
+                    child: Container(
+                      height: 46,
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryStrong,
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: isAnalyzing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '분석하기',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white),
+                                ),
+                                SizedBox(width: 4),
+                                Icon(Icons.arrow_forward_rounded, size: 15, color: Colors.white),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A section title with an optional action on the right ("더보기" /
+/// "전체보기"), which v2 moves up out of the content below it.
+class _SectionHeading extends StatelessWidget {
+  const _SectionHeading({required this.title, this.actionLabel, this.onActionTap});
+
+  final String title;
+  final String? actionLabel;
+  final VoidCallback? onActionTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Expanded(
+          child: Text(
+            title,
+            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.4, color: AppColors.ink),
+          ),
+        ),
+        if (actionLabel != null)
+          GestureDetector(
+            onTap: onActionTap,
+            child: Text(
+              actionLabel!,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primaryChip),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// One of the two full-width entry rows under the banner (내 주변 추천 /
+/// 뚜벅이 코스). v1 drew these as a pair of side-by-side cards.
+class _EntryRow extends StatelessWidget {
+  const _EntryRow({required this.glyph, required this.label, required this.caption, required this.onTap});
 
   final Widget glyph;
   final String label;
@@ -454,30 +582,45 @@ class _QuickEntryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppCard(
+    return InkWell(
       onTap: onTap,
-      borderRadius: 18,
-      padding: const EdgeInsets.all(14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 34,
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: AppColors.surfaceTint3, borderRadius: BorderRadius.circular(12)),
-            child: glyph,
-          ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
-          const SizedBox(height: 2),
-          Text(caption, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-        ],
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              alignment: Alignment.center,
+              decoration: const BoxDecoration(color: Color(0xFFE6F4F3), shape: BoxShape.circle),
+              child: glyph,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, letterSpacing: -0.3, color: AppColors.ink),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    caption,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: AppColors.textTertiary),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, size: 20, color: Color(0xFF9FB2B5)),
+          ],
+        ),
       ),
     );
   }
 }
+
+
 
 class _SimilarTastePlaceCard extends StatelessWidget {
   const _SimilarTastePlaceCard({required this.rec, required this.onTap});

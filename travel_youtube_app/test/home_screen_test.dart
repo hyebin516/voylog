@@ -77,9 +77,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('urlField')), findsOneWidget);
-    expect(find.text('브이로그 URL을 붙여넣으세요'), findsOneWidget);
+    expect(find.text('YouTube 링크 붙여넣기'), findsOneWidget);
 
-    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+    await tester.tap(find.byKey(const Key('analyzeButton')));
     await tester.pump();
 
     expect(find.text('URL을 먼저 입력해 주세요.'), findsOneWidget);
@@ -94,7 +94,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byKey(const Key('urlField')), 'https://youtu.be/v1');
-    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+    await tester.tap(find.byKey(const Key('analyzeButton')));
     await tester.pumpAndSettle();
 
     expect(videoRepository.lastUrl, 'https://youtu.be/v1');
