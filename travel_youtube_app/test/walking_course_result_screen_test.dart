@@ -15,6 +15,7 @@ import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart'
 import 'package:travel_youtube_app/repositories/saved_walking_course_repository.dart';
 import 'package:travel_youtube_app/repositories/walking_course_repository.dart';
 import 'package:travel_youtube_app/screens/walking_course_result_screen.dart';
+import 'package:travel_youtube_app/services/kakao_map_launcher.dart';
 
 import 'fakes/fake_map_widget.dart';
 import 'helpers/phone_viewport.dart';
@@ -135,14 +136,60 @@ class FakeFolderRouteRepository extends BookmarkFolderRepository {
   }
 }
 
-Widget _wrap(WalkingCourseProvider provider) {
+/// A folder whose bookmarks sit in different cities: one leg is a drive of
+/// nearly three hours, which no bus covers.
+class FakeLongDriveFolderRouteRepository extends BookmarkFolderRepository {
+  @override
+  Future<WalkingCourseModel> createRoute(String folderId) async {
+    return const WalkingCourseModel(
+      course: WalkingCourseRouteModel(
+        routeType: 'placeToPlace',
+        transportMode: 'mixed',
+        totalDistanceM: 277500,
+        totalDurationSec: 14400,
+        routeData: [
+          RoutePointModel(order: 0, type: 'place', hotelId: null, placeId: 'a', name: '허그스', latitude: 36.78, longitude: 127.0),
+          RoutePointModel(order: 1, type: 'place', hotelId: null, placeId: 'b', name: '최영화빵', latitude: 36.02, longitude: 129.36, legDistanceM: 240000, legDurationSec: 10620, legTransportMode: 'car'),
+        ],
+      ),
+      recommendations: [],
+    );
+  }
+}
+
+/// Records what would have been sent to Kakao Map instead of launching it.
+class RecordingKakaoMapLauncher extends KakaoMapLauncher {
+  RecordingKakaoMapLauncher();
+
+  List<RouteStop>? lastStops;
+  String? lastTransportMode;
+  bool result = true;
+
+  @override
+  Future<bool> openRoute({
+    required List<RouteStop> stops,
+    required String transportMode,
+  }) async {
+    lastStops = stops;
+    lastTransportMode = transportMode;
+    return result;
+  }
+}
+
+Widget _wrap(
+  WalkingCourseProvider provider, {
+  KakaoMapLauncher? kakaoMapLauncher,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider.value(value: provider),
       ChangeNotifierProvider(create: (_) => BookmarkProvider()),
     ],
     child: MaterialApp(
-      home: WalkingCourseResultScreen(mapRepository: const FakeMapRepository()),
+      home: WalkingCourseResultScreen(
+        mapRepository: const FakeMapRepository(),
+        kakaoMapLauncher: kakaoMapLauncher ?? const KakaoMapLauncher(),
+      ),
     ),
   );
 }
@@ -444,9 +491,111 @@ void main() {
     expect(find.textContaining('아산 · 장소 3곳'), findsOneWidget);
     expect(find.text('도보 7분'), findsOneWidget);
     expect(find.text('버스 21분 · 600번 · 온양온천역 신한은행 → 신정호관광지 건너'), findsOneWidget);
+    // Not "뚜벅이 코스": a folder route walks, buses and drives as each leg
+    // needs, so that header was claiming something the route isn't.
+    expect(find.text('내 동선'), findsOneWidget);
+    expect(find.text('뚜벅이 코스'), findsNothing);
+  });
+
+  testWidgets('a long drive is shown in hours, not a clamped minute count', (tester) async {
+    // Bookmarks in different cities produce a leg of a few hours. The label
+    // used to clamp the minutes at 999, so a 177-minute drive read as
+    // "차량 999분".
+    usePhoneViewport(tester);
+    final provider = WalkingCourseProvider(
+      repository: FakeWalkingCourseRepository(),
+      folderRepository: FakeLongDriveFolderRouteRepository(),
+    );
+    await provider.generateFromBookmarkFolder(folderId: 'f1', folderName: '아산');
+
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pumpAndSettle();
+
+    expect(find.text('차량 2시간 57분'), findsOneWidget);
+    expect(find.textContaining('999'), findsNothing);
     expect(find.text('출발'), findsOneWidget);
     expect(find.textContaining('도보 시작'), findsNothing);
     // No region to re-anchor on, so no start point picker.
     expect(find.text('시작 지점 정하기'), findsNothing);
+  });
+
+  testWidgets('tapping a leg opens just that leg, in the mode it travels', (
+    tester,
+  ) async {
+    // The bus leg is the reason this exists: a mixed course can't be one
+    // Kakao link, so the only way its bus leg reaches Kakao Map is alone.
+    await tester.binding.setSurfaceSize(const Size(400, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final launcher = RecordingKakaoMapLauncher();
+    final provider = WalkingCourseProvider(
+      repository: FakeWalkingCourseRepository(),
+      folderRepository: FakeFolderRouteRepository(),
+    );
+    await provider.generateFromBookmarkFolder(
+      folderId: 'f1',
+      folderName: '아산 북마크',
+    );
+    await tester.pumpWidget(_wrap(provider, kakaoMapLauncher: launcher));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.textContaining('버스 21분'));
+    await tester.pumpAndSettle();
+
+    expect(launcher.lastTransportMode, 'transit');
+    expect(
+      launcher.lastStops!.map((s) => s.name).toList(),
+      ['파인데이즈', '카페 산시'],
+    );
+  });
+
+  testWidgets('a mixed course offers no whole-course button', (tester) async {
+    // Kakao's transit links carry no waypoints at all, so one link would
+    // quietly lose every stop after the second.
+    await tester.binding.setSurfaceSize(const Size(400, 1400));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final provider = WalkingCourseProvider(
+      repository: FakeWalkingCourseRepository(),
+      folderRepository: FakeFolderRouteRepository(),
+    );
+    await provider.generateFromBookmarkFolder(
+      folderId: 'f1',
+      folderName: '아산 북마크',
+    );
+    await tester.pumpWidget(_wrap(provider));
+    await tester.pumpAndSettle();
+
+    expect(find.text('카카오맵에서 전체 코스 보기'), findsNothing);
+  });
+
+  testWidgets('a walking course opens every stop in one link', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 1600));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final launcher = RecordingKakaoMapLauncher();
+    final repository = FakeWalkingCourseRepository()
+      ..resultToReturn = const WalkingCourseModel(
+        course: _course,
+        recommendations: [],
+      );
+    final provider = WalkingCourseProvider(repository: repository);
+    await provider.generate('제주');
+    await tester.pumpWidget(_wrap(provider, kakaoMapLauncher: launcher));
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('카카오맵에서 전체 코스 보기'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('카카오맵에서 전체 코스 보기'));
+    await tester.pumpAndSettle();
+
+    expect(launcher.lastTransportMode, 'walk');
+    // The region-center anchor is a routing artifact, not a place, so it
+    // stays out of the link -- otherwise the course would start and end at
+    // a point the user never chose.
+    expect(
+      launcher.lastStops!.map((s) => s.name).toList(),
+      ['흑돼지집', '용두암'],
+    );
   });
 }

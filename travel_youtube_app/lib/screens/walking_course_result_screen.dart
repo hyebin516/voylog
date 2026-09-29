@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
+import '../utils/route_paths.dart';
 import '../models/map_view_types.dart';
 import '../models/itinerary_model.dart';
 import '../models/nearby_recommendation_model.dart';
@@ -9,6 +10,7 @@ import '../models/start_point_model.dart';
 import '../providers/walking_course_provider.dart';
 import '../routes/app_routes.dart';
 import '../repositories/map_repository.dart';
+import '../services/kakao_map_launcher.dart';
 import '../utils/route_format.dart';
 import '../utils/view_state.dart';
 import '../widgets/data_source_attribution.dart';
@@ -29,13 +31,25 @@ class WalkingCourseResultScreen extends StatelessWidget {
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
+  /// Opens legs and the whole course in Kakao Map. Widget tests inject a
+  /// fake so `flutter test` never launches anything.
+  final KakaoMapLauncher kakaoMapLauncher;
+
   const WalkingCourseResultScreen({
     super.key,
     this.mapRepository = const KakaoMapRepository(),
+    this.kakaoMapLauncher = const KakaoMapLauncher(),
   });
 
   @override
   Widget build(BuildContext context) {
+    // The same screen serves two things: the region-based walking course
+    // (FR-17) and a route built from a bookmark folder (FR-11). The folder
+    // one walks, buses and drives as each leg needs, so calling it a
+    // 뚜벅이 코스 in the header was wrong.
+    final course = context.watch<WalkingCourseProvider>().result?.course;
+    final isFolderRoute = course?.isPlaceToPlace ?? false;
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -64,9 +78,9 @@ class WalkingCourseResultScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    '뚜벅이 코스',
-                    style: TextStyle(
+                  Text(
+                    isFolderRoute ? '내 동선' : '뚜벅이 코스',
+                    style: const TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
                       color: AppColors.ink,
@@ -76,7 +90,10 @@ class WalkingCourseResultScreen extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: _WalkingCourseResultBody(mapRepository: mapRepository),
+              child: _WalkingCourseResultBody(
+                mapRepository: mapRepository,
+                kakaoMapLauncher: kakaoMapLauncher,
+              ),
             ),
           ],
         ),
@@ -86,9 +103,13 @@ class WalkingCourseResultScreen extends StatelessWidget {
 }
 
 class _WalkingCourseResultBody extends StatefulWidget {
-  const _WalkingCourseResultBody({required this.mapRepository});
+  const _WalkingCourseResultBody({
+    required this.mapRepository,
+    required this.kakaoMapLauncher,
+  });
 
   final MapRepository mapRepository;
+  final KakaoMapLauncher kakaoMapLauncher;
 
   @override
   State<_WalkingCourseResultBody> createState() =>
@@ -113,6 +134,28 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
     await context.read<WalkingCourseProvider>().regenerateWithStartPoint(
       picked,
     );
+  }
+
+  /// Opens every stop as one route in Kakao Map.
+  ///
+  /// Only offered when the whole course fits in one link -- Kakao carries
+  /// five waypoints and silently drops the rest, and a public-transport
+  /// link takes none at all, so a longer or bus-using course is opened one
+  /// leg at a time instead of shown wrong.
+  Future<void> _onOpenWholeCoursePressed(
+    BuildContext context,
+    List<RouteStop> stops,
+    String transportMode,
+  ) async {
+    final opened = await widget.kakaoMapLauncher.openRoute(
+      stops: stops,
+      transportMode: transportMode,
+    );
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('카카오맵을 열 수 없어요.')),
+      );
+    }
   }
 
   Future<void> _onSavePressed(BuildContext context) async {
@@ -195,6 +238,27 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
           ),
     ];
 
+    // The course as one Kakao Map link: the start point the user picked
+    // (the region-center anchor is a routing artifact and isn't a place)
+    // followed by every stop that has coordinates.
+    final wholeCourseStops = [
+      if (startPoint != null && startPoint.isUserStartPoint) startPoint,
+      ...placeStops,
+    ]
+        .where((p) => p.latitude != null && p.longitude != null)
+        .map(
+          (p) => RouteStop(
+            name: p.name,
+            latitude: p.latitude!,
+            longitude: p.longitude!,
+          ),
+        )
+        .toList();
+    final canOpenWholeCourse = KakaoMapLauncher.canOpenWholeRoute(
+      stopCount: wholeCourseStops.length,
+      transportMode: course.transportMode,
+    );
+
     final stopListItems = <Widget>[];
     for (var i = 0; i < placeStops.length; i++) {
       final markerId = placeStops[i].markerId;
@@ -211,7 +275,11 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
       );
       if (i < placeStops.length - 1) {
         stopListItems.add(
-          _WalkTimeRow(point: placeStops[i + 1]),
+          _WalkTimeRow(
+            origin: placeStops[i],
+            point: placeStops[i + 1],
+            kakaoMapLauncher: widget.kakaoMapLauncher,
+          ),
         );
       }
     }
@@ -275,6 +343,7 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
               initialLongitude: routeMarkers.first.longitude,
               markers: routeMarkers,
               drawRoutePolyline: true,
+              routeLegPaths: routeLegPathsOf(placeStops),
               focusedMarkerId: _selectedMarkerId,
             ),
           ),
@@ -295,6 +364,27 @@ class _WalkingCourseResultBodyState extends State<_WalkingCourseResultBody> {
                         stopListItems[i],
                         if (i < stopListItems.length - 1)
                           const SizedBox(height: 10),
+                      ],
+                      if (canOpenWholeCourse) ...[
+                        const SizedBox(height: 14),
+                        OutlinedButton.icon(
+                          onPressed: () => _onOpenWholeCoursePressed(
+                            context,
+                            wholeCourseStops,
+                            course.transportMode,
+                          ),
+                          icon: const Icon(Icons.map_outlined, size: 18),
+                          label: const Text(
+                            '카카오맵에서 전체 코스 보기',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(double.infinity, 46),
+                          ),
+                        ),
                       ],
                       const DataSourceAttribution(),
                     ],
@@ -457,28 +547,77 @@ class _StopRow extends StatelessWidget {
 
 /// The leg arriving at [point]: "도보 N분", or on a bookmark-folder route
 /// "버스 N분" with which bus to take and between which stops.
+///
+/// Tapping it opens that one leg in Kakao Map, in the mode this leg
+/// actually travels -- walking directions for a walk, the bus timetable for
+/// a bus, the drive for a drive. A whole mixed-mode course can't be one
+/// Kakao link (a link carries a single mode), so leg by leg is how the bus
+/// legs reach Kakao Map at all.
 class _WalkTimeRow extends StatelessWidget {
-  const _WalkTimeRow({required this.point});
+  const _WalkTimeRow({
+    required this.origin,
+    required this.point,
+    required this.kakaoMapLauncher,
+  });
 
+  /// The stop this leg leaves from -- Kakao needs both ends.
+  final RoutePointModel origin;
   final RoutePointModel point;
+  final KakaoMapLauncher kakaoMapLauncher;
+
+  bool get _canOpen =>
+      origin.latitude != null &&
+      origin.longitude != null &&
+      point.latitude != null &&
+      point.longitude != null;
+
+  Future<void> _openLeg(BuildContext context) async {
+    final opened = await kakaoMapLauncher.openRoute(
+      stops: [
+        RouteStop(
+          name: origin.name,
+          latitude: origin.latitude!,
+          longitude: origin.longitude!,
+        ),
+        RouteStop(
+          name: point.name,
+          latitude: point.latitude!,
+          longitude: point.longitude!,
+        ),
+      ],
+      transportMode: point.legTransportMode ?? 'walk',
+    );
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('카카오맵을 열 수 없어요.')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final seconds = point.legDurationSec;
     if (seconds == null) return const SizedBox.shrink();
 
-    final minutes = (seconds / 60).round().clamp(1, 999);
+    // Anything under a minute still reads as "1분" rather than "0분", and
+    // anything over an hour as "2시간 57분" -- this used to clamp the minute
+    // count at 999, so a 177-minute drive between far-apart bookmarks
+    // displayed as "차량 999분".
+    // Rounded to the nearest minute first (1253s reads as 21분, not 20분),
+    // with a floor of one minute so a short hop never shows "0분".
+    final roundedSeconds = ((seconds / 60).round().clamp(1, 1 << 30)) * 60;
+    final duration = formatRouteDuration(roundedSeconds);
     final IconData icon;
     final String label;
     if (point.isTransitLeg) {
       icon = Icons.directions_bus_rounded;
-      label = '버스 $minutes분';
+      label = '버스 $duration';
     } else if (point.isDrivenLeg) {
       icon = Icons.directions_car_rounded;
-      label = '차량 $minutes분';
+      label = '차량 $duration';
     } else {
       icon = Icons.directions_walk_rounded;
-      label = '도보 $minutes분';
+      label = '도보 $duration';
     }
     const style = TextStyle(
       fontSize: 11.5,
@@ -487,8 +626,8 @@ class _WalkTimeRow extends StatelessWidget {
     );
     final guidance = point.legGuidance;
 
-    return Padding(
-      padding: const EdgeInsets.only(left: 12),
+    final row = Padding(
+      padding: const EdgeInsets.fromLTRB(12, 2, 0, 2),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -500,7 +639,26 @@ class _WalkTimeRow extends StatelessWidget {
               style: style,
             ),
           ),
+          if (_canOpen) ...[
+            const SizedBox(width: 6),
+            const Icon(
+              Icons.open_in_new_rounded,
+              size: 12,
+              color: AppColors.textMuted2,
+            ),
+          ],
         ],
+      ),
+    );
+
+    if (!_canOpen) return row;
+    return InkWell(
+      onTap: () => _openLeg(context),
+      borderRadius: BorderRadius.circular(8),
+      child: Semantics(
+        button: true,
+        label: '$label 구간 카카오맵에서 보기',
+        child: row,
       ),
     );
   }
