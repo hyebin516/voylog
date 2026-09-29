@@ -71,28 +71,11 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     final trip = tripProvider.currentTrip;
 
     return Scaffold(
+      // v1 layered a blue gradient and a decorative circle here; v2 makes
+      // every screen a flat `surface-page`.
+      backgroundColor: AppColors.surfacePage,
       body: Stack(
         children: [
-          // The design's soft blue gradient + decorative blob circles for
-          // this "여행" flow (bookmark folders/trip list share the same
-          // treatment) -- not a flat white background.
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.surfaceTint3, Colors.white],
-                  stops: [0, 0.55],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: -70,
-            left: -60,
-            child: _Blob(size: 220, color: const Color(0xFFBFE6F7)),
-          ),
           SafeArea(
             child: Column(
               children: [
@@ -346,24 +329,6 @@ class _DateField extends StatelessWidget {
             color: AppColors.ink,
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
       ),
     );
   }

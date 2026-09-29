@@ -91,10 +91,8 @@ class _BottomBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(top: BorderSide(color: AppColors.divider)),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(color: AppColors.primary.withValues(alpha: 0.08), blurRadius: 20, offset: const Offset(0, -6)),
-        ],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        boxShadow: AppColors.tabBarShadow(),
       ),
       child: SafeArea(
         top: false,
@@ -113,26 +111,27 @@ class _BottomBar extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Container(
-                          width: 38,
-                          height: 30,
+                          width: 60,
+                          height: 36,
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: i == currentIndex ? AppColors.surfaceTint3Alt : Colors.transparent,
-                            borderRadius: BorderRadius.circular(13),
+                            color: i == currentIndex ? AppColors.surfaceTint3 : Colors.transparent,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
                           ),
                           child: _glyphFor(
                             tabs[i].glyph,
-                            size: 18,
-                            color: i == currentIndex ? AppColors.primaryStrong : AppColors.textMuted2,
+                            size: 24,
+                            color: i == currentIndex ? AppColors.primary : AppColors.textMuted2,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           tabs[i].label,
                           style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: i == currentIndex ? AppColors.primaryStrong : AppColors.textMuted2,
+                            fontSize: 11,
+                            // The active label is bolder as well as darker.
+                            fontWeight: i == currentIndex ? FontWeight.w700 : FontWeight.w600,
+                            color: i == currentIndex ? AppColors.primary : AppColors.textMuted2,
                           ),
                         ),
                       ],

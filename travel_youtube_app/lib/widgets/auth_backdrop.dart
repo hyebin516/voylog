@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../core/theme/app_theme.dart';
 
-/// Soft gradient + blurred "blob" background used behind the splash/login/
-/// signup/email-verify screens, matching the Voylog design prototype.
+/// The background behind the splash/login/signup/email-verify screens.
+///
+/// v1 layered a blue gradient and two decorative circles ("blobs") here.
+/// v2 removes the blobs everywhere and makes every screen a flat
+/// `surface-page`, so this is now just that colour -- kept as a widget so the
+/// ten screens using it stay one edit away from any future change.
 class AuthBackdrop extends StatelessWidget {
   const AuthBackdrop({super.key, required this.child});
 
@@ -11,39 +15,7 @@ class AuthBackdrop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [AppColors.surfaceTint, Colors.white],
-          stops: [0.0, 0.55],
-        ),
-      ),
-      child: Stack(
-        children: [
-          const Positioned(top: -70, left: -60, child: _Blob(size: 220, color: Color(0xFFBFE6F7))),
-          const Positioned(top: 40, right: -50, child: _Blob(size: 160, color: Color(0xFFDFF2FA))),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-class _Blob extends StatelessWidget {
-  const _Blob({required this.size, required this.color});
-
-  final double size;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
+    return ColoredBox(color: AppColors.surfacePage, child: child);
   }
 }
 
@@ -56,18 +28,20 @@ class AuthBackButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // v2: 36x36, radius 12, white, `sh-back-btn`, 17px chevron in
+    // `text-secondary`.
     return Container(
-      width: 38,
-      height: 38,
+      width: 36,
+      height: 36,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: AppColors.softShadow(opacity: 0.18, blurRadius: 12, offset: const Offset(0, 4)),
+        borderRadius: BorderRadius.circular(AppRadius.xs),
+        boxShadow: AppColors.backButtonShadow(),
       ),
       child: IconButton(
         padding: EdgeInsets.zero,
         onPressed: onPressed ?? () => Navigator.of(context).maybePop(),
-        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: AppColors.primary),
+        icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 17, color: AppColors.textSecondary),
       ),
     );
   }
