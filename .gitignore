@@ -21,3 +21,6 @@ Voylog UI.zip
 
 # Redis 로컬 덤프 (개발 머신에서 생김, 저장소에 들어갈 이유 없음)
 dump.rdb
+
+# 폰트 원본 zip (필요한 weight만 뽑아 assets/fonts/에 둠)
+travel_youtube_app/assets/fonts/*.zip

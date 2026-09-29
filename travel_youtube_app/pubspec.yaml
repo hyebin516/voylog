@@ -109,19 +109,26 @@ flutter:
   # For details regarding adding assets from package dependencies, see
   # https://flutter.dev/to/asset-from-package
 
-  # Bundled locally (assets/fonts/) so the design's "M PLUS Rounded 1c"
-  # typeface renders even with no network access -- google_fonts'
-  # allowRuntimeFetching is off (see main.dart) since it needs the CDN.
+  # Bundled locally (assets/fonts/) so the design's Pretendard renders even
+  # with no network access -- google_fonts' allowRuntimeFetching is off (see
+  # main.dart) since it needs the CDN, and Pretendard isn't on Google Fonts
+  # anyway. The handoff ships PretendardVariable.woff2, which Flutter cannot
+  # load; these are the static weights from the same release (OFL).
+  #
+  # Only the weights the app actually uses -- a Korean typeface is ~1.5MB per
+  # weight, so shipping all nine would add ~14MB for nothing.
   fonts:
-    - family: MPLUSRounded1c
+    - family: Pretendard
       fonts:
-        - asset: assets/fonts/MPLUSRounded1c-Regular.ttf
+        - asset: assets/fonts/Pretendard-Regular.otf
           weight: 400
-        - asset: assets/fonts/MPLUSRounded1c-Medium.ttf
+        - asset: assets/fonts/Pretendard-Medium.otf
           weight: 500
-        - asset: assets/fonts/MPLUSRounded1c-Bold.ttf
+        - asset: assets/fonts/Pretendard-SemiBold.otf
+          weight: 600
+        - asset: assets/fonts/Pretendard-Bold.otf
           weight: 700
-        - asset: assets/fonts/MPLUSRounded1c-ExtraBold.ttf
+        - asset: assets/fonts/Pretendard-ExtraBold.otf
           weight: 800
 
   # For details regarding fonts from package dependencies,
