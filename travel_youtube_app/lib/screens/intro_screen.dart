@@ -134,10 +134,96 @@ class _IntroArtwork extends StatelessWidget {
                 child: _FloatingCard(
                   width: 162 * scale,
                   height: 104 * scale,
-                  child: Image.asset(
-                    'assets/images/intro/video-sea-clean2.png',
-                    fit: BoxFit.cover,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      Image.asset(
+                        'assets/images/intro/video-sea-clean2.png',
+                        fit: BoxFit.cover,
+                      ),
+                      // Translucent play button over the thumbnail.
+                      Center(
+                        child: Container(
+                          width: 30 * scale,
+                          height: 22 * scale,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            borderRadius: BorderRadius.circular(6 * scale),
+                          ),
+                          child: Icon(
+                            Icons.play_arrow_rounded,
+                            size: 16 * scale,
+                            color: const Color(0xFF3AA6B0),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        right: 5 * scale,
+                        bottom: 7 * scale,
+                        child: Text(
+                          '12:34',
+                          style: TextStyle(
+                            fontSize: 8 * scale,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      // Progress bar, 32% along.
+                      Positioned(
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        child: SizedBox(
+                          height: 2 * scale,
+                          child: Row(
+                            children: [
+                              Expanded(
+                                flex: 32,
+                                child: ColoredBox(color: Colors.white.withValues(alpha: 0.95)),
+                              ),
+                              Expanded(
+                                flex: 68,
+                                child: ColoredBox(color: Colors.white.withValues(alpha: 0.35)),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+              ),
+            ),
+            // YouTube badge, tucked against the video card's top-left.
+            Positioned(
+              left: 14 * scale,
+              top: 14 * scale,
+              child: Container(
+                width: 36 * scale,
+                height: 30 * scale,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8 * scale),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00323C).withValues(alpha: 0.18),
+                      blurRadius: 10 * scale,
+                      offset: Offset(0, 3 * scale),
+                    ),
+                  ],
+                ),
+                child: Container(
+                  width: 26 * scale,
+                  height: 19 * scale,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF0000),
+                    borderRadius: BorderRadius.circular(5 * scale),
+                  ),
+                  child: Icon(Icons.play_arrow_rounded, size: 13 * scale, color: Colors.white),
                 ),
               ),
             ),
@@ -167,15 +253,34 @@ class _IntroArtwork extends StatelessWidget {
                       Column(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          for (final thumb in ['t1', 't2', 't3'])
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(4 * scale),
-                              child: Image.asset(
-                                'assets/images/intro/$thumb.png',
-                                width: 26 * scale,
-                                height: 27 * scale,
-                                fit: BoxFit.cover,
-                              ),
+                          for (final (thumb, time) in const [
+                            ('t1', '01:12'),
+                            ('t2', '04:36'),
+                            ('t3', '08:20'),
+                          ])
+                            Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(4 * scale),
+                                  child: Image.asset(
+                                    'assets/images/intro/$thumb.png',
+                                    width: 26 * scale,
+                                    height: 21 * scale,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                SizedBox(height: 1 * scale),
+                                Text(
+                                  time,
+                                  style: TextStyle(
+                                    fontSize: 7 * scale,
+                                    height: 1,
+                                    fontWeight: FontWeight.w500,
+                                    color: const Color(0xFF1A8F99),
+                                  ),
+                                ),
+                              ],
                             ),
                         ],
                       ),
@@ -184,11 +289,87 @@ class _IntroArtwork extends StatelessWidget {
                 ),
               ),
             ),
+            // Arrows and sparkles last, so they sit over the cards.
+            Positioned.fill(
+              child: CustomPaint(painter: _IntroFlourishPainter(scale)),
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+/// The handoff's hand-drawn flourishes: three curved arrows tying the video
+/// card to the map card, and two clusters of sparkle strokes.
+class _IntroFlourishPainter extends CustomPainter {
+  const _IntroFlourishPainter(this.scale);
+
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 * scale
+      ..strokeCap = StrokeCap.round;
+
+    Offset pt(double x, double y) => Offset(x * scale, y * scale);
+
+    // Arrow from the "From Vlog" caption down to the video card.
+    _arrow(canvas, stroke, pt(252, 22), pt(286, 44), pt(300, 74), scale);
+    // Arrow curving from the video card across to the map card.
+    _arrow(canvas, stroke, pt(206, 96), pt(236, 76), pt(268, 86), scale);
+    // Arrow from the "To Travel Route" caption up to the map card.
+    _arrow(canvas, stroke, pt(104, 190), pt(140, 176), pt(176, 158), scale);
+
+    _sparkle(canvas, stroke, pt(228, 18), 7);
+    _sparkle(canvas, stroke, pt(330, 118), 6);
+  }
+
+  /// A quadratic curve from [from] through [control] to [to], with a two-
+  /// stroke head at the end.
+  void _arrow(Canvas canvas, Paint paint, Offset from, Offset control, Offset to, double scale) {
+    canvas.drawPath(
+      Path()
+        ..moveTo(from.dx, from.dy)
+        ..quadraticBezierTo(control.dx, control.dy, to.dx, to.dy),
+      paint,
+    );
+
+    // Head angled along the curve's final direction.
+    final dx = to.dx - control.dx;
+    final dy = to.dy - control.dy;
+    final angle = math.atan2(dy, dx);
+    const spread = 0.5;
+    final headLength = 7 * scale;
+    for (final offset in [spread, -spread]) {
+      canvas.drawLine(
+        to,
+        Offset(
+          to.dx - headLength * math.cos(angle + offset),
+          to.dy - headLength * math.sin(angle + offset),
+        ),
+        paint,
+      );
+    }
+  }
+
+  /// A four-pointed twinkle: one long axis, one short.
+  void _sparkle(Canvas canvas, Paint paint, Offset center, double radius) {
+    final r = radius * scale;
+    canvas.drawLine(center.translate(0, -r), center.translate(0, r), paint);
+    canvas.drawLine(center.translate(-r * 0.42, 0), center.translate(r * 0.42, 0), paint);
+    // A smaller companion, offset, so the pair reads as a twinkle rather
+    // than a plus sign.
+    final small = center.translate(r * 1.5, r * 1.1);
+    canvas.drawLine(small.translate(0, -r * 0.5), small.translate(0, r * 0.5), paint);
+    canvas.drawLine(small.translate(-r * 0.22, 0), small.translate(r * 0.22, 0), paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _IntroFlourishPainter oldDelegate) => oldDelegate.scale != scale;
 }
 
 class _FloatingCard extends StatelessWidget {
@@ -281,6 +462,8 @@ class _IntroSheet extends StatelessWidget {
             key: const Key('introStartButton'),
             label: '동선 만들기 시작',
             icon: Icons.arrow_forward_rounded,
+            // The handoff puts the arrow at the right edge with the label
+            // centred, not in front of it.
             iconAtEnd: true,
             onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.login),
           ),

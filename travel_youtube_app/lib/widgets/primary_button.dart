@@ -61,16 +61,24 @@ class PrimaryButton extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
                       )
                     : iconAtEnd
+                    // `fit: expand` matters: a Stack sizes itself to its
+                    // largest non-positioned child, so without it `right`
+                    // is measured from the label's edge and the icon lands
+                    // on top of the words.
                     ? Stack(
-                        alignment: Alignment.center,
+                        fit: StackFit.expand,
                         children: [
-                          Text(
-                            label,
-                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          Center(
+                            child: Text(
+                              label,
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                            ),
                           ),
                           if (icon != null)
                             Positioned(
                               right: 22,
+                              top: 0,
+                              bottom: 0,
                               child: Icon(icon, size: 20, color: Colors.white),
                             ),
                         ],
