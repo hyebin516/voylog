@@ -246,7 +246,9 @@ void main() {
     expect(repository.lastNickname, isNull);
   });
 
-  testWidgets('shows an error view when the email is already registered', (tester) async {
+  testWidgets('an already-registered email is reported under that field', (
+    tester,
+  ) async {
     final repository = FakeAuthRepository()..requestOtpError = const ApiException(code: 'EMAIL_EXISTS', message: 'boom');
     await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
@@ -255,6 +257,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('이미 가입된 이메일입니다.'), findsOneWidget);
+    // Beside the field it belongs to, not in the generic box at the foot.
+    expect(find.byType(ErrorView), findsNothing);
+  });
+
+  testWidgets('editing the email clears the already-registered verdict', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository()..requestOtpError = const ApiException(code: 'EMAIL_EXISTS', message: 'boom');
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
+
+    await tester.enterText(find.byKey(const Key('signupEmailField')), 'a@b.com');
+    await tester.tap(find.text('인증하기'));
+    await tester.pumpAndSettle();
+    expect(find.text('이미 가입된 이메일입니다.'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('signupEmailField')), 'different@b.com');
+    await tester.pumpAndSettle();
+
+    expect(find.text('이미 가입된 이메일입니다.'), findsNothing);
+  });
+
+  testWidgets('a verified email says so', (tester) async {
+    final repository = FakeAuthRepository();
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
+
+    await _verifyEmail(tester);
+
+    expect(find.text('인증된 이메일이에요'), findsOneWidget);
   });
 
   testWidgets('shows an error view when signup fails server-side', (tester) async {

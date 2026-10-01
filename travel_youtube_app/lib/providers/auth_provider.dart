@@ -70,6 +70,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> requestSignupOtp(String email) async {
     _state = ViewState.loading;
     _errorMessage = null;
+    _errorCode = null;
     notifyListeners();
 
     try {
@@ -80,6 +81,7 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.friendlyMessage;
+      _errorCode = e.code;
       notifyListeners();
       return false;
     }

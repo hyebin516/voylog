@@ -34,6 +34,8 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _checkedNickname;
   bool? _nicknameAvailable;
   String? _nicknameCheckError;
+  String? _rejectedNickname;
+  String? _rejectedEmail;
   bool _isCheckingNickname = false;
 
   bool get _emailVerified => _verifiedEmail != null && _verifiedEmail == _emailController.text.trim();
@@ -41,13 +43,24 @@ class _SignupScreenState extends State<SignupScreen> {
   bool get _nicknameConfirmedAvailable =>
       _nicknameAvailable == true && _checkedNickname == _nicknameController.text.trim();
 
+  /// What to say under the email field, if anything: that it is verified,
+  /// or that it is already registered.
+  (String, InlineFieldTone)? _emailFieldMessage(AuthProvider authProvider) {
+    if (_emailVerified) return ('인증된 이메일이에요', InlineFieldTone.success);
+    if (_rejectedEmail == null || _rejectedEmail != _emailController.text.trim()) {
+      return null;
+    }
+    return (authProvider.errorMessage ?? '이미 가입된 이메일입니다.', InlineFieldTone.error);
+  }
+
   /// The signup call's own rejection of the nickname, which can happen even
   /// after a clean duplicate check: someone else may take the name between
   /// the check and the submit.
   String? _submitNicknameError(AuthProvider authProvider) {
-    if (authProvider.state != ViewState.error) return null;
-    if (authProvider.errorCode != 'NICKNAME_EXISTS') return null;
-    return authProvider.errorMessage;
+    if (_rejectedNickname == null || _rejectedNickname != _nicknameController.text.trim()) {
+      return null;
+    }
+    return authProvider.errorMessage ?? '이미 사용 중인 닉네임입니다.';
   }
 
   /// What the last duplicate check found, or null when none has run for the
@@ -104,7 +117,13 @@ class _SignupScreenState extends State<SignupScreen> {
     setState(() => _inputError = null);
 
     final success = await authProvider.requestSignupOtp(email);
-    if (!mounted || !success) return;
+    if (!mounted) return;
+    if (!success) {
+      setState(() {
+        _rejectedEmail = authProvider.errorCode == 'EMAIL_EXISTS' ? email : null;
+      });
+      return;
+    }
 
     final verified = await Navigator.pushNamed<bool>(context, AppRoutes.signupOtp, arguments: email);
     if (!mounted || verified != true) return;
@@ -147,7 +166,15 @@ class _SignupScreenState extends State<SignupScreen> {
     if (!mounted) return;
     if (success) {
       Navigator.pushNamedAndRemoveUntil(context, AppRoutes.home, (route) => false);
+      return;
     }
+    setState(() {
+      // Pin the rejection to the value it was about: without this the
+      // message outlives the text it refers to and sits there accusing a
+      // nickname the user has already changed.
+      if (authProvider.errorCode == 'NICKNAME_EXISTS') _rejectedNickname = nickname;
+      if (authProvider.errorCode == 'EMAIL_EXISTS') _rejectedEmail = email;
+    });
   }
 
   @override
@@ -258,6 +285,8 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                     ],
                   ),
+                  if (_emailFieldMessage(authProvider) case (final message, final tone)?)
+                    InlineFieldError(message: message, tone: tone),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
                     key: const Key('signupPasswordField'),
@@ -318,7 +347,8 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   // Anything a field already reports stays with that field.
                   if (authProvider.state == ViewState.error &&
-                      authProvider.errorCode != 'NICKNAME_EXISTS') ...[
+                      authProvider.errorCode != 'NICKNAME_EXISTS' &&
+                      authProvider.errorCode != 'EMAIL_EXISTS') ...[
                     const SizedBox(height: AppSpacing.md),
                     ErrorView(message: authProvider.errorMessage ?? '회원가입에 실패했습니다.'),
                   ],
