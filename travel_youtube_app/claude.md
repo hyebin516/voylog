@@ -154,7 +154,11 @@ Represent API JSON
 
 Splash Screen
 
+Intro Screen (온보딩 — 로그인 전, 세션이 복원된 사용자는 건너뜀)
+
 Login Screen
+
+Analyzing Screen (분석 중 — 홈의 "분석하기"가 띄우고, 1차 분석 동안만)
 
 Home Screen
 
@@ -617,7 +621,22 @@ Light Theme
 
 Primary Color
 
-Blue
+Teal (`#158a92`) — 디자인 핸드오프 v2. v1은 블루(`#3d9fdb`)였고, 토큰 이름은
+그대로 둔 채 값만 바꿔서 화면들이 `app_theme.dart` 한 곳을 따라오게 했다.
+
+**색·간격·반경·그림자는 반드시 `AppColors`/`AppRadius`/`AppSpacing`을 통해
+쓴다.** 위젯에 직접 쓴 값은 팔레트를 바꿔도 따라오지 않아서, v2 전환 때
+14개 파일이 블루인 채로 남아 있었다.
+
+Fonts
+
+본문 Pretendard (400/500/600/700/800), 온보딩 전용으로 워드마크 Poppins,
+손글씨 캡션 Caveat. 전부 `assets/fonts/`에 번들 — `google_fonts`의 런타임
+다운로드는 꺼져 있다.
+
+OS 글자 크기 설정은 `AppTextScaling`으로 0.9~1.15로 제한한다. 그 설정은
+텍스트만 키우고 아이콘·배지는 그대로 둬서, 130%에서 라벨이 행을 넘치고
+타입/아이콘 비율이 디자인과 어긋난다.
 
 Rounded Buttons
 

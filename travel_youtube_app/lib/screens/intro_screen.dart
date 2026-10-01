@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../routes/app_routes.dart';
 import '../widgets/primary_button.dart';
-import '../widgets/voylog_logo.dart';
 
 /// The onboarding screen (handoff v2, `intro`): what the app is for, and one
 /// way in.
@@ -13,11 +12,11 @@ import '../widgets/voylog_logo.dart';
 /// Shown to a signed-out user before the login screen; a restored session
 /// goes straight to home and never sees it.
 ///
-/// Two typefaces from the handoff are not bundled: the wordmark's Poppins
-/// (the shared [VoylogWordmark] stands in) and the Caveat handwriting on the
-/// "From Vlog → To Travel Route" captions. Both are Google Fonts, and this
-/// app loads fonts from `assets/fonts/` rather than the network, so they'd
-/// need their `.ttf` adding the way Pretendard was.
+/// Everything here is traced from `Voylog App v2.dc.html` rather than from
+/// the README's summary -- the positions, rotations and SVG paths only exist
+/// in the markup. The handoff's frame is 393pt wide and the artwork is
+/// positioned absolutely within it, so the layout below works in those units
+/// and scales them to the real width.
 class IntroScreen extends StatelessWidget {
   const IntroScreen({super.key});
 
@@ -28,7 +27,7 @@ class IntroScreen extends StatelessWidget {
         decoration: const BoxDecoration(gradient: AppColors.introGradient),
         child: Stack(
           children: [
-            // The warm glow the handoff puts in the top-right corner.
+            // The glow in the top-right corner.
             Positioned(
               top: -60,
               right: -80,
@@ -47,7 +46,7 @@ class IntroScreen extends StatelessWidget {
               ),
             ),
             const _IntroArtwork(),
-            Align(alignment: Alignment.bottomCenter, child: _IntroSheet()),
+            const Align(alignment: Alignment.bottomCenter, child: _IntroSheet()),
             SafeArea(
               child: Padding(
                 padding: const EdgeInsets.only(top: 20),
@@ -69,11 +68,31 @@ class IntroScreen extends StatelessWidget {
                           ),
                         ],
                       ),
-                      child: const MountainGlyphIcon(size: 26, color: AppColors.primaryBrand),
+                      child: const SizedBox(
+                        width: 30,
+                        height: 27,
+                        child: CustomPaint(painter: _RouteGlyphPainter()),
+                      ),
                     ),
                     const SizedBox(width: 10),
-                    // Poppins in the handoff; the shared wordmark stands in.
-                    const VoylogWordmark(fontSize: 38, color: Colors.white),
+                    Text(
+                      'Voylog',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 38,
+                        height: 1,
+                        letterSpacing: -0.5,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: const Color(0xFF003C46).withValues(alpha: 0.15),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -85,32 +104,37 @@ class IntroScreen extends StatelessWidget {
   }
 }
 
-/// The floating video and map cards over the landscape photo.
+/// The floating cards, the landscape photo, the handwriting and the
+/// flourishes. The group's own `transform: scale(.86)` is applied here.
 class _IntroArtwork extends StatelessWidget {
   const _IntroArtwork();
 
+  /// Where this box starts in the handoff's frame, so the markup's absolute
+  /// `top:` values can be used directly minus this.
+  static const double _groupTop = 120;
+  static const double _groupHeight = 400;
+
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    // The handoff lays the artwork out on a 393pt frame; everything below is
-    // in those units and scaled to the real width.
-    final scale = width / 393;
+    final scale = MediaQuery.sizeOf(context).width / 393;
 
     return Positioned(
       left: 0,
       right: 0,
-      top: 120 * scale,
-      height: 400 * scale,
+      top: _groupTop * scale,
+      height: _groupHeight * scale,
       child: IgnorePointer(
         child: Stack(
           clipBehavior: Clip.none,
           children: [
-            // Landscape photo, fading in from the top so it meets the
-            // gradient instead of cutting against it.
+            // top:336 height:176, masked transparent->opaque over the first
+            // 34%, image anchored at "center 30%". A sibling of the scaled
+            // group in the markup, not a child of it -- so it keeps the full
+            // width while the cards shrink.
             Positioned(
               left: 0,
               right: 0,
-              top: 216 * scale,
+              top: (336 - _groupTop) * scale,
               height: 176 * scale,
               child: ShaderMask(
                 shaderCallback: (rect) => const LinearGradient(
@@ -123,175 +147,254 @@ class _IntroArtwork extends StatelessWidget {
                 child: Image.asset(
                   'assets/images/intro/landscape.png',
                   fit: BoxFit.cover,
+                  alignment: const Alignment(0, -0.4),
                 ),
               ),
             ),
-            Positioned(
-              left: 36 * scale,
-              top: 32 * scale,
-              child: Transform.rotate(
-                angle: -7 * math.pi / 180,
-                child: _FloatingCard(
-                  width: 162 * scale,
-                  height: 104 * scale,
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      Image.asset(
-                        'assets/images/intro/video-sea-clean2.png',
-                        fit: BoxFit.cover,
-                      ),
-                      // Translucent play button over the thumbnail.
-                      Center(
-                        child: Container(
-                          width: 30 * scale,
-                          height: 22 * scale,
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.7),
-                            borderRadius: BorderRadius.circular(6 * scale),
-                          ),
-                          child: Icon(
-                            Icons.play_arrow_rounded,
-                            size: 16 * scale,
-                            color: const Color(0xFF3AA6B0),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 5 * scale,
-                        bottom: 7 * scale,
-                        child: Text(
-                          '12:34',
-                          style: TextStyle(
-                            fontSize: 8 * scale,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      // Progress bar, 32% along.
-                      Positioned(
-                        left: 0,
-                        right: 0,
-                        bottom: 0,
-                        child: SizedBox(
-                          height: 2 * scale,
-                          child: Row(
+            // `transform: scale(.86); transform-origin: 50% 240px`, where
+            // 240 is measured from the top of the frame.
+            Positioned.fill(
+              child: Transform.scale(
+                scale: 0.86,
+                alignment: Alignment(0, ((240 - _groupTop) / _groupHeight) * 2 - 1),
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    // Video card: left:36 top:152, 162x104, rotate -7deg.
+                    Positioned(
+                      left: 36 * scale,
+                      top: (152 - _groupTop) * scale,
+                      child: Transform.rotate(
+                        angle: -7 * math.pi / 180,
+                        child: _FloatingCard(
+                          width: 162 * scale,
+                          height: 104 * scale,
+                          padding: 5 * scale,
+                          child: Stack(
+                            fit: StackFit.expand,
                             children: [
-                              Expanded(
-                                flex: 32,
-                                child: ColoredBox(color: Colors.white.withValues(alpha: 0.95)),
+                              Image.asset(
+                                'assets/images/intro/video-sea-clean2.png',
+                                fit: BoxFit.cover,
                               ),
-                              Expanded(
-                                flex: 68,
-                                child: ColoredBox(color: Colors.white.withValues(alpha: 0.35)),
+                              Center(
+                                child: Container(
+                                  width: 30 * scale,
+                                  height: 22 * scale,
+                                  alignment: Alignment.center,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.7),
+                                    borderRadius: BorderRadius.circular(6 * scale),
+                                  ),
+                                  child: SizedBox(
+                                    width: 8 * scale,
+                                    height: 9 * scale,
+                                    child: const CustomPaint(
+                                      painter: _PlayTrianglePainter(Color(0xFF3AA6B0)),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                right: 5 * scale,
+                                bottom: 7 * scale,
+                                child: Text(
+                                  '12:34',
+                                  style: TextStyle(
+                                    fontSize: 8 * scale,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                bottom: 0,
+                                child: SizedBox(
+                                  height: 2 * scale,
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 32,
+                                        child: ColoredBox(
+                                          color: Colors.white.withValues(alpha: 0.95),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 68,
+                                        child: ColoredBox(
+                                          color: Colors.white.withValues(alpha: 0.35),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ],
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // YouTube badge, tucked against the video card's top-left.
-            Positioned(
-              left: 14 * scale,
-              top: 14 * scale,
-              child: Container(
-                width: 36 * scale,
-                height: 30 * scale,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8 * scale),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00323C).withValues(alpha: 0.18),
-                      blurRadius: 10 * scale,
-                      offset: Offset(0, 3 * scale),
                     ),
-                  ],
-                ),
-                child: Container(
-                  width: 26 * scale,
-                  height: 19 * scale,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF0000),
-                    borderRadius: BorderRadius.circular(5 * scale),
-                  ),
-                  child: Icon(Icons.play_arrow_rounded, size: 13 * scale, color: Colors.white),
-                ),
-              ),
-            ),
-            Positioned(
-              left: 208 * scale,
-              top: 104 * scale,
-              child: Transform.rotate(
-                angle: 3.5 * math.pi / 180,
-                child: _FloatingCard(
-                  width: 160 * scale,
-                  height: 112 * scale,
-                  padding: 6 * scale,
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 86,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(5 * scale),
-                          child: Image.asset(
-                            'assets/images/intro/map-clean.png',
-                            fit: BoxFit.cover,
-                            height: double.infinity,
+                    // YouTube badge: left:26 top:146, 36x30 white box around
+                    // a 26x19 red chip, tilted -7deg like the card it leans
+                    // on. Sitting it further up and left ran it into the
+                    // sparkle.
+                    Positioned(
+                      left: 26 * scale,
+                      top: (146 - _groupTop) * scale,
+                      child: Transform.rotate(
+                        angle: -7 * math.pi / 180,
+                        child: Container(
+                          width: 36 * scale,
+                          height: 30 * scale,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8 * scale),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.15),
+                                blurRadius: 8 * scale,
+                                offset: Offset(0, 3 * scale),
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            width: 26 * scale,
+                            height: 19 * scale,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF0000),
+                              borderRadius: BorderRadius.circular(5 * scale),
+                            ),
+                            child: SizedBox(
+                              width: 7 * scale,
+                              height: 8 * scale,
+                              child: const CustomPaint(painter: _PlayTrianglePainter(Colors.white)),
+                            ),
                           ),
                         ),
                       ),
-                      SizedBox(width: 6 * scale),
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          for (final (thumb, time) in const [
-                            ('t1', '01:12'),
-                            ('t2', '04:36'),
-                            ('t3', '08:20'),
-                          ])
-                            Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ClipRRect(
-                                  borderRadius: BorderRadius.circular(4 * scale),
+                    ),
+                    // Map card: left:208 top:224, 160x112, rotate 3.5deg.
+                    Positioned(
+                      left: 208 * scale,
+                      top: (224 - _groupTop) * scale,
+                      child: Transform.rotate(
+                        angle: 3.5 * math.pi / 180,
+                        child: _FloatingCard(
+                          width: 160 * scale,
+                          height: 112 * scale,
+                          padding: 6 * scale,
+                          child: Row(
+                            children: [
+                              // The map is a fixed 86 wide, not a share of
+                              // the row -- giving it a flex squeezed the
+                              // column beside it and cropped the map.
+                              SizedBox(
+                                width: 86 * scale,
+                                height: double.infinity,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(6 * scale),
                                   child: Image.asset(
-                                    'assets/images/intro/$thumb.png',
-                                    width: 26 * scale,
-                                    height: 21 * scale,
+                                    'assets/images/intro/map-clean.png',
                                     fit: BoxFit.cover,
                                   ),
                                 ),
-                                SizedBox(height: 1 * scale),
-                                Text(
-                                  time,
-                                  style: TextStyle(
-                                    fontSize: 7 * scale,
-                                    height: 1,
-                                    fontWeight: FontWeight.w500,
-                                    color: const Color(0xFF1A8F99),
+                              ),
+                              SizedBox(width: 6 * scale),
+                              Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 1 * scale),
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      for (final (thumb, time) in const [
+                                        ('t1', '01:12'),
+                                        ('t2', '04:36'),
+                                        ('t3', '08:20'),
+                                      ])
+                                        // Thumbnail and time sit side by
+                                        // side with a 5 gap, not stacked.
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius: BorderRadius.circular(4 * scale),
+                                              child: Image.asset(
+                                                'assets/images/intro/$thumb.png',
+                                                width: 26 * scale,
+                                                height: 27 * scale,
+                                                fit: BoxFit.cover,
+                                              ),
+                                            ),
+                                            SizedBox(width: 5 * scale),
+                                            // Flexible, because the time's
+                                            // width depends on the font the
+                                            // platform resolves and a few
+                                            // pixels over blows the card.
+                                            Flexible(
+                                              child: FittedBox(
+                                                fit: BoxFit.scaleDown,
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  time,
+                                                  maxLines: 1,
+                                                  style: TextStyle(
+                                                    fontSize: 7.5 * scale,
+                                                    height: 1,
+                                                    fontWeight: FontWeight.w500,
+                                                    color: const Color(0xFF1A8F99),
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
-                        ],
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    // left:226 top:132, rotate -12deg, Caveat 500 21px/.95, with
+                    // "Vlog" indented 20px under "From".
+                    Positioned(
+                      left: 226 * scale,
+                      top: (132 - _groupTop) * scale,
+                      child: Transform.rotate(
+                        angle: -12 * math.pi / 180,
+                        alignment: Alignment.topLeft,
+                        child: _Handwriting(
+                          fontSize: 21 * scale,
+                          lineHeight: 0.95,
+                          lines: [(0.0, 'From'), (20.0 * scale, 'Vlog')],
+                        ),
+                      ),
+                    ),
+                    // left:90 top:286, rotate -11deg, Caveat 500 19px/1.
+                    Positioned(
+                      left: 90 * scale,
+                      top: (286 - _groupTop) * scale,
+                      child: Transform.rotate(
+                        angle: -11 * math.pi / 180,
+                        alignment: Alignment.topLeft,
+                        child: _Handwriting(
+                          fontSize: 19 * scale,
+                          lineHeight: 1,
+                          lines: const [(0.0, 'To'), (0.0, 'Travel Route')],
+                        ),
+                      ),
+                    ),
+                    Positioned.fill(child: CustomPaint(painter: _IntroFlourishPainter(scale))),
+                  ],
                 ),
               ),
-            ),
-            // Arrows and sparkles last, so they sit over the cards.
-            Positioned.fill(
-              child: CustomPaint(painter: _IntroFlourishPainter(scale)),
             ),
           ],
         ),
@@ -300,76 +403,39 @@ class _IntroArtwork extends StatelessWidget {
   }
 }
 
-/// The handoff's hand-drawn flourishes: three curved arrows tying the video
-/// card to the map card, and two clusters of sparkle strokes.
-class _IntroFlourishPainter extends CustomPainter {
-  const _IntroFlourishPainter(this.scale);
+/// The Caveat captions. Written line by line because the handoff indents
+/// "Vlog" under "From" with its own padding.
+class _Handwriting extends StatelessWidget {
+  const _Handwriting({required this.lines, required this.fontSize, required this.lineHeight});
 
-  final double scale;
+  /// `(leftPadding, text)` per line.
+  final List<(double, String)> lines;
+  final double fontSize;
+  final double lineHeight;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final stroke = Paint()
-      ..color = Colors.white.withValues(alpha: 0.9)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2 * scale
-      ..strokeCap = StrokeCap.round;
-
-    Offset pt(double x, double y) => Offset(x * scale, y * scale);
-
-    // Arrow from the "From Vlog" caption down to the video card.
-    _arrow(canvas, stroke, pt(252, 22), pt(286, 44), pt(300, 74), scale);
-    // Arrow curving from the video card across to the map card.
-    _arrow(canvas, stroke, pt(206, 96), pt(236, 76), pt(268, 86), scale);
-    // Arrow from the "To Travel Route" caption up to the map card.
-    _arrow(canvas, stroke, pt(104, 190), pt(140, 176), pt(176, 158), scale);
-
-    _sparkle(canvas, stroke, pt(228, 18), 7);
-    _sparkle(canvas, stroke, pt(330, 118), 6);
-  }
-
-  /// A quadratic curve from [from] through [control] to [to], with a two-
-  /// stroke head at the end.
-  void _arrow(Canvas canvas, Paint paint, Offset from, Offset control, Offset to, double scale) {
-    canvas.drawPath(
-      Path()
-        ..moveTo(from.dx, from.dy)
-        ..quadraticBezierTo(control.dx, control.dy, to.dx, to.dy),
-      paint,
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (final (indent, text) in lines)
+          Padding(
+            padding: EdgeInsets.only(left: indent),
+            child: Text(
+              text,
+              style: TextStyle(
+                fontFamily: 'Caveat',
+                fontWeight: FontWeight.w500,
+                fontSize: fontSize,
+                height: lineHeight,
+                color: Colors.white,
+              ),
+            ),
+          ),
+      ],
     );
-
-    // Head angled along the curve's final direction.
-    final dx = to.dx - control.dx;
-    final dy = to.dy - control.dy;
-    final angle = math.atan2(dy, dx);
-    const spread = 0.5;
-    final headLength = 7 * scale;
-    for (final offset in [spread, -spread]) {
-      canvas.drawLine(
-        to,
-        Offset(
-          to.dx - headLength * math.cos(angle + offset),
-          to.dy - headLength * math.sin(angle + offset),
-        ),
-        paint,
-      );
-    }
   }
-
-  /// A four-pointed twinkle: one long axis, one short.
-  void _sparkle(Canvas canvas, Paint paint, Offset center, double radius) {
-    final r = radius * scale;
-    canvas.drawLine(center.translate(0, -r), center.translate(0, r), paint);
-    canvas.drawLine(center.translate(-r * 0.42, 0), center.translate(r * 0.42, 0), paint);
-    // A smaller companion, offset, so the pair reads as a twinkle rather
-    // than a plus sign.
-    final small = center.translate(r * 1.5, r * 1.1);
-    canvas.drawLine(small.translate(0, -r * 0.5), small.translate(0, r * 0.5), paint);
-    canvas.drawLine(small.translate(-r * 0.22, 0), small.translate(r * 0.22, 0), paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant _IntroFlourishPainter oldDelegate) => oldDelegate.scale != scale;
 }
 
 class _FloatingCard extends StatelessWidget {
@@ -377,7 +443,7 @@ class _FloatingCard extends StatelessWidget {
     required this.width,
     required this.height,
     required this.child,
-    this.padding = 0,
+    required this.padding,
   });
 
   final double width;
@@ -390,7 +456,7 @@ class _FloatingCard extends StatelessWidget {
     return Container(
       width: width,
       height: height,
-      padding: EdgeInsets.all(padding == 0 ? 5 : padding),
+      padding: EdgeInsets.all(padding),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
@@ -409,6 +475,8 @@ class _FloatingCard extends StatelessWidget {
 
 /// The bottom sheet: headline, one line of explanation, and the way in.
 class _IntroSheet extends StatelessWidget {
+  const _IntroSheet();
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -420,30 +488,38 @@ class _IntroSheet extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(30, 36, 30, 24 + MediaQuery.paddingOf(context).bottom),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          const Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: '브이로그가\n'),
-                // The handoff underlines this by hand; a solid rule would
-                // read as a link, so it stays colour-only until the
-                // hand-drawn stroke is traced.
+          const Text('브이로그가', textAlign: TextAlign.center, style: _headlineStyle),
+          // "여행 일정" carries a hand-drawn underline that runs a little
+          // past the words, so it gets its own stack rather than sitting
+          // inline with the rest of the line.
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              const Text.rich(
                 TextSpan(
-                  text: '여행 일정',
-                  style: TextStyle(color: Color(0xFF149AA3)),
+                  children: [
+                    TextSpan(
+                      text: '여행 일정',
+                      style: TextStyle(color: Color(0xFF149AA3)),
+                    ),
+                    TextSpan(text: '이 되는 순간'),
+                  ],
                 ),
-                TextSpan(text: '이 되는 순간'),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 33,
-              fontWeight: FontWeight.w800,
-              height: 1.3,
-              letterSpacing: -1,
-              color: AppColors.ink,
-            ),
+                textAlign: TextAlign.center,
+                style: _headlineStyle,
+              ),
+              Positioned(
+                left: 0,
+                // The underline belongs to "여행 일정" alone, which is the
+                // first 4 of the line's 10 characters.
+                right: null,
+                width: 150,
+                bottom: -4,
+                height: 10,
+                child: CustomPaint(painter: _HeadlineUnderlinePainter()),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           const Text(
@@ -462,8 +538,8 @@ class _IntroSheet extends StatelessWidget {
             key: const Key('introStartButton'),
             label: '동선 만들기 시작',
             icon: Icons.arrow_forward_rounded,
-            // The handoff puts the arrow at the right edge with the label
-            // centred, not in front of it.
+            // The handoff floats the arrow 22px from the right edge with
+            // the label centred.
             iconAtEnd: true,
             onPressed: () => Navigator.pushReplacementNamed(context, AppRoutes.login),
           ),
@@ -471,4 +547,203 @@ class _IntroSheet extends StatelessWidget {
       ),
     );
   }
+}
+
+const TextStyle _headlineStyle = TextStyle(
+  fontSize: 33,
+  fontWeight: FontWeight.w800,
+  height: 1.3,
+  letterSpacing: -1,
+  color: AppColors.ink,
+);
+
+/// The headline's hand-drawn underline: `M2 7 C50 2 100 2 148 5`, 2.5px
+/// `#1a9aa3`, on a 150x10 box.
+class _HeadlineUnderlinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sx = size.width / 150;
+    final sy = size.height / 10;
+    Offset pt(double x, double y) => Offset(x * sx, y * sy);
+
+    canvas.drawPath(
+      Path()
+        ..moveTo(pt(2, 7).dx, pt(2, 7).dy)
+        ..cubicTo(
+          pt(50, 2).dx,
+          pt(50, 2).dy,
+          pt(100, 2).dx,
+          pt(100, 2).dy,
+          pt(148, 5).dx,
+          pt(148, 5).dy,
+        ),
+      Paint()
+        ..color = const Color(0xFF1A9AA3)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _HeadlineUnderlinePainter oldDelegate) => false;
+}
+
+/// A play triangle: `M0 0 L<w> <h/2> L0 <h> Z`.
+class _PlayTrianglePainter extends CustomPainter {
+  const _PlayTrianglePainter(this.color);
+
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 0)
+        ..lineTo(size.width, size.height / 2)
+        ..lineTo(0, size.height)
+        ..close(),
+      Paint()..color = color,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _PlayTrianglePainter oldDelegate) => oldDelegate.color != color;
+}
+
+/// The prototype's flourishes, traced path for path.
+///
+/// Each group below is one `<svg>` from the illustration: its absolute
+/// position (minus the group's 120 top offset), its stroke width, and the
+/// `d` attribute's points. Two are sparkle bursts -- three separate strokes,
+/// not a star -- and three are arrows drawn with an explicit two-stroke head.
+class _IntroFlourishPainter extends CustomPainter {
+  const _IntroFlourishPainter(this.scale);
+
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Sparkle, left:16 top:130 -- "M4 22 L1 17  M11 16 L8 4  M20 14 L23 6"
+    _strokes(canvas, 16, 10, 2.2, const [
+      [4, 22, 1, 17],
+      [11, 16, 8, 4],
+      [20, 14, 23, 6],
+    ]);
+    // Arrow, left:300 top:156 -- "M14 2 C28 6 28 22 8 34  M8 34 L9 25  M8 34 L17 33"
+    _curve(canvas, 300, 36, 2, const [14, 2, 28, 6, 28, 22, 8, 34]);
+    _strokes(canvas, 300, 36, 2, const [
+      [8, 34, 9, 25],
+      [8, 34, 17, 33],
+    ]);
+    // Arrow, left:230 top:202 -- "M1 1 L13 11  M13 11 L13 4  M13 11 L6 11"
+    _strokes(canvas, 230, 82, 1.8, const [
+      [1, 1, 13, 11],
+      [13, 11, 13, 4],
+      [13, 11, 6, 11],
+    ]);
+    // Sparkle, left:356 top:212 -- "M4 12 L3 2  M13 12 L16 3  M20 20 L28 15"
+    _strokes(canvas, 356, 92, 2.2, const [
+      [4, 12, 3, 2],
+      [13, 12, 16, 3],
+      [20, 20, 28, 15],
+    ]);
+    // Arrow, left:166 top:260 -- "M2 2 C8 16 22 24 38 24  M38 24 L31 18  M38 24 L31 29"
+    _curve(canvas, 166, 140, 2, const [2, 2, 8, 16, 22, 24, 38, 24]);
+    _strokes(canvas, 166, 140, 2, const [
+      [38, 24, 31, 18],
+      [38, 24, 31, 29],
+    ]);
+  }
+
+  Paint _paint(double width) => Paint()
+    ..color = Colors.white
+    ..style = PaintingStyle.stroke
+    ..strokeWidth = width * scale
+    ..strokeCap = StrokeCap.round;
+
+  void _strokes(Canvas canvas, double ox, double oy, double width, List<List<int>> segments) {
+    final paint = _paint(width);
+    for (final s in segments) {
+      canvas.drawLine(
+        Offset((ox + s[0]) * scale, (oy + s[1]) * scale),
+        Offset((ox + s[2]) * scale, (oy + s[3]) * scale),
+        paint,
+      );
+    }
+  }
+
+  void _curve(Canvas canvas, double ox, double oy, double width, List<int> c) {
+    Offset pt(int x, int y) => Offset((ox + x) * scale, (oy + y) * scale);
+    canvas.drawPath(
+      Path()
+        ..moveTo(pt(c[0], c[1]).dx, pt(c[0], c[1]).dy)
+        ..cubicTo(
+          pt(c[2], c[3]).dx,
+          pt(c[2], c[3]).dy,
+          pt(c[4], c[5]).dx,
+          pt(c[4], c[5]).dy,
+          pt(c[6], c[7]).dx,
+          pt(c[6], c[7]).dy,
+        ),
+      _paint(width),
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _IntroFlourishPainter oldDelegate) => oldDelegate.scale != scale;
+}
+
+/// The logo box's route glyph: three dots joined by a curve, traced from
+/// `M6 18c2-6 4-9 6-9s4 3 6 9` with r=2 dots at (6,18), (12,9) and (18,18)
+/// on the prototype's `2.5 4.5 19 17` viewBox.
+class _RouteGlyphPainter extends CustomPainter {
+  const _RouteGlyphPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 19;
+    Offset pt(double x, double y) => Offset((x - 2.5) * scale, (y - 4.5) * scale);
+
+    // c2-6 4-9 6-9, then s4 3 6 9 (the smooth form mirrors the previous
+    // control point).
+    canvas.drawPath(
+      Path()
+        ..moveTo(pt(6, 18).dx, pt(6, 18).dy)
+        ..cubicTo(
+          pt(8, 12).dx,
+          pt(8, 12).dy,
+          pt(10, 9).dx,
+          pt(10, 9).dy,
+          pt(12, 9).dx,
+          pt(12, 9).dy,
+        )
+        ..cubicTo(
+          pt(14, 9).dx,
+          pt(14, 9).dy,
+          pt(16, 12).dx,
+          pt(16, 12).dy,
+          pt(18, 18).dx,
+          pt(18, 18).dy,
+        ),
+      Paint()
+        ..color = AppColors.primaryBrand
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2 * scale
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    final dot = Paint()..color = AppColors.primaryBrand;
+    for (final c in const [
+      [6.0, 18.0],
+      [12.0, 9.0],
+      [18.0, 18.0],
+    ]) {
+      canvas.drawCircle(pt(c[0], c[1]), 2 * scale, dot);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RouteGlyphPainter oldDelegate) => false;
 }
