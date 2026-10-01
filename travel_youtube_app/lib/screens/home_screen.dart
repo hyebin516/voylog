@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -16,6 +18,8 @@ import '../providers/video_provider.dart';
 import '../repositories/itinerary_repository.dart';
 import '../repositories/trip_repository.dart';
 import '../routes/app_routes.dart';
+import 'analyzing_screen.dart';
+import 'place_detail_screen.dart';
 import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
@@ -91,6 +95,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() => _inputError = null);
 
+    // The waiting screen covers the first pass and closes itself when the
+    // analysis leaves its loading state, so nothing here has to pop it.
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(builder: (_) => const AnalyzingScreen()),
+      ),
+    );
+
     await videoProvider.analyze(url);
 
     if (!mounted) return;
@@ -131,7 +143,12 @@ class _HomeScreenState extends State<HomeScreen> {
       confidence: 1.0,
       category: rec.category,
     );
-    Navigator.pushNamed(context, AppRoutes.placeDetail, arguments: place);
+    Navigator.pushNamed(
+      context,
+      AppRoutes.placeDetail,
+      // The save count belongs to the place detail now, not to the card.
+      arguments: PlaceDetailArgs(place: place, savedCount: rec.contributorCount),
+    );
   }
 
   void _openShareRouteSheet() {
@@ -661,8 +678,6 @@ class _SimilarTastePlaceCard extends StatelessWidget {
                       decoration: BoxDecoration(color: AppColors.surfaceTint3Alt, borderRadius: BorderRadius.circular(999)),
                       child: Text('취향 일치 $matchPercent%', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong)),
                     ),
-                    const SizedBox(width: 6),
-                    Text('${rec.contributorCount}명이 저장', style: const TextStyle(fontSize: 11, color: AppColors.textMuted2)),
                   ],
                 ),
               ],

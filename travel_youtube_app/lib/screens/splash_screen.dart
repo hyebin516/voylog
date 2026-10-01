@@ -27,7 +27,9 @@ class _SplashScreenState extends State<SplashScreen> {
 
     Navigator.pushReplacementNamed(
       context,
-      isAuthenticated ? AppRoutes.home : AppRoutes.login,
+      // A restored session goes straight home and never sees the
+      // onboarding; everyone else starts there.
+      isAuthenticated ? AppRoutes.home : AppRoutes.intro,
     );
   }
 

@@ -210,27 +210,19 @@ class _TripListScreenState extends State<TripListScreen> {
                   if (authProvider.isAuthenticated)
                     InkWell(
                       onTap: _createTrip,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 40,
+                        height: 40,
                         alignment: Alignment.center,
                         decoration: BoxDecoration(
                           color: AppColors.primary,
-                          borderRadius: BorderRadius.circular(12),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primaryStrong.withValues(
-                                alpha: 0.3,
-                              ),
-                              blurRadius: 14,
-                              offset: const Offset(0, 6),
-                            ),
-                          ],
+                          borderRadius: BorderRadius.circular(AppRadius.sm),
+                          boxShadow: AppColors.primaryShadow(),
                         ),
                         child: const Icon(
                           Icons.add_rounded,
-                          size: 17,
+                          size: 18,
                           color: Colors.white,
                         ),
                       ),
@@ -268,11 +260,24 @@ class _TripListScreenState extends State<TripListScreen> {
 
                   return ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
-                    itemCount: tripProvider.trips.length,
+                    // One extra row at the top: the handoff's "내 여행 파일
+                    // N개" line, which sits with the list rather than in the
+                    // header so it scrolls away with it.
+                    itemCount: tripProvider.trips.length + 1,
                     separatorBuilder: (context, _) =>
                         const SizedBox(height: 12),
                     itemBuilder: (context, index) {
-                      final TripModel trip = tripProvider.trips[index];
+                      if (index == 0) {
+                        return Text(
+                          '내 여행 파일 ${tripProvider.trips.length}개',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textTertiary,
+                          ),
+                        );
+                      }
+                      final TripModel trip = tripProvider.trips[index - 1];
                       return InkWell(
                         onTap: () => Navigator.pushNamed(
                           context,

@@ -16,8 +16,25 @@ import '../widgets/primary_button.dart';
 import '../widgets/tag_chip.dart';
 import '../utils/place_category_label.dart';
 
+/// Route arguments for [PlaceDetailScreen] when the caller has more than the
+/// place itself to pass. A bare [PlaceModel] is still accepted.
+class PlaceDetailArgs {
+  const PlaceDetailArgs({required this.place, this.savedCount});
+
+  final PlaceModel place;
+  final int? savedCount;
+}
+
 class PlaceDetailScreen extends StatefulWidget {
   final PlaceModel place;
+
+  /// How many people with a similar taste have saved this place.
+  ///
+  /// Only set when the screen was opened from the home screen's "취향이
+  /// 비슷한 사람들의 북마크" carousel, which is the one place that number
+  /// comes from. v1 printed it on the carousel card itself; v2 keeps the
+  /// card to its name and category and shows the count here instead.
+  final int? savedCount;
 
   /// Defaults to the real native Kakao map. Widget tests inject
   /// `FakeMapRepository()` instead.
@@ -40,6 +57,7 @@ class PlaceDetailScreen extends StatefulWidget {
   PlaceDetailScreen({
     super.key,
     required this.place,
+    this.savedCount,
     this.mapRepository = const KakaoMapRepository(),
     this.shareService = const PlaceShareService(),
     this.kakaoMapLauncher = const KakaoMapLauncher(),
@@ -170,6 +188,34 @@ class _PlaceDetailScreenState extends State<PlaceDetailScreen> {
                 if (place.address != null && place.address!.isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(place.address!, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                ],
+                if (widget.savedCount != null) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.warningBg,
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.bookmark_rounded, size: 11, color: AppColors.warningIcon),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${widget.savedCount}명이 저장',
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.warningText,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
                 if (placeCategoryLabel(place.category) != null || place.tags.isNotEmpty) ...[
                   const SizedBox(height: 14),

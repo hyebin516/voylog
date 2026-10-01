@@ -100,15 +100,19 @@ class VoylogLogoMark extends StatelessWidget {
 
 /// The "Voylog" wordmark next to [VoylogLogoMark].
 class VoylogWordmark extends StatelessWidget {
-  const VoylogWordmark({super.key, this.fontSize = 24});
+  const VoylogWordmark({super.key, this.fontSize = 24, this.color});
 
   final double fontSize;
+
+  /// Defaults to the ink colour; the onboarding screen sets it white over
+  /// the gradient.
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return Text(
       'Voylog',
-      style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w800, color: AppColors.ink),
+      style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.w800, color: color ?? AppColors.ink),
     );
   }
 }

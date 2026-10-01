@@ -7,6 +7,8 @@ import '../providers/itinerary_provider.dart';
 import '../providers/trip_provider.dart';
 import '../routes/app_routes.dart';
 import '../models/itinerary_model.dart';
+import '../models/map_view_types.dart';
+import '../repositories/map_repository.dart';
 import '../utils/date_format.dart';
 import '../utils/route_format.dart';
 import '../utils/view_state.dart';
@@ -18,7 +20,15 @@ import '../widgets/loading_indicator.dart';
 class TripDetailScreen extends StatefulWidget {
   final String tripId;
 
-  const TripDetailScreen({super.key, required this.tripId});
+  /// Defaults to the real native Kakao map. Widget tests inject
+  /// `FakeMapRepository()` instead.
+  final MapRepository mapRepository;
+
+  const TripDetailScreen({
+    super.key,
+    required this.tripId,
+    this.mapRepository = const KakaoMapRepository(),
+  });
 
   @override
   State<TripDetailScreen> createState() => _TripDetailScreenState();
@@ -31,6 +41,31 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<TripProvider>().loadTrip(widget.tripId);
     });
+  }
+
+  /// One marker per located stop across every day, numbered within its day.
+  List<MapMarkerData> _tripMarkers(List<ItineraryModel> days) {
+    final markers = <MapMarkerData>[];
+    for (final day in days) {
+      var placeNumber = 0;
+      for (final point in day.routeData) {
+        if (point.latitude == null || point.longitude == null) continue;
+        final isHotel = point.isHotel;
+        if (!isHotel) placeNumber += 1;
+        markers.add(
+          MapMarkerData(
+            // Day number keeps ids apart when two days share a hotel.
+            id: '${day.dayNumber}:${point.placeId ?? point.hotelId ?? point.name}',
+            title: point.name,
+            latitude: point.latitude!,
+            longitude: point.longitude!,
+            label: isHotel ? null : '$placeNumber',
+            kind: isHotel ? MapMarkerKind.start : MapMarkerKind.place,
+          ),
+        );
+      }
+    }
+    return markers;
   }
 
   Future<void> _editDates(DateTime? currentStart, DateTime? currentEnd) async {
@@ -233,6 +268,31 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                                 ),
                               ),
                             ],
+                          ),
+                          // Every located stop of every day, so the trip
+                          // reads as one shape before the day cards break it
+                          // apart. Hidden until a day has been planned --
+                          // an empty map box says nothing.
+                          Builder(
+                            builder: (context) {
+                              final markers = _tripMarkers(trip.days);
+                              if (markers.isEmpty) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(top: AppSpacing.sm),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                                  child: SizedBox(
+                                    height: 150,
+                                    child: widget.mapRepository.buildMap(
+                                      initialLatitude: markers.first.latitude,
+                                      initialLongitude: markers.first.longitude,
+                                      markers: markers,
+                                      drawRoutePolyline: true,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                           const SizedBox(height: AppSpacing.md),
                           const Text(

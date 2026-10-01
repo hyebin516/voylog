@@ -11,6 +11,7 @@ import '../screens/support_inquiry_screen.dart';
 import '../screens/day_folder_select_screen.dart';
 import '../screens/forgot_password_screen.dart';
 import '../screens/hotel_search_screen.dart';
+import '../screens/intro_screen.dart';
 import '../screens/login_screen.dart';
 import '../screens/my_page_screen.dart';
 import '../screens/nearby_recommendations_screen.dart';
@@ -45,6 +46,7 @@ class AppRoutes {
   AppRoutes._();
 
   static const String splash = '/';
+  static const String intro = '/intro';
   static const String login = '/login';
   static const String home = '/home';
   static const String videoAnalysis = '/video-analysis';
@@ -91,6 +93,11 @@ class AppRoutes {
           builder: (_) => const SplashScreen(),
           settings: settings,
         );
+      case AppRoutes.intro:
+        return MaterialPageRoute(
+          builder: (_) => const IntroScreen(),
+          settings: settings,
+        );
       case AppRoutes.login:
         return MaterialPageRoute(
           builder: (_) => const LoginScreen(),
@@ -107,9 +114,15 @@ class AppRoutes {
           settings: settings,
         );
       case AppRoutes.placeDetail:
-        final place = settings.arguments as PlaceModel;
+        // Usually just the place. The home taste carousel also passes how
+        // many similar-taste users saved it, which only it knows.
+        final args = settings.arguments;
+        final place = args is PlaceDetailArgs ? args.place : args as PlaceModel;
         return MaterialPageRoute(
-          builder: (_) => PlaceDetailScreen(place: place),
+          builder: (_) => PlaceDetailScreen(
+            place: place,
+            savedCount: args is PlaceDetailArgs ? args.savedCount : null,
+          ),
           settings: settings,
         );
       case AppRoutes.dayFolderSelect:

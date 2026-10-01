@@ -97,6 +97,9 @@ flutter:
   # (see README.md) — flutter_dotenv reads it as an asset at startup.
   assets:
     - .env
+    # Onboarding artwork, from the design handoff bundle
+    # (Voylog UI/design_handoff_voylog_app/assets/).
+    - assets/images/intro/
 
   # To add assets to your application, add an assets section, like this:
   # assets:

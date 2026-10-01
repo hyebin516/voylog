@@ -18,6 +18,11 @@ class PrimaryButton extends StatelessWidget {
   // (lib/widgets/nav_icons.dart) that don't have a matching Material icon.
   final Widget? iconWidget;
 
+  /// Floats [icon] at the right edge instead of placing it before the
+  /// label, which stays centred in the button. The handoff's onboarding CTA
+  /// is drawn that way.
+  final bool iconAtEnd;
+
   const PrimaryButton({
     super.key,
     required this.label,
@@ -25,6 +30,7 @@ class PrimaryButton extends StatelessWidget {
     this.isLoading = false,
     this.icon,
     this.iconWidget,
+    this.iconAtEnd = false,
   });
 
   @override
@@ -53,6 +59,21 @@ class PrimaryButton extends StatelessWidget {
                         height: 22,
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white),
+                      )
+                    : iconAtEnd
+                    ? Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          Text(
+                            label,
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                          ),
+                          if (icon != null)
+                            Positioned(
+                              right: 22,
+                              child: Icon(icon, size: 20, color: Colors.white),
+                            ),
+                        ],
                       )
                     : Row(
                         mainAxisSize: MainAxisSize.min,
