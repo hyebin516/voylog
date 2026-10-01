@@ -7,6 +7,7 @@ import 'package:travel_youtube_app/providers/auth_provider.dart';
 import 'package:travel_youtube_app/repositories/auth_repository.dart';
 import 'package:travel_youtube_app/routes/app_routes.dart';
 import 'package:travel_youtube_app/screens/signup_screen.dart';
+import 'package:travel_youtube_app/widgets/error_view.dart';
 
 import 'fakes/fake_push_registration.dart';
 
@@ -269,5 +270,30 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('이메일 인증을 먼저 완료해 주세요.'), findsOneWidget);
+  });
+
+  testWidgets('a nickname the server rejects is reported under that field', (
+    tester,
+  ) async {
+    // The duplicate check can pass and the name still be gone by the time
+    // signup runs -- someone else took it in between. That verdict belongs
+    // beside the nickname, not in a generic box at the foot of the form.
+    final repository = FakeAuthRepository()
+      ..signupError = const ApiException(code: 'NICKNAME_EXISTS', message: 'taken');
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
+
+    await _checkNickname(tester, 'Nagyeong');
+    await _verifyEmail(tester);
+    await tester.enterText(find.byKey(const Key('signupPasswordField')), 'password123');
+    await tester.enterText(find.byKey(const Key('signupPasswordConfirmField')), 'password123');
+    await tester.tap(find.byKey(const Key('signupTermsCheckbox')));
+    await tester.tap(find.text('가입하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이미 사용 중인 닉네임입니다.'), findsOneWidget);
+    // It replaces the stale "사용할 수 있는" verdict rather than sitting
+    // next to it, and the foot of the form stays quiet.
+    expect(find.text('사용할 수 있는 닉네임이에요'), findsNothing);
+    expect(find.byType(ErrorView), findsNothing);
   });
 }

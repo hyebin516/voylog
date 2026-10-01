@@ -20,10 +20,16 @@ class AuthProvider extends ChangeNotifier {
   ViewState _state = ViewState.idle;
   UserModel? _currentUser;
   String? _errorMessage;
+  String? _errorCode;
 
   ViewState get state => _state;
   UserModel? get currentUser => _currentUser;
   String? get errorMessage => _errorMessage;
+
+  /// The backend's error code for the last failure, so a screen can put the
+  /// message beside the field it belongs to instead of at the foot of the
+  /// form. Null unless the call that failed recorded one.
+  String? get errorCode => _errorCode;
   bool get isLoading => _state == ViewState.loading;
   bool get isAuthenticated => _currentUser != null;
 
@@ -110,6 +116,7 @@ class AuthProvider extends ChangeNotifier {
   Future<bool> signup({required String email, required String password, required String nickname}) async {
     _state = ViewState.loading;
     _errorMessage = null;
+    _errorCode = null;
     notifyListeners();
 
     try {
@@ -121,6 +128,7 @@ class AuthProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.friendlyMessage;
+      _errorCode = e.code;
       notifyListeners();
       return false;
     }

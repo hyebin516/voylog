@@ -41,6 +41,15 @@ class _SignupScreenState extends State<SignupScreen> {
   bool get _nicknameConfirmedAvailable =>
       _nicknameAvailable == true && _checkedNickname == _nicknameController.text.trim();
 
+  /// The signup call's own rejection of the nickname, which can happen even
+  /// after a clean duplicate check: someone else may take the name between
+  /// the check and the submit.
+  String? _submitNicknameError(AuthProvider authProvider) {
+    if (authProvider.state != ViewState.error) return null;
+    if (authProvider.errorCode != 'NICKNAME_EXISTS') return null;
+    return authProvider.errorMessage;
+  }
+
   /// What the last duplicate check found, or null when none has run for the
   /// nickname currently typed (editing it clears the verdict).
   String? get _nicknameCheckMessage {
@@ -205,8 +214,11 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   // Every outcome says something. Before, only "taken"
                   // did, so a free nickname looked like the button had done
-                  // nothing at all.
-                  if (_nicknameCheckMessage != null)
+                  // nothing at all. A rejection from the signup call itself
+                  // wins, since it is the newer verdict.
+                  if (_submitNicknameError(authProvider) != null)
+                    InlineFieldError(message: _submitNicknameError(authProvider)!)
+                  else if (_nicknameCheckMessage != null)
                     InlineFieldError(
                       message: _nicknameCheckMessage!,
                       tone: _nicknameAvailable == true
@@ -304,7 +316,9 @@ class _SignupScreenState extends State<SignupScreen> {
                     isLoading: authProvider.isLoading,
                     onPressed: () => _onSignupPressed(authProvider),
                   ),
-                  if (authProvider.state == ViewState.error) ...[
+                  // Anything a field already reports stays with that field.
+                  if (authProvider.state == ViewState.error &&
+                      authProvider.errorCode != 'NICKNAME_EXISTS') ...[
                     const SizedBox(height: AppSpacing.md),
                     ErrorView(message: authProvider.errorMessage ?? '회원가입에 실패했습니다.'),
                   ],
