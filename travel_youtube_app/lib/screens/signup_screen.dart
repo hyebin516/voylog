@@ -33,12 +33,28 @@ class _SignupScreenState extends State<SignupScreen> {
   String? _verifiedEmail;
   String? _checkedNickname;
   bool? _nicknameAvailable;
+  String? _nicknameCheckError;
   bool _isCheckingNickname = false;
 
   bool get _emailVerified => _verifiedEmail != null && _verifiedEmail == _emailController.text.trim();
 
   bool get _nicknameConfirmedAvailable =>
       _nicknameAvailable == true && _checkedNickname == _nicknameController.text.trim();
+
+  /// What the last duplicate check found, or null when none has run for the
+  /// nickname currently typed (editing it clears the verdict).
+  String? get _nicknameCheckMessage {
+    if (_checkedNickname == null || _checkedNickname != _nicknameController.text.trim()) {
+      return null;
+    }
+    return switch (_nicknameAvailable) {
+      true => '사용할 수 있는 닉네임이에요',
+      false => '이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해주세요',
+      // The request itself failed -- saying "available" would be a lie and
+      // saying "taken" would be too, so it says neither.
+      null => _nicknameCheckError ?? '닉네임을 확인하지 못했어요. 잠시 후 다시 시도해 주세요',
+    };
+  }
 
   @override
   void dispose() {
@@ -66,6 +82,7 @@ class _SignupScreenState extends State<SignupScreen> {
       _isCheckingNickname = false;
       _checkedNickname = nickname;
       _nicknameAvailable = available;
+      _nicknameCheckError = available == null ? authProvider.errorMessage : null;
     });
   }
 
@@ -186,15 +203,16 @@ class _SignupScreenState extends State<SignupScreen> {
                             ),
                     ],
                   ),
-                  if (_checkedNickname != null &&
-                      _checkedNickname == _nicknameController.text.trim() &&
-                      _nicknameAvailable == false) ...[
-                    const SizedBox(height: 4),
-                    const Text(
-                      '이미 사용 중인 닉네임이에요.',
-                      style: TextStyle(fontSize: 12, color: AppColors.danger),
+                  // Every outcome says something. Before, only "taken"
+                  // did, so a free nickname looked like the button had done
+                  // nothing at all.
+                  if (_nicknameCheckMessage != null)
+                    InlineFieldError(
+                      message: _nicknameCheckMessage!,
+                      tone: _nicknameAvailable == true
+                          ? InlineFieldTone.success
+                          : InlineFieldTone.error,
                     ),
-                  ],
                   const SizedBox(height: AppSpacing.sm),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,

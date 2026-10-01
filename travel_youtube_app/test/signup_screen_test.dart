@@ -20,8 +20,11 @@ class FakeAuthRepository extends AuthRepository {
   String? lastPassword;
   String? lastNickname;
 
+  ApiException? nicknameCheckError;
+
   @override
   Future<bool> checkNicknameAvailable(String nickname) async {
+    if (nicknameCheckError != null) throw nicknameCheckError!;
     return !takenNicknames.contains(nickname);
   }
 
@@ -93,13 +96,42 @@ void main() {
     expect(find.text('닉네임을 입력해 주세요.'), findsOneWidget);
   });
 
-  testWidgets('checking nickname availability shows a checkmark', (tester) async {
+  testWidgets('a free nickname says so, not just a checkmark', (tester) async {
+    // The check used to speak up only when a nickname was taken, so a free
+    // one was indistinguishable from the button doing nothing.
     final repository = FakeAuthRepository();
     await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
 
     await _checkNickname(tester, 'Nagyeong');
 
-    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
+    expect(find.text('사용할 수 있는 닉네임이에요'), findsOneWidget);
+    expect(find.byIcon(Icons.check_circle_rounded), findsWidgets);
+  });
+
+  testWidgets('editing the nickname clears the previous verdict', (tester) async {
+    final repository = FakeAuthRepository();
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
+
+    await _checkNickname(tester, 'Nagyeong');
+    expect(find.text('사용할 수 있는 닉네임이에요'), findsOneWidget);
+
+    await tester.enterText(find.byKey(const Key('signupNicknameField')), 'Nagyeong2');
+    await tester.pump();
+
+    expect(find.text('사용할 수 있는 닉네임이에요'), findsNothing);
+  });
+
+  testWidgets('a failed check says it failed rather than claiming either way', (
+    tester,
+  ) async {
+    final repository = FakeAuthRepository()
+      ..nicknameCheckError = const ApiException(code: 'SERVER_ERROR', message: 'boom');
+    await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
+
+    await _checkNickname(tester, 'Nagyeong');
+
+    expect(find.text('사용할 수 있는 닉네임이에요'), findsNothing);
+    expect(find.textContaining('이미 사용 중인'), findsNothing);
   });
 
   testWidgets('shows an inline message when the nickname is already taken', (tester) async {
@@ -108,7 +140,7 @@ void main() {
 
     await _checkNickname(tester, 'Nagyeong');
 
-    expect(find.text('이미 사용 중인 닉네임이에요.'), findsOneWidget);
+    expect(find.text('이미 사용 중인 닉네임이에요. 다른 닉네임을 입력해주세요'), findsOneWidget);
     expect(find.byIcon(Icons.check_circle_rounded), findsNothing);
   });
 
