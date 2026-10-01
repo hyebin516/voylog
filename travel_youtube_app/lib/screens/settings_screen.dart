@@ -276,7 +276,7 @@ class _SettingsRow extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceTint1,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE3F0F8), width: 1.5),
+          border: Border.all(color: AppColors.dividerStrong, width: 1.5),
         ),
         child: Row(
           children: [

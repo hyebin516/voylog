@@ -538,7 +538,7 @@ class _SummaryRow extends StatelessWidget {
             text,
             style: const TextStyle(
               fontSize: 12,
-              color: Color(0xFF4A6C80),
+              color: AppColors.textTertiary,
               height: 1.55,
             ),
           ),

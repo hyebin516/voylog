@@ -187,11 +187,11 @@ class _SupportInquiryScreenState extends State<SupportInquiryScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFE3F0F8), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.dividerStrong, width: 1.5),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
-        borderSide: const BorderSide(color: Color(0xFFE3F0F8), width: 1.5),
+        borderSide: const BorderSide(color: AppColors.dividerStrong, width: 1.5),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(18),
@@ -229,7 +229,7 @@ class _CategoryChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.surfaceTint3 : AppColors.surfaceTint1,
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: selected ? AppColors.primary : const Color(0xFFE3F0F8), width: 1.5),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.dividerStrong, width: 1.5),
         ),
         child: Text(
           label,
@@ -260,7 +260,7 @@ class _InquiryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.surfaceTint1,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE3F0F8), width: 1.5),
+        border: Border.all(color: AppColors.dividerStrong, width: 1.5),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

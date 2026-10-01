@@ -198,7 +198,7 @@ class _DayFolderSelectScreenState extends State<DayFolderSelectScreen> {
                             Icon(
                               Icons.info_outline_rounded,
                               size: 14,
-                              color: Color(0xFF8BB9CF),
+                              color: AppColors.textMuted,
                             ),
                             SizedBox(width: 7),
                             Expanded(
@@ -296,7 +296,7 @@ class _FolderOption extends StatelessWidget {
               ),
               child: FolderGlyphIcon(
                 size: 22,
-                color: selected ? AppColors.primary : const Color(0xFF8BB9CF),
+                color: selected ? AppColors.primary : AppColors.textMuted,
               ),
             ),
             const SizedBox(width: 13),
@@ -347,7 +347,7 @@ class _FolderOption extends StatelessWidget {
                 height: 22,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFDCEAF1), width: 2),
+                  border: Border.all(color: AppColors.dividerStrong, width: 2),
                 ),
               ),
           ],

@@ -306,7 +306,7 @@ class _HeroIconButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 12, offset: Offset(0, 4))],
+          boxShadow: AppColors.floatingButtonShadow(),
         ),
         child: Icon(icon, size: 17, color: AppColors.textSecondary),
       ),
@@ -330,7 +330,7 @@ class _HeroBookmarkButton extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Color(0x1F000000), blurRadius: 12, offset: Offset(0, 4))],
+        boxShadow: AppColors.floatingButtonShadow(),
       ),
       child: BookmarkButton(placeId: placeId),
     );
@@ -452,29 +452,46 @@ class _PlaceSummarySection extends StatelessWidget {
           children: [
             const Text('여러 영상 속 방문자 의견', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.ink)),
             const SizedBox(height: AppSpacing.sm),
-            if (summary.pros != null)
-              _SummaryOpinionCard(
-                icon: Icons.check_circle_rounded,
-                iconColor: const Color(0xFF5FC2A0),
-                bg: const Color(0xFFF0FAF5),
-                border: const Color(0xFFD5F0E4),
-                titleColor: const Color(0xFF2F8B6A),
-                title: '이런 점이 좋아요',
-                text: summary.pros!,
-                textColor: const Color(0xFF3D6B58),
+            // One card holding both sides, as the handoff has it. v1 drew
+            // two tinted boxes (green / red); v2 keeps the card white and
+            // carries the meaning in the badge alone.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                border: Border.all(color: AppColors.dividerStrong, width: 1.5),
+                borderRadius: BorderRadius.circular(AppRadius.md),
               ),
-            if (summary.pros != null && summary.cons != null) const SizedBox(height: AppSpacing.sm),
-            if (summary.cons != null)
-              _SummaryOpinionCard(
-                icon: Icons.error_rounded,
-                iconColor: AppColors.danger,
-                bg: const Color(0xFFFDF5F4),
-                border: const Color(0xFFF7DEDC),
-                titleColor: const Color(0xFFB8443F),
-                title: '이런 점은 참고하세요',
-                text: summary.cons!,
-                textColor: const Color(0xFF8A5450),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (summary.pros != null)
+                    _SummaryOpinionRow(
+                      label: '장점',
+                      labelColor: AppColors.primary,
+                      labelBackground: AppColors.surfaceTint3,
+                      text: summary.pros!,
+                    ),
+                  if (summary.pros != null && summary.cons != null) ...[
+                    const SizedBox(height: 10),
+                    const Divider(height: 1, thickness: 1, color: Color(0xFFEEF6F6)),
+                    const SizedBox(height: 10),
+                  ],
+                  if (summary.cons != null)
+                    _SummaryOpinionRow(
+                      label: '단점',
+                      labelColor: AppColors.accentCoral,
+                      labelBackground: AppColors.accentCoralBg,
+                      text: summary.cons!,
+                    ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '브이로그 코멘트 ${summary.sourceCount}개 영상 AI 요약',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textMuted2),
+                  ),
+                ],
               ),
+            ),
           ],
         );
       },
@@ -482,51 +499,49 @@ class _PlaceSummarySection extends StatelessWidget {
   }
 }
 
-class _SummaryOpinionCard extends StatelessWidget {
-  const _SummaryOpinionCard({
-    required this.icon,
-    required this.iconColor,
-    required this.bg,
-    required this.border,
-    required this.titleColor,
-    required this.title,
+/// One side of the AI summary: a pill badge beside the sentence.
+class _SummaryOpinionRow extends StatelessWidget {
+  const _SummaryOpinionRow({
+    required this.label,
+    required this.labelColor,
+    required this.labelBackground,
     required this.text,
-    required this.textColor,
   });
 
-  final IconData icon;
-  final Color iconColor;
-  final Color bg;
-  final Color border;
-  final Color titleColor;
-  final String title;
+  final String label;
+  final Color labelColor;
+  final Color labelBackground;
   final String text;
-  final Color textColor;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border.all(color: border, width: 1.5),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: iconColor),
-              const SizedBox(width: 8),
-              Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: titleColor)),
-            ],
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+          decoration: BoxDecoration(
+            color: labelBackground,
+            borderRadius: BorderRadius.circular(AppRadius.pill),
           ),
-          const SizedBox(height: 8),
-          Text(text, style: TextStyle(fontSize: 12.5, color: textColor, height: 1.5)),
-        ],
-      ),
+          child: Text(
+            label,
+            style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: labelColor),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              height: 1.55,
+              color: Color(0xFF46686E),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

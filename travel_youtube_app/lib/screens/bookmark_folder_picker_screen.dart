@@ -89,7 +89,7 @@ class _BookmarkFolderPickerScreenState extends State<BookmarkFolderPickerScreen>
                         color: AppColors.surfaceTint1,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(18),
-                          side: const BorderSide(color: Color(0xFFE3F0F8), width: 1.5),
+                          side: const BorderSide(color: AppColors.dividerStrong, width: 1.5),
                         ),
                         clipBehavior: Clip.antiAlias,
                         child: CheckboxListTile(

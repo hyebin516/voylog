@@ -131,10 +131,10 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
     final folders = context.watch<BookmarkFolderProvider>().folders;
 
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(28), topRight: Radius.circular(28)),
-        boxShadow: [BoxShadow(color: Color(0x26143C50), blurRadius: 30, offset: Offset(0, -12))],
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(AppRadius.sheet)),
+        boxShadow: AppColors.bottomSheetShadow(),
       ),
       padding: const EdgeInsets.fromLTRB(22, 22, 22, 30),
       child: SafeArea(
@@ -148,7 +148,7 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
                 width: 38,
                 height: 5,
                 margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(color: const Color(0xFFE2EEF6), borderRadius: BorderRadius.circular(3)),
+                decoration: BoxDecoration(color: AppColors.divider, borderRadius: BorderRadius.circular(3)),
               ),
             ),
             Row(
@@ -333,7 +333,7 @@ class _FolderRow extends StatelessWidget {
               ),
               child: FolderGlyphIcon(
                 size: 17,
-                color: selected ? AppColors.primary : const Color(0xFF8BB9CF),
+                color: selected ? AppColors.primary : AppColors.textMuted,
               ),
             ),
             const SizedBox(width: 12),
@@ -354,7 +354,7 @@ class _FolderRow extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? AppColors.primary : null,
                 shape: BoxShape.circle,
-                border: selected ? null : Border.all(color: const Color(0xFFDCEAF1), width: 2),
+                border: selected ? null : Border.all(color: AppColors.dividerStrong, width: 2),
               ),
               child: selected ? const Icon(Icons.check_rounded, size: 14, color: Colors.white) : null,
             ),

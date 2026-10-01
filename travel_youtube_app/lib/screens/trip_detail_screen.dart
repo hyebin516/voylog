@@ -129,7 +129,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(999),
                               border: Border.all(
-                                color: const Color(0xFFD5EAF7),
+                                color: AppColors.surfaceTint3,
                                 width: 1.5,
                               ),
                               boxShadow: AppColors.cardShadow(),

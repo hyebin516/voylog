@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+
 /// A rounded-rect container with a dashed border, matching the design
 /// handoff's `border: 2px dashed #bfe0f2` treatment (used for "장소
 /// 추가하기"/"내 동선 추천하기"/"날짜 추가" style affordances) -- Flutter's
@@ -8,7 +10,7 @@ class DashedBorderContainer extends StatelessWidget {
   const DashedBorderContainer({
     super.key,
     required this.child,
-    this.color = const Color(0xFFBFE0F2),
+    this.color = AppColors.selectedBorder,
     this.backgroundColor,
     this.strokeWidth = 2,
     this.borderRadius = 18,

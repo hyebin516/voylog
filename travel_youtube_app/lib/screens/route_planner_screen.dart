@@ -470,7 +470,7 @@ class _SelectedPlaceRow extends StatelessWidget {
           const Icon(
             Icons.drag_indicator_rounded,
             size: 16,
-            color: Color(0xFFC7D9E3),
+            color: AppColors.borderStrong,
           ),
           const SizedBox(width: 11),
           Expanded(
@@ -498,7 +498,7 @@ class _SelectedPlaceRow extends StatelessWidget {
               child: const Icon(
                 Icons.close_rounded,
                 size: 13,
-                color: Color(0xFFC7D9E3),
+                color: AppColors.borderStrong,
               ),
             ),
           ),

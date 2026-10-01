@@ -590,7 +590,7 @@ class _ExportOption extends StatelessWidget {
             style: const TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF5B7F94),
+              color: AppColors.textTertiary,
             ),
           ),
         ],

@@ -102,7 +102,7 @@ class _AnalysisTabScreenState extends State<AnalysisTabScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    border: Border.all(color: const Color(0xFFD9EDF7), width: 2),
+                    border: Border.all(color: AppColors.inputBorder, width: 2),
                     borderRadius: BorderRadius.circular(999),
                     boxShadow: AppColors.cardShadow(),
                   ),

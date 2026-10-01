@@ -60,7 +60,7 @@ class _SavedRoutesFabState extends State<SavedRoutesFab> with WidgetsBindingObse
             decoration: BoxDecoration(
               color: AppColors.primary,
               borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: AppColors.primaryStrong.withValues(alpha: 0.4), blurRadius: 24, offset: const Offset(0, 12))],
+              boxShadow: AppColors.fabShadow(),
             ),
             child: const MountainGlyphIcon(size: 24, color: Colors.white),
           ),

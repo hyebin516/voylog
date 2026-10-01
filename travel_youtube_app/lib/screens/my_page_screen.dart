@@ -460,7 +460,7 @@ class _StatTile extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: const Color(0xFFE3F0F8), width: 1.5),
+          border: Border.all(color: AppColors.dividerStrong, width: 1.5),
           borderRadius: BorderRadius.circular(18),
           boxShadow: AppColors.cardShadow(),
         ),
@@ -501,7 +501,7 @@ class _MenuTile extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
-          border: Border.all(color: const Color(0xFFE3F0F8), width: 1.5),
+          border: Border.all(color: AppColors.dividerStrong, width: 1.5),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
@@ -517,7 +517,7 @@ class _MenuTile extends StatelessWidget {
             Expanded(
               child: Text(label, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: labelColor)),
             ),
-            if (showChevron) const Icon(Icons.chevron_right_rounded, size: 15, color: Color(0xFFC7D9E3)),
+            if (showChevron) const Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.borderStrong),
           ],
         ),
       ),
