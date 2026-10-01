@@ -24,3 +24,6 @@ dump.rdb
 
 # 폰트 원본 zip (필요한 weight만 뽑아 assets/fonts/에 둠)
 travel_youtube_app/assets/fonts/*.zip
+
+# 핸드오프 번들 원본 zip (압축 푼 폴더가 레포에 들어 있음)
+Voylog UI/**/*.zip
