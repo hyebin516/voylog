@@ -2,7 +2,15 @@ const axios = require('axios');
 const env = require('../config/env');
 const AppError = require('../utils/AppError');
 
-const client = axios.create({ baseURL: env.aiWorkerUrl });
+// The shared secret, when the worker is configured to want one. The worker
+// spends money on every call and has no user accounts of its own, so if it
+// is reachable from the internet this header is the only thing between it
+// and a stranger's script. Omitted when unset, which is how local dev and
+// a worker kept on a private network run.
+const client = axios.create({
+  baseURL: env.aiWorkerUrl,
+  headers: env.aiWorkerToken ? { 'X-Worker-Token': env.aiWorkerToken } : {},
+});
 
 async function callAiWorker(path, payload, timeoutMs) {
   try {

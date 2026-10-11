@@ -1,5 +1,9 @@
+import secrets
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+
+from app.config import AI_WORKER_TOKEN
 
 from app.routers import (
     embedding_router,
@@ -13,6 +17,30 @@ from app.routers import (
 from app.utils.exceptions import AiWorkerError
 
 app = FastAPI(title="Travel YouTube AI Worker")
+
+# Paths that answer without the shared secret. /health has to stay open for
+# the host's liveness probe, and the docs are harmless without the routes.
+_OPEN_PATHS = frozenset({"/health", "/docs", "/openapi.json", "/redoc"})
+
+
+@app.middleware("http")
+async def require_worker_token(request: Request, call_next):
+    """Rejects callers that do not know the shared secret.
+
+    Only enforced when AI_WORKER_TOKEN is set, so local dev and the test
+    suite run untouched. Deployments either set it or keep this service off
+    the public internet -- see backend/.env.example.
+    """
+    if AI_WORKER_TOKEN and request.url.path not in _OPEN_PATHS:
+        presented = request.headers.get("X-Worker-Token", "")
+        # Compared in constant time: a plain == leaks the secret one
+        # character at a time to anyone who can measure the response.
+        if not secrets.compare_digest(presented, AI_WORKER_TOKEN):
+            return JSONResponse(
+                status_code=401,
+                content={"error": {"code": "WORKER_UNAUTHORIZED", "message": "Invalid worker token"}},
+            )
+    return await call_next(request)
 
 app.include_router(transcript_router.router)
 app.include_router(place_router.router)

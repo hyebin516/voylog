@@ -3,6 +3,9 @@ require('dotenv').config();
 module.exports = {
   port: process.env.PORT || 4000,
   nodeEnv: process.env.NODE_ENV || 'development',
+  // How many reverse proxies sit in front, for Express' req.ip. Set to 1 on
+  // a managed host (Render, Fly, a Nginx in front); leave unset locally.
+  trustProxy: process.env.TRUST_PROXY ? Number(process.env.TRUST_PROXY) : 0,
   databaseUrl: process.env.DATABASE_URL,
   redisUrl: process.env.REDIS_URL,
   jwtSecret: process.env.JWT_SECRET,
@@ -10,6 +13,9 @@ module.exports = {
   kakaoClientId: process.env.KAKAO_CLIENT_ID,
   kakaoClientSecret: process.env.KAKAO_CLIENT_SECRET,
   aiWorkerUrl: process.env.AI_WORKER_URL,
+  // Shared secret for the AI worker. Must match AI_WORKER_TOKEN on the
+  // worker side; unset means the worker is not asking for one.
+  aiWorkerToken: process.env.AI_WORKER_TOKEN,
   smtpHost: process.env.SMTP_HOST,
   smtpPort: Number(process.env.SMTP_PORT) || 587,
   smtpUser: process.env.SMTP_USER,

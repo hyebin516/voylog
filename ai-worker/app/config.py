@@ -10,6 +10,13 @@ KAKAO_REST_API_KEY = os.getenv("KAKAO_REST_API_KEY")
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 AI_WORKER_PORT = int(os.getenv("AI_WORKER_PORT", "8000"))
 
+# Shared secret the backend must present in X-Worker-Token. This worker has
+# no user accounts and spends money on every call, so when it is reachable
+# from the internet the token is the only thing standing between it and a
+# stranger's script. Unset means "do not check" -- the way local dev runs,
+# and the way a worker kept on a private network can run.
+AI_WORKER_TOKEN = os.getenv("AI_WORKER_TOKEN")
+
 LLM_TIMEOUT_SECONDS = 30
 KAKAO_TIMEOUT_SECONDS = 10
 ROUTE_OPTIMIZATION_TIMEOUT_SECONDS = 15

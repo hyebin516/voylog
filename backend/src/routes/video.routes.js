@@ -1,6 +1,7 @@
 const express = require('express');
 const videoController = require('../controllers/video.controller');
 const optionalAuthenticate = require('../middlewares/optionalAuth');
+const { analyzeLimiter } = require('../middlewares/rateLimit');
 const {
   validateAnalyzeRequest,
   validateSearchRequest,
@@ -9,7 +10,7 @@ const {
 
 const router = express.Router();
 
-router.post('/analyze', optionalAuthenticate, validateAnalyzeRequest, videoController.analyze);
+router.post('/analyze', analyzeLimiter, optionalAuthenticate, validateAnalyzeRequest, videoController.analyze);
 router.get('/search', validateSearchRequest, videoController.search);
 router.post('/recommendations', validateRecommendationRequest, videoController.recommendations);
 

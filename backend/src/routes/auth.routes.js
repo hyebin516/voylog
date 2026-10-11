@@ -12,9 +12,13 @@ const {
   validateResetPassword,
 } = require('../validators/auth.validator');
 const authenticate = require('../middlewares/auth');
+const { authLimiter } = require('../middlewares/rateLimit');
 const { uploadProfileImage } = require('../middlewares/profileImageUpload');
 
 const router = express.Router();
+
+// Credential checks and outgoing mail -- both worth protecting from a script.
+router.use(authLimiter);
 
 router.post('/kakao', validateKakaoLogin, authController.kakaoLogin);
 router.get('/check-nickname', validateCheckNickname, authController.checkNickname);
