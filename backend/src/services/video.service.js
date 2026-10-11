@@ -66,6 +66,26 @@ async function generateAndStorePlaceEmbeddings(places) {
   );
 }
 
+// The app lists places in the order it receives them, so they have to leave
+// here in the order they appear in the video. A fresh analysis returns the
+// rows exactly as the LLM listed them -- which is not the timeline -- while a
+// cached one comes back from `findPlacesByVideoId`, already sorted. Sorting
+// here covers both, and the enrichment merge that appends to either.
+//
+// Places with no timestamp (found in the title, description, hashtags or
+// on-screen text) have no position in the video, so they go last rather than
+// pretending to be at 0:00.
+function byTimeline(places) {
+  return [...places].sort((a, b) => {
+    const left = a.timestamp_sec;
+    const right = b.timestamp_sec;
+    if (left == null && right == null) return 0;
+    if (left == null) return 1;
+    if (right == null) return -1;
+    return left - right;
+  });
+}
+
 function toResponse(video, places, isCached) {
   return {
     videoId: video.video_id,
@@ -75,7 +95,7 @@ function toResponse(video, places, isCached) {
     // True while the background on-screen-text pass is still running, so
     // the client knows more places may still appear and can refresh.
     enrichmentPending: video.enrichment_status === 'pending',
-    places: places.map((p) => ({
+    places: byTimeline(places).map((p) => ({
       placeId: p.place_id,
       name: p.name,
       timestampSec: p.timestamp_sec,
@@ -384,4 +404,12 @@ async function getRecommendations(regions, themes, duration) {
   return { videos: result.videos };
 }
 
-module.exports = { analyzeVideo, searchByHashtag, getRecommendations, generateAndStorePlaceEmbeddings };
+module.exports = {
+  analyzeVideo,
+  searchByHashtag,
+  getRecommendations,
+  generateAndStorePlaceEmbeddings,
+  // Response shaping is pure and worth testing on its own -- the ordering
+  // rule in particular, which only shows up on a fresh analysis.
+  __testing: { toResponse },
+};
