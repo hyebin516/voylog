@@ -3,7 +3,14 @@ import asyncio
 import pytest
 
 from app.schemas.request_schema import PlaceExtractionRequest, TranscriptSegment, VideoMeta
-from app.schemas.response_schema import GeocodedPlace, LlmPlaceExtractionResult, PlaceMatchResult, PlaceCandidate, PlaceTag
+from app.schemas.response_schema import (
+    GeocodedPlace,
+    LlmPlaceExtractionResult,
+    PlaceCandidate,
+    PlaceMatchResult,
+    PlaceTag,
+    PlaceVerificationResult,
+)
 from app.services import place_extraction_service
 
 
@@ -19,6 +26,20 @@ def make_request(**overrides):
 
 async def _no_location(candidate, region, provider):
     return None
+
+
+@pytest.fixture(autouse=True)
+def never_verify_places(monkeypatch):
+    """Extraction now asks the LLM whether its unlocated names are places at
+    all. Without this the suite makes real, paid calls -- and the real model
+    answers honestly, so a synthetic fixture place like "대전" gets dropped
+    and the test fails for a reason that has nothing to do with it. Tests
+    that care about the check stub it themselves."""
+
+    def _nothing_to_drop(user_prompt, provider):
+        return PlaceVerificationResult(notPlaces=[])
+
+    monkeypatch.setattr(place_extraction_service.llm_service, "verify_places", _nothing_to_drop)
 
 
 @pytest.fixture(autouse=True)

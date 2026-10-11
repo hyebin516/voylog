@@ -255,6 +255,19 @@ class PlaceSummaryResult(BaseModel):
     cons: Optional[str] = None
 
 
+class NotAPlace(BaseModel):
+    index: int
+    reason: Optional[str] = None
+
+
+class PlaceVerificationResult(BaseModel):
+    """Which of the unlocated names the LLM judged not to be places at all.
+    Empty is the normal answer -- a name the map missed is usually still a
+    real place."""
+
+    notPlaces: List[NotAPlace] = []
+
+
 class PlaceMatchResult(BaseModel):
     """Which map-search candidate the LLM judged to be the extracted place.
     `index` is None when none of them is a confident match -- better no pin

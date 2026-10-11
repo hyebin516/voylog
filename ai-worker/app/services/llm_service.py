@@ -10,7 +10,13 @@ from app.config import ANTHROPIC_API_KEY, LLM_TIMEOUT_SECONDS, OPENAI_API_KEY, V
 from app.prompts.place_extraction_prompt import SYSTEM_PROMPT
 from app.prompts.place_match_prompt import SYSTEM_PROMPT as MATCH_SYSTEM_PROMPT
 from app.prompts.place_summary_prompt import SYSTEM_PROMPT as SUMMARY_SYSTEM_PROMPT
-from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceMatchResult, PlaceSummaryResult
+from app.prompts.place_verification_prompt import SYSTEM_PROMPT as VERIFICATION_SYSTEM_PROMPT
+from app.schemas.response_schema import (
+    LlmPlaceExtractionResult,
+    PlaceMatchResult,
+    PlaceSummaryResult,
+    PlaceVerificationResult,
+)
 from app.utils.exceptions import AiProviderError
 from app.utils.logger import logger
 
@@ -287,7 +293,7 @@ def _call_claude_summary(user_prompt: str) -> PlaceSummaryResult:
         raise RuntimeError("Claude client is not configured")
 
     response = _anthropic_client.messages.create(
-        model="claude-3-5-sonnet-latest",
+        model=_CLAUDE_MODEL,
         max_tokens=512,
         system=SUMMARY_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
@@ -334,7 +340,7 @@ def _call_claude_match(user_prompt: str) -> PlaceMatchResult:
         raise RuntimeError("Claude client is not configured")
 
     response = _anthropic_client.messages.create(
-        model="claude-3-5-sonnet-latest",
+        model=_CLAUDE_MODEL,
         max_tokens=256,
         system=MATCH_SYSTEM_PROMPT,
         messages=[{"role": "user", "content": user_prompt}],
@@ -362,3 +368,58 @@ def match_place(user_prompt: str, provider: str = "auto") -> PlaceMatchResult:
     except Exception as exc:
         logger.warning("match_place failed, leaving the candidate choice to the caller: %s", exc)
         return PlaceMatchResult(index=None, reason=None)
+
+
+def _parse_verification_json(raw_text: str) -> PlaceVerificationResult:
+    data = json.loads(raw_text)
+    return PlaceVerificationResult(**data)
+
+
+def _call_openai_verification(user_prompt: str) -> PlaceVerificationResult:
+    if not _openai_client:
+        raise RuntimeError("OpenAI client is not configured")
+
+    response = _openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": VERIFICATION_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+    )
+    return _parse_verification_json(response.choices[0].message.content)
+
+
+def _call_claude_verification(user_prompt: str) -> PlaceVerificationResult:
+    if not _anthropic_client:
+        raise RuntimeError("Claude client is not configured")
+
+    response = _anthropic_client.messages.create(
+        model=_CLAUDE_MODEL,
+        max_tokens=512,
+        system=VERIFICATION_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    return _parse_verification_json(_first_text_block(response))
+
+
+def verify_places(user_prompt: str, provider: str = "auto") -> PlaceVerificationResult:
+    """Picks out the names that are not places at all.
+
+    Never raises. A failure here means the list is left exactly as it was,
+    which is the same behaviour the app had before this check existed --
+    far better than failing an analysis that already has its places."""
+    try:
+        if provider == "openai":
+            return _call_with_retry(_call_openai_verification, user_prompt, "openai")
+        if provider == "claude":
+            return _call_with_retry(_call_claude_verification, user_prompt, "claude")
+
+        try:
+            return _call_with_retry(_call_openai_verification, user_prompt, "openai")
+        except AiProviderError:
+            logger.info("Falling back to Claude after OpenAI failure")
+            return _call_with_retry(_call_claude_verification, user_prompt, "claude")
+    except Exception as exc:
+        logger.warning("verify_places failed, keeping every name: %s", exc)
+        return PlaceVerificationResult(notPlaces=[])
