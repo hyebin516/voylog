@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../providers/video_provider.dart';
+import '../utils/view_state.dart';
 
 /// How long the first pass usually takes. Measured at 15-27s for a typical
 /// video (see CLAUDE.md's "장소 추출 모델"), so the handoff's 20 is a fair
@@ -26,10 +27,16 @@ const List<String> _steps = [
 /// it always has. Holding the user here for the enrichment would be a change
 /// to the flow, not to its looks.
 ///
-/// Closes itself when the analysis leaves its loading state, whether it
-/// succeeded or failed -- the home screen shows the error in place.
+/// Closes itself once the analysis succeeds. A failure keeps this screen up
+/// and turns it into the error state: the message, 다시 시도 and 취소. The
+/// home screen used to show that error inline, under the input, where it
+/// shared the page with everything else and offered no way to dismiss it.
 class AnalyzingScreen extends StatefulWidget {
-  const AnalyzingScreen({super.key});
+  const AnalyzingScreen({super.key, required this.youtubeUrl});
+
+  /// Kept so 다시 시도 can run the same analysis again from here, without
+  /// sending the user back to the input to press 분석하기 a second time.
+  final String youtubeUrl;
 
   @override
   State<AnalyzingScreen> createState() => _AnalyzingScreenState();
@@ -80,12 +87,40 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
     return 0;
   }
 
+  void _retry() {
+    final videoProvider = context.read<VideoProvider>();
+    setState(() {
+      _elapsed = Duration.zero;
+      _closing = false;
+    });
+    _timer?.cancel();
+    _timer = Timer.periodic(_tick, (_) {
+      if (!mounted) return;
+      setState(() => _elapsed += _tick);
+    });
+    unawaited(videoProvider.analyze(widget.youtubeUrl));
+  }
+
+  void _cancel() {
+    // Drop the failure before leaving, so nothing downstream treats this
+    // abandoned attempt as the current state of the 분석 tab.
+    context.read<VideoProvider>().dismissAnalysisError();
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) navigator.pop();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isLoading = context.watch<VideoProvider>().isLoading;
+    final videoProvider = context.watch<VideoProvider>();
+    final isLoading = videoProvider.isLoading;
 
-    // The analysis is over (either way) -- step aside and let the home
-    // screen show the result or the error.
+    if (videoProvider.state == ViewState.error) {
+      // Stop the countdown: it is measuring a request that is already over.
+      _timer?.cancel();
+      return _buildFailure(videoProvider.errorMessage);
+    }
+
+    // Succeeded -- step aside and let the result take over.
     if (!isLoading && !_closing) {
       _closing = true;
       // Stop ticking as well as closing: if this screen is the only route
@@ -172,6 +207,125 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
                   ],
                 ),
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+
+  Widget _buildFailure(String? message) {
+    return PopScope(
+      // Back is the same as 취소 here: it must still clear the failure.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _cancel();
+      },
+      child: Scaffold(
+        body: DecoratedBox(
+          decoration: const BoxDecoration(gradient: AppColors.analyzingGradient),
+          child: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 40),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 92,
+                        height: 92,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.16),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.priority_high_rounded,
+                          size: 48,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+                    const Text(
+                      '분석하지 못했어요',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      message ?? '잠시 후 다시 시도해 주세요.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        height: 1.5,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                    ),
+                    const SizedBox(height: 34),
+                    _FailureButton(
+                      label: '다시 시도',
+                      filled: true,
+                      onTap: _retry,
+                    ),
+                    const SizedBox(height: 12),
+                    _FailureButton(
+                      label: '취소',
+                      filled: false,
+                      onTap: _cancel,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A pill sized for the failure state. The shared [PrimaryButton] paints the
+/// teal brand gradient, which disappears against this screen's teal
+/// background, so these two are white-on-teal instead.
+class _FailureButton extends StatelessWidget {
+  const _FailureButton({required this.label, required this.filled, required this.onTap});
+
+  final String label;
+  final bool filled;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: filled ? Colors.white : Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(999),
+        side: filled
+            ? BorderSide.none
+            : BorderSide(color: Colors.white.withValues(alpha: 0.6), width: 1.4),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: filled ? AppColors.primary : Colors.white,
             ),
           ),
         ),

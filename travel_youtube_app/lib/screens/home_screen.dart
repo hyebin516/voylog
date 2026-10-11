@@ -24,7 +24,6 @@ import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/dashed_border_container.dart';
-import '../widgets/error_view.dart';
 import '../widgets/nav_icons.dart';
 import '../widgets/saved_routes_fab.dart';
 import '../utils/place_category_label.dart';
@@ -95,11 +94,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     setState(() => _inputError = null);
 
-    // The waiting screen covers the first pass and closes itself when the
-    // analysis leaves its loading state, so nothing here has to pop it.
+    // The waiting screen covers the first pass and closes itself once the
+    // analysis succeeds, so nothing here has to pop it. A failure stays on
+    // that screen, which offers 다시 시도 and 취소.
     unawaited(
       Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => const AnalyzingScreen()),
+        MaterialPageRoute<void>(builder: (_) => AnalyzingScreen(youtubeUrl: url)),
       ),
     );
 
@@ -244,13 +244,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     if (_inputError != null) ...[
                       Text(_inputError!, style: const TextStyle(color: AppColors.danger, fontSize: 12)),
-                      const SizedBox(height: AppSpacing.sm),
-                    ],
-                    if (videoProvider.state == ViewState.error) ...[
-                      ErrorView(
-                        message: videoProvider.errorMessage ?? '분석에 실패했습니다.',
-                        onRetry: () => _onAnalyzePressed(videoProvider),
-                      ),
                       const SizedBox(height: AppSpacing.sm),
                     ],
                     Container(

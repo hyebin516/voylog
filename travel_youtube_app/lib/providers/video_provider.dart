@@ -158,6 +158,16 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Clears a failed analysis without discarding the video already on the
+  /// 분석 tab: cancelling one failure should not erase the last result the
+  /// user still has open there.
+  void dismissAnalysisError() {
+    if (_state != ViewState.error) return;
+    _state = _currentVideo != null ? ViewState.success : ViewState.idle;
+    _errorMessage = null;
+    notifyListeners();
+  }
+
   void reset() {
     _enrichmentTimer?.cancel();
     _state = ViewState.idle;
