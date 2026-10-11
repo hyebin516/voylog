@@ -8,7 +8,8 @@ from app.schemas.response_schema import GeocodedPlace, PlaceExtractionResponse, 
 from app.prompts import place_match_prompt
 from app.services import frame_extraction_service, llm_service
 from app.services.geocoding_service import search_places
-from app.utils.korean_similarity import names_plausibly_same, similar_written_words
+from app.utils.korean_similarity import sound_similarity, names_plausibly_same, similar_written_words
+from app.utils.place_similarity import normalized_name
 from app.utils.logger import logger
 
 # How many map-search candidates to put in front of the LLM. Enough to
@@ -170,6 +171,107 @@ def _display_name(candidate, geo: dict | None, transcript_auto_generated: bool) 
     return candidate.name
 
 
+# Two mentions this far apart in the video are two visits, not one name heard
+# twice. Captions re-spell a name within a sentence, not minutes later.
+_SAME_MOMENT_SEC = 20
+
+# Jamo-level agreement above this means the same name misheard: "경포
+# 해수역장" vs "경포 해수욕장" differs by one letter out of eleven.
+_SAME_NAME_SOUND = 0.75
+
+
+def _merge_mishearings(
+    places: list[GeocodedPlace], transcript_auto_generated: bool = False
+) -> list[GeocodedPlace]:
+    """Collapses entries that are one place the captions spelled two ways.
+
+    Matched on *sound*, not on category: an auto-caption typo often lands the
+    two copies in different categories ("경포 해수역장" came back as `beach`
+    and "경포 해수욕장" as `other`), so requiring the categories to agree --
+    which is what the enrichment merge does -- keeps both.
+
+    The copy that was located wins, since a geocoded name is one Kakao
+    recognised; between two located or two unlocated copies the first stays.
+    Everything it knows that the winner does not is carried over, so merging
+    never loses an address, a category or a comment.
+    """
+    kept: list[GeocodedPlace] = []
+    for place in places:
+        match_index = next(
+            (
+                i
+                for i, other in enumerate(kept)
+                if _same_mention(place, other, transcript_auto_generated)
+            ),
+            None,
+        )
+        if match_index is None:
+            kept.append(place)
+            continue
+        kept[match_index] = _better_of(kept[match_index], place)
+    return kept
+
+
+def _same_mention(
+    a: GeocodedPlace, b: GeocodedPlace, transcript_auto_generated: bool
+) -> bool:
+    if normalized_name(a.name) == normalized_name(b.name):
+        # The same name twice is one place only if it is also the same moment;
+        # a second visit later in the video is its own card with its own
+        # timestamp for the user to jump to.
+        return _same_moment(a, b)
+    if not _sound_alike_is_possible(a, b, transcript_auto_generated):
+        return False
+    return _same_moment(a, b) and sound_similarity(a.name, b.name) >= _SAME_NAME_SOUND
+
+
+def _sound_alike_is_possible(
+    a: GeocodedPlace, b: GeocodedPlace, transcript_auto_generated: bool
+) -> bool:
+    """Whether two *different* names can be one name heard wrong.
+
+    Only speech recognition mishears, so this needs auto-generated captions
+    and two transcript-derived places. Without the guard, names that differ
+    by a single letter for an ordinary reason -- a numbered branch, two
+    neighbouring shops -- would be merged into one place on sound alone.
+    """
+    if not transcript_auto_generated:
+        return False
+    return a.source == "transcript" and b.source == "transcript"
+
+
+def _same_moment(a: GeocodedPlace, b: GeocodedPlace) -> bool:
+    if a.timestampSec is None or b.timestampSec is None:
+        # Metadata-derived places have no position in the video to compare,
+        # so an identical name is all there is to go on.
+        return normalized_name(a.name) == normalized_name(b.name)
+    return abs(a.timestampSec - b.timestampSec) <= _SAME_MOMENT_SEC
+
+
+def _better_of(first: GeocodedPlace, second: GeocodedPlace) -> GeocodedPlace:
+    winner, loser = (first, second)
+    if winner.latitude is None and loser.latitude is not None:
+        winner, loser = (loser, winner)
+
+    # Fill the winner's gaps from the one being dropped.
+    return winner.model_copy(
+        update={
+            "latitude": winner.latitude if winner.latitude is not None else loser.latitude,
+            "longitude": winner.longitude if winner.longitude is not None else loser.longitude,
+            "address": winner.address or loser.address,
+            "category": winner.category or loser.category,
+            "businessHours": winner.businessHours or loser.businessHours,
+            "tags": winner.tags or loser.tags,
+            "mentionNote": winner.mentionNote or loser.mentionNote,
+            # The earlier mention is where the place first appears.
+            "timestampSec": min(
+                [t for t in (winner.timestampSec, loser.timestampSec) if t is not None],
+                default=None,
+            ),
+        }
+    )
+
+
 async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResponse:
     user_prompt = build_user_prompt(
         title=request.video.title,
@@ -250,4 +352,6 @@ async def extract_places(request: PlaceExtractionRequest) -> PlaceExtractionResp
             )
         )
 
-    return PlaceExtractionResponse(places=places)
+    return PlaceExtractionResponse(
+        places=_merge_mishearings(places, request.transcriptAutoGenerated)
+    )

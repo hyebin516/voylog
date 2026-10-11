@@ -3,7 +3,7 @@ import asyncio
 import pytest
 
 from app.schemas.request_schema import PlaceExtractionRequest, TranscriptSegment, VideoMeta
-from app.schemas.response_schema import LlmPlaceExtractionResult, PlaceMatchResult, PlaceCandidate, PlaceTag
+from app.schemas.response_schema import GeocodedPlace, LlmPlaceExtractionResult, PlaceMatchResult, PlaceCandidate, PlaceTag
 from app.services import place_extraction_service
 
 
@@ -683,3 +683,157 @@ def test_bare_tag_codes_from_the_llm_are_kept_instead_of_failing_the_extraction(
     )
 
     assert [(t.code, t.confidence) for t in result.places[0].tags] == [("베이커리 카페", 0.6), ("소금빵", 0.8)]
+
+
+# --- Collapsing one place the auto-captions spelled two ways -------------
+# Real case from https://youtu.be/8tIGm8xndws: YouTube's speech recognition
+# wrote "경포 해수역장" and "경포 해수욕장" one second apart, and the
+# extractor returned both -- one located, one not.
+
+
+def make_place(name, **overrides):
+    defaults = dict(name=name, source="transcript", confidence=0.8)
+    defaults.update(overrides)
+    return GeocodedPlace(**defaults)
+
+
+def test_merge_keeps_the_located_copy_of_a_misheard_name():
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수역장", timestampSec=433, category="beach"),
+            make_place("경포 해수욕장", timestampSec=434, latitude=37.8, longitude=128.9, category="other"),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert [p.name for p in merged] == ["경포 해수욕장"]
+    assert merged[0].latitude == 37.8
+
+
+def test_merge_keeps_the_located_copy_even_when_it_came_first():
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수욕장", timestampSec=433, latitude=37.8, longitude=128.9),
+            make_place("경포 해수역장", timestampSec=434),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert [p.name for p in merged] == ["경포 해수욕장"]
+    assert merged[0].latitude == 37.8
+
+
+def test_merge_ignores_category_disagreement():
+    """The two copies of a misheard name usually land in different
+    categories, which is exactly why the enrichment merge (which requires
+    them to agree) left both in."""
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수역장", timestampSec=433, category="beach"),
+            make_place("경포 해수욕장", timestampSec=433, category="other"),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert len(merged) == 1
+
+
+def test_merge_fills_the_survivors_gaps_from_the_dropped_copy():
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("소배", timestampSec=100, category="restaurant", mentionNote="국물이 진했다"),
+            make_place("소베", timestampSec=100, latitude=37.5, longitude=127.0, address="서울시 중구"),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert len(merged) == 1
+    survivor = merged[0]
+    assert survivor.name == "소베"  # the located copy
+    assert survivor.address == "서울시 중구"
+    assert survivor.category == "restaurant"  # carried over from the dropped copy
+    assert survivor.mentionNote == "국물이 진했다"
+
+
+def test_merge_keeps_the_earlier_timestamp():
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수욕장", timestampSec=433, latitude=37.8, longitude=128.9),
+            make_place("경포 해수역장", timestampSec=440),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert merged[0].timestampSec == 433
+
+
+def test_merge_leaves_the_same_name_mentioned_much_later_alone():
+    """Two visits to one place are two cards with two timestamps, and the
+    user taps each to jump to that part of the video."""
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수욕장", timestampSec=100, latitude=37.8, longitude=128.9),
+            make_place("경포 해수욕장", timestampSec=600, latitude=37.8, longitude=128.9),
+        ]
+    )
+
+    assert len(merged) == 2
+
+
+def test_merge_leaves_different_places_at_the_same_moment_alone():
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("교동짬뽕", timestampSec=200, latitude=37.75, longitude=128.89),
+            make_place("안목해변 커피거리", timestampSec=205, latitude=37.77, longitude=128.94),
+        ]
+    )
+
+    assert len(merged) == 2
+
+
+def test_merge_without_timestamps_needs_an_identical_name():
+    """A metadata-only place has no position in the video to compare, so
+    sound alone is not enough to call two names one place."""
+    merged = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수역장", source="description"),
+            make_place("경포 해수욕장", source="hashtags", latitude=37.8, longitude=128.9),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert len(merged) == 2
+
+    same = place_extraction_service._merge_mishearings(
+        [
+            make_place("경포 해수욕장", source="description"),
+            make_place("경포해수욕장", source="hashtags", latitude=37.8, longitude=128.9),
+        ],
+        transcript_auto_generated=True,
+    )
+
+    assert len(same) == 1
+
+
+def test_merge_leaves_similar_names_alone_when_a_human_wrote_the_captions():
+    """Only speech recognition mishears. In a human-written caption two names
+    a letter apart are two places -- a numbered branch, two shops in a row."""
+    places = [
+        make_place("장소1", timestampSec=0),
+        make_place("장소2", timestampSec=0, latitude=37.5, longitude=127.0),
+    ]
+
+    assert len(place_extraction_service._merge_mishearings(places)) == 2
+
+
+def test_merge_leaves_similar_names_alone_across_different_sources():
+    """A name read off the screen was not misheard, so it is not a respelling
+    of what the captions said."""
+    places = [
+        make_place("경포 해수역장", timestampSec=433),
+        make_place("경포 해수욕장", timestampSec=433, source="on_screen_text", latitude=37.8, longitude=128.9),
+    ]
+
+    assert (
+        len(place_extraction_service._merge_mishearings(places, transcript_auto_generated=True)) == 2
+    )
