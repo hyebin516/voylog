@@ -1,0 +1,72 @@
+# The whole stack, for running it the way a server will run it rather than
+# as four processes started by hand. The app still reaches the backend over
+# `adb reverse tcp:4000`, exactly as it does without Compose.
+#
+#   docker compose up --build
+#
+# Secrets come from backend/.env and ai-worker/.env, which are gitignored.
+# Copy the .env.example next to each one first.
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: travel_youtube
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Applied in filename order the first time the volume is created, so
+      # a fresh stack comes up with the schema already in place.
+      - ./database/migrations:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d travel_youtube"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ai-worker:
+    build: ./ai-worker
+    env_file: ./ai-worker/.env
+    # Deliberately no `ports:`. The worker is reachable from the backend
+    # container and from nowhere else -- it has no user accounts and spends
+    # money on every call. Publish a port only if you also set
+    # AI_WORKER_TOKEN on both sides.
+    expose:
+      - "8000"
+
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    environment:
+      # Override whatever the local .env says: inside Compose these are
+      # service names, not localhost.
+      DATABASE_URL: postgres://postgres:postgres@db:5432/travel_youtube
+      REDIS_URL: redis://redis:6379
+      AI_WORKER_URL: http://ai-worker:8000
+      NODE_ENV: production
+    ports:
+      - "4000:4000"
+    volumes:
+      # Profile photos survive a rebuild; without this they vanish with the
+      # container, and every avatar 404s.
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-worker:
+        condition: service_started
+
+volumes:
+  db-data:
+  uploads:
