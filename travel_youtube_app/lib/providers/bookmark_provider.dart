@@ -45,24 +45,50 @@ class BookmarkProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> toggleBookmark(String placeId) async {
+  /// The bookmark row for [placeId], which the folder sheet needs to address
+  /// it. Null when the place is not bookmarked.
+  String? bookmarkIdFor(String placeId) {
     final matches = _bookmarks.where((b) => b.placeId == placeId);
-    final existing = matches.isEmpty ? null : matches.first;
+    return matches.isEmpty ? null : matches.first.bookmarkId;
+  }
+
+  Future<void> addBookmark(String placeId) async {
     _errorMessage = null;
 
     try {
-      if (existing != null) {
-        await _repository.removeBookmark(existing.bookmarkId);
-        _bookmarks = _bookmarks.where((b) => b.placeId != placeId).toList();
-      } else {
-        await _repository.addBookmark(placeId);
-        await loadBookmarks();
-        return;
-      }
+      await _repository.addBookmark(placeId);
+      // Refetched rather than appended locally: the sheet that opens next
+      // needs the server's bookmarkId.
+      await loadBookmarks();
+      return;
     } on ApiException catch (e) {
       _errorMessage = e.friendlyMessage;
     }
 
     notifyListeners();
+  }
+
+  /// Drops the bookmark itself, not just its folder membership. This is the
+  /// only way back out for a place saved from a card, so it lives in the
+  /// folder sheet rather than behind a second tap on the bookmark icon --
+  /// that tap now opens the sheet, as the design has it.
+  Future<void> removeBookmark(String placeId) async {
+    final existing = bookmarkIdFor(placeId);
+    if (existing == null) return;
+    _errorMessage = null;
+
+    try {
+      await _repository.removeBookmark(existing);
+      _bookmarks = _bookmarks.where((b) => b.placeId != placeId).toList();
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+    }
+
+    notifyListeners();
+  }
+
+  Future<void> toggleBookmark(String placeId) async {
+    if (bookmarkIdFor(placeId) != null) return removeBookmark(placeId);
+    return addBookmark(placeId);
   }
 }

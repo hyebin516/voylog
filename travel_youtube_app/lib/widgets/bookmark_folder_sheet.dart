@@ -3,25 +3,35 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../providers/bookmark_folder_provider.dart';
+import '../providers/bookmark_provider.dart';
 import '../repositories/bookmark_folder_repository.dart';
 import 'dashed_border_container.dart';
 import 'nav_icons.dart';
 
 /// Shows the design's "북마크에 저장" bottom sheet: pick which folders the
 /// given [bookmarkId] belongs to. Each row toggle saves immediately.
-Future<void> showBookmarkFolderSheet(BuildContext context, {required String bookmarkId}) {
+Future<void> showBookmarkFolderSheet(
+  BuildContext context, {
+  required String bookmarkId,
+  String? placeId,
+}) {
   return showModalBottomSheet(
     context: context,
     backgroundColor: Colors.transparent,
     isScrollControlled: true,
-    builder: (_) => BookmarkFolderSheet(bookmarkId: bookmarkId),
+    builder: (_) => BookmarkFolderSheet(bookmarkId: bookmarkId, placeId: placeId),
   );
 }
 
 class BookmarkFolderSheet extends StatefulWidget {
-  const BookmarkFolderSheet({super.key, required this.bookmarkId});
+  const BookmarkFolderSheet({super.key, required this.bookmarkId, this.placeId});
 
   final String bookmarkId;
+
+  /// The place this bookmark points at. Given, the sheet can unsave it
+  /// outright -- the only way back out, since the bookmark icon now opens
+  /// this sheet instead of toggling. Omitted, that action is hidden.
+  final String? placeId;
 
   @override
   State<BookmarkFolderSheet> createState() => _BookmarkFolderSheetState();
@@ -33,6 +43,7 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
 
   bool _loadingMembership = true;
   bool _creatingFolder = false;
+  bool _removingBookmark = false;
   bool _showNewFolderField = false;
   final Set<String> _memberFolderIds = {};
   final Map<String, int> _displayCounts = {};
@@ -124,6 +135,27 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
       _displayCounts[folder.folderId] = 0;
     });
     await _toggleFolder(folder.folderId);
+  }
+
+  Future<void> _removeBookmark() async {
+    final placeId = widget.placeId;
+    if (placeId == null) return;
+
+    setState(() => _removingBookmark = true);
+    final bookmarkProvider = context.read<BookmarkProvider>();
+    await bookmarkProvider.removeBookmark(placeId);
+    if (!mounted) return;
+
+    final error = bookmarkProvider.errorMessage;
+    if (error != null) {
+      bookmarkProvider.clearError();
+      setState(() => _removingBookmark = false);
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error)));
+      return;
+    }
+
+    // The sheet is about a bookmark that no longer exists, so it goes too.
+    Navigator.of(context).maybePop();
   }
 
   @override
@@ -276,23 +308,41 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
                         ),
             ),
             const SizedBox(height: 20),
-            Align(
-              alignment: Alignment.centerRight,
-              child: InkWell(
-                onTap: () => Navigator.of(context).maybePop(),
-                borderRadius: BorderRadius.circular(999),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
+            Row(
+              children: [
+                if (widget.placeId != null)
+                  InkWell(
+                    onTap: _removingBookmark ? null : _removeBookmark,
                     borderRadius: BorderRadius.circular(999),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 14),
+                      child: Text(
+                        _removingBookmark ? '해제 중…' : '북마크 해제',
+                        style: const TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.danger,
+                        ),
+                      ),
+                    ),
                   ),
-                  padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-                  child: const Text(
-                    '저장하기',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                const Spacer(),
+                InkWell(
+                  onTap: () => Navigator.of(context).maybePop(),
+                  borderRadius: BorderRadius.circular(999),
+                  child: Ink(
+                    decoration: BoxDecoration(
+                      color: AppColors.primary,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                    child: const Text(
+                      '저장하기',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ],
         ),

@@ -3,7 +3,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/bookmark_model.dart';
+import 'package:travel_youtube_app/models/bookmark_folder_model.dart';
+import 'package:travel_youtube_app/providers/bookmark_folder_provider.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
+import 'package:travel_youtube_app/repositories/bookmark_folder_repository.dart';
 import 'package:travel_youtube_app/repositories/bookmark_repository.dart';
 import 'package:travel_youtube_app/utils/place_id.dart';
 import 'package:travel_youtube_app/widgets/bookmark_button.dart';
@@ -36,10 +39,25 @@ class FakeBookmarkRepository extends BookmarkRepository {
     stored.add(bookmark);
     return bookmark.bookmarkId;
   }
+
+  @override
+  Future<void> removeBookmark(String bookmarkId) async {
+    stored.removeWhere((b) => b.bookmarkId == bookmarkId);
+  }
+}
+
+class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
+  @override
+  Future<List<BookmarkFolderModel>> listFolders() async => [];
 }
 
 Widget _wrap(BookmarkProvider provider, String placeId) => MultiProvider(
-      providers: [ChangeNotifierProvider.value(value: provider)],
+      providers: [
+        ChangeNotifierProvider.value(value: provider),
+        ChangeNotifierProvider(
+          create: (_) => BookmarkFolderProvider(repository: FakeBookmarkFolderRepository()),
+        ),
+      ],
       child: MaterialApp(
         home: Scaffold(body: BookmarkButton(placeId: placeId)),
       ),
@@ -92,5 +110,51 @@ void main() {
     await tester.pump();
 
     expect(find.byType(SnackBar), findsOneWidget);
+  });
+
+  testWidgets('saving a place opens the folder sheet', (tester) async {
+    final provider = BookmarkProvider(repository: FakeBookmarkRepository());
+
+    await tester.pumpWidget(_wrap(provider, _realPlaceId));
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+
+    expect(find.text('북마크에 저장'), findsOneWidget);
+  });
+
+  testWidgets('tapping a place already saved opens the sheet rather than unsaving it', (tester) async {
+    // The design's icon is "open the save sheet", not a toggle. A second tap
+    // used to remove the bookmark on the spot with nothing shown, which left
+    // no way back to its folders.
+    final repository = FakeBookmarkRepository();
+    final provider = BookmarkProvider(repository: repository);
+
+    await tester.pumpWidget(_wrap(provider, _realPlaceId));
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('저장하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.bookmark_rounded), findsOneWidget);
+
+    await tester.tap(find.byIcon(Icons.bookmark_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('북마크에 저장'), findsOneWidget);
+    expect(provider.isBookmarked(_realPlaceId), isTrue);
+  });
+
+  testWidgets('the sheet can unsave the bookmark outright', (tester) async {
+    final provider = BookmarkProvider(repository: FakeBookmarkRepository());
+
+    await tester.pumpWidget(_wrap(provider, _realPlaceId));
+    await tester.tap(find.byType(IconButton));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('북마크 해제'));
+    await tester.pumpAndSettle();
+
+    expect(provider.isBookmarked(_realPlaceId), isFalse);
+    expect(find.text('북마크에 저장'), findsNothing);
+    expect(find.byIcon(Icons.bookmark_border_rounded), findsOneWidget);
   });
 }

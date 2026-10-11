@@ -32,26 +32,32 @@ class BookmarkButton extends StatelessWidget {
 
         return IconButton(
           onPressed: () async {
-            final wasBookmarked = bookmarked;
-            await bookmarkProvider.toggleBookmark(placeId);
-            if (!context.mounted) return;
+            // The design's bookmark icon opens the save sheet every time, so
+            // a place that is already saved can still have its folders
+            // changed -- and the sheet is where it can be unsaved. A second
+            // tap used to remove it on the spot, silently, which left no way
+            // to reach the folders again.
+            if (!bookmarked) {
+              await bookmarkProvider.addBookmark(placeId);
+              if (!context.mounted) return;
 
-            // Whatever went wrong, say so: a bookmark that quietly does
-            // nothing reads as a broken button.
-            final error = bookmarkProvider.errorMessage;
-            if (error != null) {
-              bookmarkProvider.clearError();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(SnackBar(content: Text(error)));
-              return;
+              // Whatever went wrong, say so: a bookmark that quietly does
+              // nothing reads as a broken button.
+              final error = bookmarkProvider.errorMessage;
+              if (error != null) {
+                bookmarkProvider.clearError();
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(error)));
+                return;
+              }
+
+              onBookmarked?.call();
             }
-            if (wasBookmarked) return;
 
-            onBookmarked?.call();
-            final matches = bookmarkProvider.bookmarks.where((b) => b.placeId == placeId);
-            if (matches.isEmpty) return;
-            await showBookmarkFolderSheet(context, bookmarkId: matches.first.bookmarkId);
+            final bookmarkId = bookmarkProvider.bookmarkIdFor(placeId);
+            if (bookmarkId == null || !context.mounted) return;
+            await showBookmarkFolderSheet(context, bookmarkId: bookmarkId, placeId: placeId);
           },
           icon: Icon(
             bookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
