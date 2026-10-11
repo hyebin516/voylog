@@ -27,6 +27,10 @@ const List<String> _steps = [
 /// it always has. Holding the user here for the enrichment would be a change
 /// to the flow, not to its looks.
 ///
+/// Pops `true` once the analysis succeeds and `false` if the user cancels a
+/// failure, so the caller can hand off the result the same way whether it
+/// came from the first attempt or from 다시 시도.
+///
 /// Closes itself once the analysis succeeds. A failure keeps this screen up
 /// and turns it into the error state: the message, 다시 시도 and 취소. The
 /// home screen used to show that error inline, under the input, where it
@@ -106,7 +110,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
     // abandoned attempt as the current state of the 분석 tab.
     context.read<VideoProvider>().dismissAnalysisError();
     final navigator = Navigator.of(context);
-    if (navigator.canPop()) navigator.pop();
+    if (navigator.canPop()) navigator.pop(false);
   }
 
   @override
@@ -133,7 +137,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
         // back gesture can't abandon a running analysis, and that refusal
         // would otherwise block this screen from closing itself too.
         final navigator = Navigator.of(context);
-        if (navigator.canPop()) navigator.pop();
+        if (navigator.canPop()) navigator.pop(true);
       });
     }
 

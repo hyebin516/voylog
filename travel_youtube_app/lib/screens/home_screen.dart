@@ -20,7 +20,6 @@ import '../repositories/trip_repository.dart';
 import '../routes/app_routes.dart';
 import 'analyzing_screen.dart';
 import 'place_detail_screen.dart';
-import '../utils/view_state.dart';
 import '../widgets/app_card.dart';
 import '../widgets/bookmark_button.dart';
 import '../widgets/dashed_border_container.dart';
@@ -95,18 +94,19 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _inputError = null);
 
     // The waiting screen covers the first pass and closes itself once the
-    // analysis succeeds, so nothing here has to pop it. A failure stays on
-    // that screen, which offers 다시 시도 and 취소.
-    unawaited(
-      Navigator.of(context).push(
-        MaterialPageRoute<void>(builder: (_) => AnalyzingScreen(youtubeUrl: url)),
-      ),
+    // analysis succeeds. A failure stays on that screen, which offers
+    // 다시 시도 and 취소 -- and 다시 시도 runs the analysis from there, so the
+    // outcome is awaited from the route rather than from this call. Awaiting
+    // the call instead would miss a success reached by a retry, leaving the
+    // user on 홈 with the URL still in the box.
+    unawaited(videoProvider.analyze(url));
+
+    final analysed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(builder: (_) => AnalyzingScreen(youtubeUrl: url)),
     );
 
-    await videoProvider.analyze(url);
-
     if (!mounted) return;
-    if (videoProvider.state == ViewState.success) {
+    if (analysed ?? false) {
       // The result belongs to the 분석 tab, not on top of 홈: the user
       // asked for 홈 to stay free for the next video while the analysis
       // they just ran keeps its own place to come back to.

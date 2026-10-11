@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:travel_youtube_app/models/shared_route_model.dart';
 import 'package:travel_youtube_app/models/similar_taste_recommendation_model.dart';
+import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/models/video_search_result_model.dart';
 import 'package:travel_youtube_app/providers/app_shell_provider.dart';
@@ -22,9 +23,17 @@ class FakeVideoRepository extends VideoRepository {
   String? lastUrl;
   String? lastHashtag;
 
+  /// Number of leading calls that fail, so a retry can be made to succeed.
+  int failuresBeforeSuccess = 0;
+  int analyzeCalls = 0;
+
   @override
   Future<VideoModel> analyze(String youtubeUrl) async {
     lastUrl = youtubeUrl;
+    analyzeCalls++;
+    if (analyzeCalls <= failuresBeforeSuccess) {
+      throw const ApiException(code: 'AI_TIMEOUT', message: 'timed out');
+    }
     return const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 't', isCached: false, places: []);
   }
 
@@ -103,6 +112,54 @@ void main() {
     expect(shell.tabIndex, AppShellProvider.analysisTab);
     expect(find.text('route:${AppRoutes.videoAnalysis}'), findsNothing);
     expect(tester.widget<TextField>(find.byKey(const Key('urlField'))).controller!.text, isEmpty);
+  });
+
+  testWidgets('a success reached by 다시 시도 is handed off like any other', (tester) async {
+    // The hand-off used to hang off the analyze() call this screen awaited.
+    // That call had already finished -- failing -- by the time 다시 시도 ran
+    // its own, so a retried success left the user on 홈 with the URL still in
+    // the box and no hint that the analysis had worked.
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository()..failuresBeforeSuccess = 1;
+    final shell = AppShellProvider();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository, shell: shell));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('urlField')), 'https://youtu.be/v1');
+    await tester.tap(find.byKey(const Key('analyzeButton')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('분석하지 못했어요'), findsOneWidget);
+    expect(shell.tabIndex, isNot(AppShellProvider.analysisTab));
+
+    await tester.tap(find.text('다시 시도'));
+    await tester.pumpAndSettle();
+
+    expect(videoRepository.analyzeCalls, 2);
+    expect(shell.tabIndex, AppShellProvider.analysisTab);
+    expect(tester.widget<TextField>(find.byKey(const Key('urlField'))).controller!.text, isEmpty);
+  });
+
+  testWidgets('cancelling a failed analysis leaves 홈 as it was', (tester) async {
+    usePhoneViewport(tester);
+    final videoRepository = FakeVideoRepository()..failuresBeforeSuccess = 99;
+    final shell = AppShellProvider();
+    await tester.pumpWidget(_wrap(videoRepository: videoRepository, shell: shell));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('urlField')), 'https://youtu.be/v1');
+    await tester.tap(find.byKey(const Key('analyzeButton')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('취소'));
+    await tester.pumpAndSettle();
+
+    expect(shell.tabIndex, isNot(AppShellProvider.analysisTab));
+    // The URL stays put, so the user can fix a typo instead of retyping it.
+    expect(
+      tester.widget<TextField>(find.byKey(const Key('urlField'))).controller!.text,
+      'https://youtu.be/v1',
+    );
   });
 
   testWidgets('tapping a hashtag chip searches for it and opens the results', (tester) async {
