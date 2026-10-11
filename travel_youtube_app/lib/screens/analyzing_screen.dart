@@ -222,60 +222,67 @@ class _StepRow extends StatelessWidget {
   }
 }
 
-/// The handoff's mark: a white map pin with a play triangle in it, standing
-/// on two elliptical rings.
+/// The handoff's mark, traced from the prototype: a white pin standing on
+/// two elliptical rings.
+///
+/// The 130x130 box holds an 80x104 pin at the top, centred, and a 120x34
+/// pair of ellipses at the bottom (`left:5 bottom:0`).
 class _AnalyzingMarkPainter extends CustomPainter {
   const _AnalyzingMarkPainter();
 
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.width / 130;
-    final centerX = size.width / 2;
 
-    // Rings first, so the pin stands on top of them.
-    final ringRect = Rect.fromCenter(
-      center: Offset(centerX, 108 * scale),
-      width: 112 * scale,
-      height: 30 * scale,
+    // Rings: cx 60 cy 17, rx 58/ry 15 and rx 40/ry 10, offset by (5, 96).
+    Offset ring(double x, double y) => Offset((5 + x) * scale, (96 + y) * scale);
+    final ringPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2 * scale;
+    canvas.drawOval(
+      Rect.fromCenter(center: ring(60, 17), width: 116 * scale, height: 30 * scale),
+      ringPaint..color = Colors.white.withValues(alpha: 0.18),
     );
     canvas.drawOval(
-      ringRect,
+      Rect.fromCenter(center: ring(60, 17), width: 80 * scale, height: 20 * scale),
       Paint()
-        ..color = Colors.white.withValues(alpha: 0.18)
         ..style = PaintingStyle.stroke
-        ..strokeWidth = 2 * scale,
-    );
-    canvas.drawOval(
-      ringRect.deflate(20 * scale),
-      Paint()
-        ..color = Colors.white.withValues(alpha: 0.55)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2 * scale,
+        ..strokeWidth = 2 * scale
+        ..color = Colors.white.withValues(alpha: 0.55),
     );
 
-    // Pin: a circle head tapering to a point, 80x104 inside the 130 box.
-    final headCenter = Offset(centerX, 44 * scale);
-    final headRadius = 40 * scale;
-    final tip = Offset(centerX, 110 * scale);
-    final white = Paint()..color = Colors.white;
+    // Pin: the 80x104 svg sits at the top, horizontally centred.
+    Offset pin(double x, double y) => Offset((25 + x) * scale, y * scale);
 
-    final pin = Path()..addOval(Rect.fromCircle(center: headCenter, radius: headRadius));
-    final shoulderDy = headCenter.dy + headRadius * 0.62;
-    final shoulderDx = headRadius * 0.79;
-    pin
-      ..moveTo(centerX - shoulderDx, shoulderDy)
-      ..quadraticBezierTo(centerX - shoulderDx * 0.5, tip.dy - 14 * scale, tip.dx, tip.dy)
-      ..quadraticBezierTo(centerX + shoulderDx * 0.5, tip.dy - 14 * scale, centerX + shoulderDx, shoulderDy)
+    // "M40 102 C40 102 4 62 4 38 A36 36 0 0 1 76 38 C76 62 40 102 40 102Z"
+    final body = Path()
+      ..moveTo(pin(40, 102).dx, pin(40, 102).dy)
+      ..cubicTo(pin(40, 102).dx, pin(40, 102).dy, pin(4, 62).dx, pin(4, 62).dy, pin(4, 38).dx, pin(4, 38).dy)
+      ..arcToPoint(
+        pin(76, 38),
+        radius: Radius.circular(36 * scale),
+        clockwise: true,
+      )
+      ..cubicTo(pin(76, 62).dx, pin(76, 62).dy, pin(40, 102).dx, pin(40, 102).dy, pin(40, 102).dx, pin(40, 102).dy)
       ..close();
-    canvas.drawPath(pin, white);
+    canvas.drawPath(body, Paint()..color = Colors.white);
 
-    // Play triangle, optically centred in the head.
+    // "M32 24 L56 38 L32 52 Z", filled and stroked so the corners round off.
     final play = Path()
-      ..moveTo(centerX - 11 * scale, headCenter.dy - 14 * scale)
-      ..lineTo(centerX + 15 * scale, headCenter.dy)
-      ..lineTo(centerX - 11 * scale, headCenter.dy + 14 * scale)
+      ..moveTo(pin(32, 24).dx, pin(32, 24).dy)
+      ..lineTo(pin(56, 38).dx, pin(56, 38).dy)
+      ..lineTo(pin(32, 52).dx, pin(32, 52).dy)
       ..close();
-    canvas.drawPath(play, Paint()..color = const Color(0xFF0F7A84));
+    const playColor = Color(0xFF0F7A84);
+    canvas.drawPath(play, Paint()..color = playColor);
+    canvas.drawPath(
+      play,
+      Paint()
+        ..color = playColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3 * scale
+        ..strokeJoin = StrokeJoin.round,
+    );
   }
 
   @override

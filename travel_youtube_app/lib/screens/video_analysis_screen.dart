@@ -291,10 +291,10 @@ class _PlaceExpandableCardState extends State<_PlaceExpandableCard> {
     final place = widget.place;
 
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.surfaceTint1,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(AppRadius.card),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -347,8 +347,8 @@ class _PlaceExpandableCardState extends State<_PlaceExpandableCard> {
                               vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: AppColors.surfaceTint3Alt,
-                              borderRadius: BorderRadius.circular(999),
+                              color: AppColors.surfaceTint3,
+                              borderRadius: BorderRadius.circular(AppRadius.pill),
                             ),
                             child: Text(
                               formatTimestamp(place.timestampSec!),
@@ -432,7 +432,7 @@ class _PlaceExpandableCardState extends State<_PlaceExpandableCard> {
                           decoration: BoxDecoration(
                             color: Colors.white,
                             border: Border.all(
-                              color: AppColors.divider,
+                              color: AppColors.dividerStrong,
                               width: 1.5,
                             ),
                             borderRadius: BorderRadius.circular(16),
@@ -477,20 +477,25 @@ class _PlaceExpandableCardState extends State<_PlaceExpandableCard> {
               ),
             ),
           ),
-          Column(
+          // 34px white circles with `sh-icon-btn`, side by side with a 6
+          // gap -- the handoff's own shape for these two.
+          Row(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              IconButton(
-                onPressed: widget.onMapTap,
-                icon: MapPinGlyphIcon(
-                  size: 20,
+              _RoundCardButton(
+                tooltip: '지도 보기',
+                onTap: widget.onMapTap,
+                child: MapPinGlyphIcon(
+                  size: 15,
                   color: widget.onMapTap != null
                       ? AppColors.textTertiary
                       : AppColors.textMuted2,
                 ),
-                tooltip: '지도 보기',
-                visualDensity: VisualDensity.compact,
               ),
-              BookmarkButton(placeId: place.placeId),
+              const SizedBox(width: 6),
+              _RoundIconChrome(
+                child: BookmarkButton(placeId: place.placeId, compact: true),
+              ),
             ],
           ),
         ],
@@ -581,6 +586,55 @@ class _EnrichmentNotice extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// A 34px white circle holding one small control, as the handoff draws the
+/// place card's map and bookmark buttons.
+/// The design's 34px white circle behind a place card's trailing icons.
+class _RoundIconChrome extends StatelessWidget {
+  const _RoundIconChrome({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 34,
+      height: 34,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        shape: BoxShape.circle,
+        boxShadow: AppColors.floatingButtonShadow(),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// A circle this card drives itself. Built on [IconButton] rather than a bare
+/// gesture detector so a null [onTap] is disabled *and still labelled* -- the
+/// map button of a place with no coordinates has to say what it would have
+/// done, not just go grey.
+class _RoundCardButton extends StatelessWidget {
+  const _RoundCardButton({required this.tooltip, required this.child, required this.onTap});
+
+  final String tooltip;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return _RoundIconChrome(
+      child: IconButton(
+        onPressed: onTap,
+        tooltip: tooltip,
+        icon: child,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 34, height: 34),
       ),
     );
   }
