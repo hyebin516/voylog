@@ -143,9 +143,8 @@ curl https://<백엔드>/health        # {"status":"ok"}
       이 상태로는 Play Store에 올릴 수 없다. 키스토어를 만들고
       `key.properties`로 분리한 뒤 **절대 잃어버리면 안 된다** — 잃으면
       같은 앱으로 업데이트할 수 없다.
-- [ ] **`usesCleartextTraffic="true"` 제거** —
-      `android/app/src/main/AndroidManifest.xml`. localhost 개발용이고,
-      HTTPS로 넘어가면 꺼야 한다.
+- [ ] **`usesCleartextTraffic="true"` 제거** — 아래 "7. 해결 못 한 문제"
+      참고. 2026-10-12에 시도했다가 지도가 깨져서 되돌렸다.
 - [ ] `flutter build appbundle --release`로 빌드가 통과하는지 확인
 
 ### 계정·심사 쪽 — 사람이 해야 하는 것
@@ -175,3 +174,58 @@ Apple Developer Program(연 $99)과 Mac이 필요하다. CI에서
   띄우면 인스턴스마다 따로 센다. 그때는 Redis 저장소로 바꾼다.
 - **월 1회 공공데이터 갱신이 인스턴스마다 돈다.** 여러 개 띄우면 하나만
   남기고 `PUBLIC_DATA_REFRESH_ENABLED=false`로 끈다.
+
+---
+
+## 7. 해결 못 한 문제 — 평문(HTTP) 통신 제한
+
+앱은 지금 `android:usesCleartextTraffic="true"`(안드로이드)와
+`NSAllowsArbitraryLoads`(iOS)로 **아무 주소로나 평문 HTTP를 허용**한다.
+개발용으로 들어간 설정이고 스토어 출시 전에 좁혀야 하는데,
+**2026-10-12에 시도했다가 지도가 빈 화면이 되어 되돌렸다.**
+
+### 확인된 사실
+
+실기기(SM-A750N)에서, **네트워크 정상 + 지도 첫 로딩 버그 수정 적용 +
+감시 타이머 재시도 소진(45초 대기)** 조건으로 확인했다.
+
+| 설정 | 지도 |
+| --- | --- |
+| `usesCleartextTraffic="true"` (현재) | **정상** |
+| localhost/127.0.0.1/10.0.2.2만 허용하는 network-security-config | **빈 화면** |
+
+아래 둘은 지도 첫 로딩 버그를 고치기 **전에** 시도한 것이라 신뢰도가
+낮다. 다시 할 때는 재검증할 것.
+
+| 추가 시도 (신뢰도 낮음) | 결과 |
+| --- | --- |
+| 위 + 지도 origin을 `https://localhost:5000`으로 변경 | 빈 화면 |
+| 위 + `daumcdn.net`·`kakaocdn.net`·`daum.net` 허용 | 빈 화면 |
+
+**logcat에 cleartext 차단 오류가 한 줄도 남지 않는다.** 조용히 비어버려서
+무엇이 막혔는지 로그로는 알 수 없었다. 이게 세 번의 시도가 전부 추측이
+될 수밖에 없었던 이유다.
+
+### 배경
+
+지도는 WebView이고 `MapService.initialize`가 그 origin을
+`http://localhost:5000`으로 지정한다. 카카오 개발자 콘솔에 등록된
+JavaScript SDK 도메인과 일치해야 해서 http를 쓴다.
+
+### 다음에 할 일 — 추측하지 말고 먼저 볼 것
+
+1. **WebView의 네트워크 오류를 먼저 확보한다.** 이것 없이 설정만 바꿔보는
+   건 시간 낭비였다. 방법은 두 가지다.
+   - `WebView.setWebContentsDebuggingEnabled(true)`를 켜고 PC 크롬의
+     `chrome://inspect`로 기기 WebView에 붙어 Network 탭에서 **실제로
+     차단된 요청**을 본다. (가장 확실)
+   - 또는 `KakaoMapWidget`에 임시로 콘솔 메시지 핸들러를 달아 로그를 본다.
+2. 차단된 호스트를 확인한 뒤 그 호스트만 예외에 추가한다.
+3. 카카오 개발자 콘솔에 `https://localhost:5000`을 **추가 등록**한 뒤
+   origin을 https로 바꾸는 것도 후보다(등록 없이 바꿨을 땐 실패했다).
+
+### 급하지 않은 이유
+
+서버 배포에는 영향이 없다. 백엔드가 HTTPS가 되면 앱이 평문으로 주고받는
+것은 지도 WebView뿐이고, 그건 공개된 지도 타일이라 가로채여도 잃을 것이
+없다. 스토어 심사 전에만 끝내면 된다.
