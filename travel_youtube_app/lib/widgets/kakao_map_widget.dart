@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -55,13 +57,103 @@ const int _focusedZoomLevel = 3;
 // the lower one is invisible.
 const double _duplicatePinOffsetDeg = 0.00015;
 
+// How long to wait for the map to report itself created before assuming the
+// WebView came up blank. A cold WebView on an older phone takes a couple of
+// seconds, so this is generous enough not to throw away a slow but working
+// load.
+const Duration _mapLoadTimeout = Duration(seconds: 6);
+
+// A blank map recovers on the first retry in practice. The cap is here so a
+// genuinely broken setup (no network, bad app key) settles on an empty panel
+// instead of rebuilding a WebView forever.
+const int _maxMapLoadAttempts = 3;
+
+// Covers a bottom sheet's slide-in (Flutter's is 250ms) with a little room,
+// and is the backstop for a route that never reports completing.
+const Duration _revealFallbackDelay = Duration(milliseconds: 400);
+
 class _KakaoMapWidgetState extends State<KakaoMapWidget> {
   kakao.KakaoMapController? _controller;
 
   // Overlay id -> marker id, for turning a pin tap back into a marker id.
   final Map<String, String> _markerIdByOverlayId = {};
 
+  /// False until the route that holds this map has finished animating in.
+  ///
+  /// The map is a WebView, and creating one while its surface is still being
+  /// composited -- which is exactly what a bottom sheet sliding up does --
+  /// leaves it blank: the place map came up empty on first open and only
+  /// drew after closing and reopening the sheet.
+  bool _visible = false;
+  Animation<double>? _routeAnimation;
+  Timer? _revealFallback;
+
+  /// Bumped to give [kakao.KakaoMap] a new key, which throws the blank
+  /// WebView away and builds a fresh one.
+  int _attempt = 0;
+  bool _mapCreated = false;
+  Timer? _watchdog;
+
   bool get _useNumberedPins => widget.markers.any((m) => m.label != null);
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_visible) return;
+
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      _visible = true;
+      _startWatchdog();
+      return;
+    }
+
+    _routeAnimation = animation..addStatusListener(_onRouteAnimationStatus);
+
+    // Not every route reports a completion. One that was never animated --
+    // an app's first route, or a push with no transition -- sits at rest
+    // and fires no status change, and waiting on it meant the map was never
+    // built at all. Whatever happens, reveal shortly after; the point is
+    // only to miss the frames where a sheet is still sliding.
+    _revealFallback = Timer(_revealFallbackDelay, _reveal);
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _reveal();
+  }
+
+  void _reveal() {
+    if (_visible || !mounted) return;
+    _revealFallback?.cancel();
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    setState(() => _visible = true);
+    _startWatchdog();
+  }
+
+  void _startWatchdog() {
+    _watchdog?.cancel();
+    if (_mapCreated || _attempt + 1 >= _maxMapLoadAttempts) return;
+
+    _watchdog = Timer(_mapLoadTimeout, () {
+      if (!mounted || _mapCreated) return;
+      setState(() {
+        _attempt++;
+        // The old WebView is going away, and its controller with it.
+        _controller = null;
+        _markerIdByOverlayId.clear();
+      });
+      _startWatchdog();
+    });
+  }
+
+  @override
+  void dispose() {
+    _revealFallback?.cancel();
+    _watchdog?.cancel();
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(KakaoMapWidget oldWidget) {
@@ -182,7 +274,17 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
   Widget build(BuildContext context) {
     final numbered = _useNumberedPins;
 
+    // Holding the map's place until the sheet or page has settled. Tinted
+    // rather than white so it reads as "the map is coming", not as the blank
+    // panel this exists to prevent.
+    if (!_visible) {
+      return const ColoredBox(color: AppColors.surfaceTint1);
+    }
+
     return kakao.KakaoMap(
+      // Changing this key is how the watchdog replaces a WebView that never
+      // reported itself created.
+      key: ValueKey(_attempt),
       center: kakao.LatLng(widget.initialLatitude, widget.initialLongitude),
       // The plugin claims no gestures by default, so a drag started on the
       // map is otherwise won by an ancestor Scrollable (e.g. this widget
@@ -194,6 +296,8 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
       customOverlays: numbered ? _numberedPins() : null,
       polylines: _routePolylines(context),
       onMapCreated: (controller) {
+        _mapCreated = true;
+        _watchdog?.cancel();
         _controller = controller;
         _drawInitialShapes(controller);
         if (widget.focusedMarkerId != null) {
