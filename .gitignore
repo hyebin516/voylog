@@ -27,3 +27,10 @@ travel_youtube_app/assets/fonts/*.zip
 
 # 핸드오프 번들 원본 zip (압축 푼 폴더가 레포에 들어 있음)
 Voylog UI/**/*.zip
+
+# SSH/서버 인증키. 키는 프로젝트 밖(~/.ssh 등)에 두는 게 원칙이지만,
+# 실수로 들어와도 커밋되지 않도록 막아둔다 — 한번 올라가면 서버 접근
+# 권한이 그대로 공개된다.
+*.pem
+*.key
+id_rsa*
