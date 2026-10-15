@@ -53,8 +53,14 @@ services:
       REDIS_URL: redis://redis:6379
       AI_WORKER_URL: http://ai-worker:8000
       NODE_ENV: production
-    ports:
-      - "4000:4000"
+      # Caddy sits in front, so req.ip comes from X-Forwarded-For. Without
+      # this every user shares one rate-limit bucket and gets blocked
+      # together.
+      TRUST_PROXY: 1
+    # No `ports:` any more. The only way in is Caddy on 443, so the
+    # backend is never reachable over plain HTTP from outside.
+    expose:
+      - "4000"
     volumes:
       # Profile photos survive a rebuild; without this they vanish with the
       # container, and every avatar 404s.
@@ -67,6 +73,27 @@ services:
       ai-worker:
         condition: service_started
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # DOMAIN comes from backend/.env (e.g. voylog.duckdns.org). Let's
+    # Encrypt issues a certificate for it on first start, which is why 80
+    # has to be open as well as 443 -- the HTTP challenge uses it.
+    env_file: ./backend/.env
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificates live here. Without this volume every restart asks
+      # Let's Encrypt for a new one and hits their rate limit.
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
 volumes:
   db-data:
   uploads:
+  caddy-data:
+  caddy-config:
