@@ -10,8 +10,6 @@ module.exports = {
   redisUrl: process.env.REDIS_URL,
   jwtSecret: process.env.JWT_SECRET,
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || '7d',
-  kakaoClientId: process.env.KAKAO_CLIENT_ID,
-  kakaoClientSecret: process.env.KAKAO_CLIENT_SECRET,
   aiWorkerUrl: process.env.AI_WORKER_URL,
   // Shared secret for the AI worker. Must match AI_WORKER_TOKEN on the
   // worker side; unset means the worker is not asking for one.

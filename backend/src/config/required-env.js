@@ -17,7 +17,6 @@ const OPTIONAL = {
   REDIS_URL: [env.redisUrl, '분석 결과 캐시가 꺼진 채로 동작합니다(매번 DB 조회).'],
   FIREBASE_SERVICE_ACCOUNT_PATH: [env.firebaseServiceAccountPath, '푸시 알림이 전송되지 않습니다.'],
   SMTP_HOST: [env.smtpHost, '이메일 인증코드와 고객센터 메일이 전송되지 않습니다.'],
-  KAKAO_CLIENT_ID: [env.kakaoClientId, '카카오 로그인이 동작하지 않습니다.'],
 };
 
 function missingRequired() {
