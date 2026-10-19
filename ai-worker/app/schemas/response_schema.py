@@ -256,7 +256,13 @@ class PlaceSummaryResult(BaseModel):
 
 
 class NotAPlace(BaseModel):
+    # `kind` is one of the junk kinds the prompt lists. Free-text reasons
+    # let the model remove a place and justify it with something that is
+    # not grounds for removal at all ("음식점 이름" -- a restaurant name is
+    # a place), and nothing downstream could tell. A name outside the list
+    # is kept; see place_extraction_service._JUNK_KINDS.
     index: int
+    kind: Optional[str] = None
     reason: Optional[str] = None
 
 

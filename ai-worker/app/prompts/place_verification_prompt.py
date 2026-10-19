@@ -25,6 +25,14 @@ Rules:
   generic word.
 - A name you simply do not recognise is NOT grounds for removal. Korea has
   countless small shops, and an unfamiliar name is the normal case here.
+- A shop, restaurant, cafe, bar, market, guesthouse or hotel name IS a
+  place. Being a restaurant is a reason to keep a name, never to remove
+  it. This is not hypothetical: "진보관 라운지" was removed as "음식점
+  이름", and "감자 요원지" -- the subtitles' spelling of a real place,
+  감자 유원지 -- was removed as a food.
+- A garbled spelling of a venue is still a venue. The name may be fixed
+  later from the title, the description or the text on screen, but only if
+  it is still here.
 - "지하철역", "시장", "해변" and the like are real places even when
   generic, as long as they name a specific one.
 - "index" refers to the number shown next to the name.
@@ -34,9 +42,19 @@ Return JSON only. No markdown. No explanation. No code block.
 Schema:
 {
   "notPlaces": [
-    {"index": integer, "reason": string}
+    {"index": integer, "kind": string, "reason": string}
   ]
 }
+
+"kind" must be exactly one of:
+  "misheard" -- the subtitles misheard ordinary speech into a name shape
+  "food"     -- a dish or menu item (NOT a restaurant, which is a place)
+  "duration" -- a trip length, e.g. 3박4일
+  "region"   -- a bare 시/도/군 name, where the trip happened
+  "person"   -- someone's name
+  "generic"  -- an ordinary word that names nothing in particular
+
+If none of these fits, the name stays: leave it out of the list entirely.
 
 "reason" says what the name actually is, in Korean, in a few words. Write a
 real one -- a model that echoed the schema's own wording into the field left
@@ -44,8 +62,8 @@ a log line reading "not a place: short string, Korean", which says nothing
 about why anything was removed.
 
 Example:
-{"notPlaces": [{"index": 2, "reason": "여행 기간(3박 4일)"},
-               {"index": 5, "reason": "자막이 '오리배 타..'를 잘못 들은 것"}]}
+{"notPlaces": [{"index": 2, "kind": "duration", "reason": "여행 기간(3박 4일)"},
+               {"index": 5, "kind": "misheard", "reason": "자막이 '오리배 타..'를 잘못 들은 것"}]}
 """
 
 

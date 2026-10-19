@@ -42,7 +42,9 @@ def test_drops_a_name_the_model_says_is_not_a_place(monkeypatch):
 
     kept, _ = run(
         places,
-        PlaceVerificationResult(notPlaces=[NotAPlace(index=0, reason="오리배 타기를 잘못 들은 것")]),
+        PlaceVerificationResult(
+            notPlaces=[NotAPlace(index=0, kind="misheard", reason="오리배 타기를 잘못 들은 것")]
+        ),
         monkeypatch,
     )
 
@@ -129,3 +131,56 @@ def test_verify_places_itself_never_raises(monkeypatch):
     result = llm_service.verify_places("anything", "auto")
 
     assert result.notPlaces == []
+
+
+def test_keeps_a_name_removed_for_a_reason_that_is_not_grounds_for_removal(monkeypatch):
+    # Seen in production: "진보관 라운지" removed as "음식점 이름". A
+    # restaurant is a place; that is a reason to keep it.
+    places = [place("진보관 라운지")]
+
+    kept, _ = run(
+        places,
+        PlaceVerificationResult(
+            notPlaces=[NotAPlace(index=0, kind="venue", reason="음식점 이름")]
+        ),
+        monkeypatch,
+    )
+
+    assert [p.name for p in kept] == ["진보관 라운지"]
+
+
+def test_keeps_a_name_extraction_already_called_a_specific_kind_of_venue(monkeypatch):
+    # Also from production: "감자 요원지" went out as a food, and the OCR
+    # pass then found it -- 감자 유원지, a real place. Extraction read the
+    # sentences around the name and called it a restaurant; the verifier
+    # sees only the name.
+    places = [place("감자 요원지", category="restaurant")]
+
+    kept, _ = run(
+        places,
+        PlaceVerificationResult(
+            notPlaces=[NotAPlace(index=0, kind="food", reason="감자 관련 음식")]
+        ),
+        monkeypatch,
+    )
+
+    assert [p.name for p in kept] == ["감자 요원지"]
+
+
+def test_still_drops_junk_that_extraction_could_not_categorise(monkeypatch):
+    # The pass has to keep working on what it was built for: hashtag junk
+    # and misheard speech, which arrive uncategorised or as "other".
+    places = [place("고성3박4일"), place("오리바이하", category="other"), place("재민천")]
+
+    kept, _ = run(
+        places,
+        PlaceVerificationResult(
+            notPlaces=[
+                NotAPlace(index=0, kind="duration", reason="여행 기간"),
+                NotAPlace(index=1, kind="misheard", reason="오리배 타기를 잘못 들은 것"),
+            ]
+        ),
+        monkeypatch,
+    )
+
+    assert [p.name for p in kept] == ["재민천"]

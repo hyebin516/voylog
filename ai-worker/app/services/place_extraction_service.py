@@ -273,6 +273,21 @@ def _better_of(first: GeocodedPlace, second: GeocodedPlace) -> GeocodedPlace:
     )
 
 
+# The only readings that justify removing a name. Anything else the model
+# comes up with means the name stays -- it is answering a question we did
+# not ask.
+_JUNK_KINDS = {"misheard", "food", "duration", "region", "person", "generic"}
+
+
+def _named_a_venue_type(place: GeocodedPlace) -> bool:
+    """Whether extraction gave this a concrete category rather than the
+    catch-all. A categorised name is one the extractor read as a specific
+    kind of venue, which is a much better-informed claim than the
+    verifier's -- it had the sentences around it, the verifier has only the
+    name."""
+    return (place.category or "").strip().lower() not in ("", "other")
+
+
 async def _drop_non_places(
     places: list[GeocodedPlace], title: str | None, region: str | None, provider: str
 ) -> list[GeocodedPlace]:
@@ -302,10 +317,35 @@ async def _drop_non_places(
     for entry in result.notPlaces:
         # The index is the model's; a wrong one must not silently drop a
         # place that was never asked about.
-        if 0 <= entry.index < len(unlocated):
-            original_index, place = unlocated[entry.index]
-            drop.add(original_index)
-            logger.info("Dropping '%s' -- not a place: %s", place.name, entry.reason)
+        if not 0 <= entry.index < len(unlocated):
+            continue
+        original_index, place = unlocated[entry.index]
+
+        if entry.kind not in _JUNK_KINDS:
+            # The model wanted it gone for a reason that is not grounds for
+            # removal. "진보관 라운지" was removed as "음식점 이름" -- a
+            # restaurant is a place.
+            logger.info(
+                "Keeping '%s' -- '%s' is not one of the junk kinds (%s)",
+                place.name, entry.kind, entry.reason,
+            )
+            continue
+
+        if _named_a_venue_type(place):
+            # The extraction pass read the subtitles and called this a cafe,
+            # a restaurant, a beach. That is a specific claim about what the
+            # name is, made with the surrounding sentences in view, and it
+            # outranks a verifier that only ever sees the name. "감자 요원지"
+            # went out as a food this way, and the OCR pass then found it:
+            # 감자 유원지, a real place with real coordinates.
+            logger.info(
+                "Keeping '%s' -- extraction called it a %s, which outranks '%s'",
+                place.name, place.category, entry.kind,
+            )
+            continue
+
+        drop.add(original_index)
+        logger.info("Dropping '%s' -- %s: %s", place.name, entry.kind, entry.reason)
 
     return [p for i, p in enumerate(places) if i not in drop]
 
