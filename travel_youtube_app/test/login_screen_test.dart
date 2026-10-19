@@ -62,7 +62,10 @@ void main() {
     expect(authProvider.isAuthenticated, isTrue);
   });
 
-  testWidgets('shows an error view for invalid credentials', (tester) async {
+  testWidgets('a wrong password is reported in a dialog, not under the form', (tester) async {
+    // Under the form it read as part of the page; a dialog is clearly an
+    // answer to the button just pressed, and matches how a failed Kakao
+    // login already reports.
     final repository = FakeAuthRepository()
       ..emailLoginError = const ApiException(code: 'INVALID_CREDENTIALS', message: 'boom');
     await tester.pumpWidget(_wrap(AuthProvider(repository: repository, pushRegistration: fakePushRegistration())));
@@ -72,7 +75,14 @@ void main() {
     await tester.tap(find.text('로그인'));
     await tester.pumpAndSettle();
 
+    expect(find.byType(AlertDialog), findsOneWidget);
     expect(find.text('이메일 또는 비밀번호가 올바르지 않습니다.'), findsOneWidget);
+
+    await tester.tap(find.text('확인'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.text('이메일 또는 비밀번호가 올바르지 않습니다.'), findsNothing);
   });
 
   testWidgets('tapping 회원가입 navigates to the signup route', (tester) async {

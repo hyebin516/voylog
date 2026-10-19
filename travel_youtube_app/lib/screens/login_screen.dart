@@ -37,6 +37,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (email.isEmpty || password.isEmpty) return;
 
     await authProvider.loginWithEmail(email, password);
+    if (!mounted || authProvider.state != ViewState.error) return;
+
+    // A dialog, the same way a failed Kakao login already reports. The
+    // message used to sit under the form, where a wrong password looked
+    // like part of the page rather than an answer to the button just
+    // pressed.
+    await showErrorDialog(context, authProvider.errorMessage ?? '로그인에 실패했습니다.');
   }
 
   Future<void> _onKakaoLoginPressed(BuildContext context) async {
@@ -169,10 +176,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ],
                   ),
-                  if (authProvider.state == ViewState.error) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    ErrorView(message: authProvider.errorMessage ?? '로그인에 실패했습니다.'),
-                  ],
                       ],
                     ),
                   ),
