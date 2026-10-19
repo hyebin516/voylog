@@ -18,7 +18,23 @@ from app.utils.logger import logger
 # audio-only DASH streams rather than pre-merged progressive formats, so
 # `best` alone frequently has nothing to match and yt-dlp would otherwise
 # need ffmpeg to mux a video-only + audio-only pair together.
-_FORMAT_SELECTOR = "bestvideo[ext=mp4][height<=480]/bestvideo[ext=mp4]/bestvideo/best"
+#
+# The codec is named explicitly because OpenCV decodes with its own
+# bundled FFmpeg, and that build cannot decode AV1: an av01 stream opens
+# fine, reports a frame count, and then fails every single read with
+# "[av1 @ ...] Get current frame error". The sampler came back empty and
+# the OCR pass looked like it had simply found no text on screen -- minutes
+# of downloading per analysis for zero frames. Asking for `ext=mp4` does
+# not avoid it, because YouTube serves AV1 inside mp4 as well. So: H.264
+# first, then VP9, and av01 only once nothing else is on offer.
+_FORMAT_SELECTOR = (
+    "bestvideo[vcodec^=avc1][height<=480]/"
+    "bestvideo[vcodec^=avc1]/"
+    "bestvideo[vcodec^=vp9][height<=480]/"
+    "bestvideo[vcodec^=vp9]/"
+    "bestvideo[vcodec!^=av01]/"
+    "bestvideo/best"
+)
 
 
 # The vision call uses low detail, which is rendered at 512px regardless,
@@ -53,6 +69,15 @@ def _download_video(youtube_url: str, dest_dir: str) -> str | None:
     try:
         with yt_dlp.YoutubeDL(options) as ydl:
             info = ydl.extract_info(youtube_url, download=True)
+            # Named in the log because which codec yt-dlp settled on decides
+            # whether OpenCV can read a single frame of it.
+            logger.info(
+                "Frame extraction: downloaded %s (vcodec=%s, %sx%s)",
+                info.get("format_id"),
+                info.get("vcodec"),
+                info.get("width"),
+                info.get("height"),
+            )
             return ydl.prepare_filename(info)
     except Exception as exc:
         logger.warning("Frame extraction: video download failed for %s: %s", youtube_url, exc)
@@ -95,16 +120,30 @@ def _sample_frames(
         step = max((end - start) // max(count - 1, 1), 1)
 
         frames: list[bytes] = []
+        unreadable = 0
         for i in range(count):
             frame_index = min(start + i * step, total_frames - 1)
             capture.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
             ok, frame = capture.read()
             if not ok:
+                unreadable += 1
                 continue
             frame = _shrink_for_vision(frame)
             ok, encoded = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, _JPEG_QUALITY])
             if ok:
                 frames.append(encoded.tobytes())
+
+        if not frames and unreadable:
+            # A file that opens and reports a frame count but hands back
+            # nothing is what an undecodable codec looks like from here
+            # (see _FORMAT_SELECTOR). Said out loud because otherwise it is
+            # indistinguishable from a video with no text on screen.
+            logger.warning(
+                "Frame extraction: opened %s but could not decode any of the %d sampled frames "
+                "-- the stream's codec is probably unsupported",
+                video_path,
+                unreadable,
+            )
         return frames
     finally:
         capture.release()

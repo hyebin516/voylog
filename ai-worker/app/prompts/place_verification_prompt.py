@@ -34,9 +34,18 @@ Return JSON only. No markdown. No explanation. No code block.
 Schema:
 {
   "notPlaces": [
-    {"index": integer, "reason": "short string, Korean"}
+    {"index": integer, "reason": string}
   ]
 }
+
+"reason" says what the name actually is, in Korean, in a few words. Write a
+real one -- a model that echoed the schema's own wording into the field left
+a log line reading "not a place: short string, Korean", which says nothing
+about why anything was removed.
+
+Example:
+{"notPlaces": [{"index": 2, "reason": "여행 기간(3박 4일)"},
+               {"index": 5, "reason": "자막이 '오리배 타..'를 잘못 들은 것"}]}
 """
 
 

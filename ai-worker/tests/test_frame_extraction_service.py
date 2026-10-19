@@ -32,6 +32,34 @@ class _FailingYoutubeDL(_FakeYoutubeDL):
         raise RuntimeError("video unavailable")
 
 
+class _UndecodableCapture:
+    """Opens and reports a frame count, then fails every read -- exactly how
+    an AV1 stream behaves under OpenCV's bundled FFmpeg."""
+
+    def __init__(self, total_frames: int = 1000, fps: float = 30.0):
+        self._total_frames = total_frames
+        self._fps = fps
+
+    def isOpened(self):
+        return True
+
+    def get(self, prop):
+        if prop == cv2.CAP_PROP_FRAME_COUNT:
+            return self._total_frames
+        if prop == cv2.CAP_PROP_FPS:
+            return self._fps
+        return 0
+
+    def set(self, prop, value):
+        pass
+
+    def read(self):
+        return False, None
+
+    def release(self):
+        pass
+
+
 class _FakeCapture:
     """Stands in for `cv2.VideoCapture` -- reports a fixed frame count/fps and
     returns a tiny real frame (so real `cv2.imencode` still works on it)."""
@@ -147,3 +175,31 @@ def test_download_and_sample_frames_samples_the_downloaded_file(monkeypatch, tmp
     )
 
     assert frames == [b"frame1", b"frame2"]
+
+
+def test_the_format_selector_asks_for_a_codec_opencv_can_actually_decode():
+    # OpenCV's bundled FFmpeg cannot decode AV1, and YouTube serves AV1
+    # inside mp4, so `ext=mp4` is not a safe way to ask. The order here is
+    # what keeps the OCR pass from downloading a video it cannot read.
+    selector = frame_extraction_service._FORMAT_SELECTOR
+    branches = selector.split("/")
+
+    assert branches[0].startswith("bestvideo[vcodec^=avc1]")
+    first_av1_friendly = next(
+        i for i, b in enumerate(branches) if "vcodec" not in b or "!^=av01" in b
+    )
+    assert any("vcodec^=avc1" in b for b in branches[:first_av1_friendly])
+    assert any("vcodec^=vp9" in b for b in branches[:first_av1_friendly])
+
+
+def test_sample_frames_says_so_when_the_file_opens_but_nothing_decodes(monkeypatch, caplog):
+    # The silent version of this cost minutes per analysis: the video
+    # downloaded, every frame read failed, and an empty list looked
+    # identical to a video with no text on screen.
+    monkeypatch.setattr(frame_extraction_service.cv2, "VideoCapture", lambda path: _UndecodableCapture())
+
+    with caplog.at_level("WARNING"):
+        frames = frame_extraction_service._sample_frames("fake.mp4", interval_seconds=30, max_frames=4)
+
+    assert frames == []
+    assert any("could not decode" in record.message for record in caplog.records)
