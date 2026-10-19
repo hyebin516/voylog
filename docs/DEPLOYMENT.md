@@ -129,6 +129,40 @@ curl https://<백엔드>/health        # {"status":"ok"}
 
 ---
 
+### 두 번째부터는 한 줄로
+
+고친 코드를 서버에 반영할 때는 서버에서:
+
+```bash
+cd /opt/voylog
+./scripts/deploy.sh                # 전부
+./scripts/deploy.sh ai-worker      # 한 서비스만
+./scripts/deploy.sh ai-worker --no-cache
+```
+
+pull -> 빌드 -> 재시작 -> `/health` 확인까지 하고, 중간에 실패하면 거기서
+멈춘다.
+
+주의할 두 가지는 둘 다 실제로 한 번씩 당했다.
+
+- **`git pull`이 아이디/토큰을 묻는다.** 여러 줄을 한꺼번에 붙여넣으면
+  그 프롬프트가 **다음 줄들을 아이디와 비밀번호로 먹는다**. 한 번만
+  `git config --global credential.helper store` 후 pull하면 다시 묻지
+  않는다(토큰이 `~/.git-credentials`에 평문으로 남으니 서버를 반납할 때
+  지우고 GitHub에서 토큰을 폐기할 것).
+- **서버가 보고 있는 브랜치**가 고친 커밋이 있는 브랜치여야 한다. `main`을
+  보고 있으면 기능 브랜치에 아무리 푸시해도 pull로 오지 않는다.
+  `git branch --show-current`로 먼저 확인한다.
+
+반영이 됐는지는 컨테이너 안의 코드를 직접 물어보는 게 확실하다. 이미지가
+캐시로 옛 소스를 안고 있어도 바로 드러난다.
+
+```bash
+docker compose exec ai-worker python -c "from app.services.frame_extraction_service import _FORMAT_SELECTOR; print(_FORMAT_SELECTOR)"
+```
+
+---
+
 ## 4. 배포 후 확인 목록
 
 - [ ] `/health`가 200을 반환한다
