@@ -203,3 +203,47 @@ def test_sample_frames_says_so_when_the_file_opens_but_nothing_decodes(monkeypat
 
     assert frames == []
     assert any("could not decode" in record.message for record in caplog.records)
+
+
+class _ForbiddenThenFine(_FakeYoutubeDL):
+    """403s on the first call and succeeds on the second, like YouTube
+    refusing the media URL from a datacenter address."""
+
+    calls = 0
+
+    def extract_info(self, url, download=True):
+        type(self).calls += 1
+        if type(self).calls == 1:
+            raise RuntimeError("unable to download video data: HTTP Error 403: Forbidden")
+        return {"id": "abc123", "ext": "mp4"}
+
+
+class _AlwaysUnavailable(_FakeYoutubeDL):
+    calls = 0
+
+    def extract_info(self, url, download=True):
+        type(self).calls += 1
+        raise RuntimeError("Private video. Sign in if you've been granted access")
+
+
+def test_download_video_retries_a_refusal_that_reads_as_temporary(monkeypatch, tmp_path):
+    _ForbiddenThenFine.calls = 0
+    monkeypatch.setattr(frame_extraction_service.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(frame_extraction_service.yt_dlp, "YoutubeDL", _ForbiddenThenFine)
+
+    path = frame_extraction_service._download_video("https://youtu.be/abc123", str(tmp_path))
+
+    assert path == "/tmp/abc123.mp4"
+    assert _ForbiddenThenFine.calls == 2
+
+
+def test_download_video_does_not_retry_a_video_that_is_simply_gone(monkeypatch, tmp_path):
+    # Retrying a private or removed video just burns the enrichment budget.
+    _AlwaysUnavailable.calls = 0
+    monkeypatch.setattr(frame_extraction_service.time, "sleep", lambda _s: None)
+    monkeypatch.setattr(frame_extraction_service.yt_dlp, "YoutubeDL", _AlwaysUnavailable)
+
+    path = frame_extraction_service._download_video("https://youtu.be/abc123", str(tmp_path))
+
+    assert path is None
+    assert _AlwaysUnavailable.calls == 1

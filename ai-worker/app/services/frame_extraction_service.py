@@ -1,6 +1,7 @@
 import asyncio
 import os
 import tempfile
+import time
 
 import cv2
 import yt_dlp
@@ -52,10 +53,43 @@ def _shrink_for_vision(frame):
     return cv2.resize(frame, (_MAX_FRAME_WIDTH, int(height * scale)), interpolation=cv2.INTER_AREA)
 
 
+# YouTube intermittently refuses the media URL from a datacenter address:
+# the metadata resolves, then fetching the bytes answers 403. Seen in
+# production minutes after the same server had downloaded another video
+# fine, and the same URL served bytes again on the next try. Retrying costs
+# a few seconds in a pass nobody is waiting on; not retrying costs the whole
+# OCR read for that video.
+_DOWNLOAD_ATTEMPTS = 3
+_RETRY_BACKOFF_SECONDS = (4, 12)
+_TRANSIENT_SIGNS = ("403", "forbidden", "timed out", "timeout", "temporarily", "try again")
+
+
+def _looks_transient(exc: Exception) -> bool:
+    """A refusal worth repeating, as opposed to a video that is private,
+    removed or age-gated -- retrying those just wastes the budget."""
+    message = str(exc).lower()
+    return any(sign in message for sign in _TRANSIENT_SIGNS)
+
+
 def _download_video(youtube_url: str, dest_dir: str) -> str | None:
     """Downloads a low-resolution copy of the video into `dest_dir`.
     Returns the local file path, or None if the download failed for any
     reason -- this is a best-effort fallback, never meant to raise."""
+    for attempt in range(_DOWNLOAD_ATTEMPTS):
+        path = _download_video_once(youtube_url, dest_dir)
+        if path is not _RETRY:
+            return path
+        if attempt + 1 < _DOWNLOAD_ATTEMPTS:
+            time.sleep(_RETRY_BACKOFF_SECONDS[attempt])
+    return None
+
+
+# Distinguishes "failed, but worth another go" from "failed for good"
+# without raising out of a best-effort helper.
+_RETRY = object()
+
+
+def _download_video_once(youtube_url: str, dest_dir: str):
     out_template = os.path.join(dest_dir, "%(id)s.%(ext)s")
     options = {
         "format": _FORMAT_SELECTOR,
@@ -80,6 +114,11 @@ def _download_video(youtube_url: str, dest_dir: str) -> str | None:
             )
             return ydl.prepare_filename(info)
     except Exception as exc:
+        if _looks_transient(exc):
+            logger.warning(
+                "Frame extraction: video download refused for %s, retrying: %s", youtube_url, exc
+            )
+            return _RETRY
         logger.warning("Frame extraction: video download failed for %s: %s", youtube_url, exc)
         return None
 
