@@ -44,6 +44,10 @@ dependencies:
   # webview_flutter_android — see third_party/kakao_map_plugin/VENDOR_NOTES.md
   kakao_map_plugin:
     path: third_party/kakao_map_plugin
+  # Only for AndroidWebViewController.enableDebugging in debug builds, so a
+  # desktop Chrome can attach to the map's WebView (MapService). It already
+  # comes in through kakao_map_plugin; listed here to be importable.
+  webview_flutter_android: ^4.13.0
   flutter_dotenv: ^6.0.1
   kakao_flutter_sdk_user: ^2.0.0+1
   geolocator: ^14.0.2

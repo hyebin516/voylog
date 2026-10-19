@@ -65,12 +65,52 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>내 주변 여행지를 추천해 드리기 위해 위치 정보가 필요합니다.</string>
 	<!-- Required by kakao_map_plugin / webview_flutter to load the Kakao Maps SDK -->
+	<!-- Was NSAllowsArbitraryLoads: plain HTTP to anywhere, which App Review
+	     asks you to justify. What actually needs HTTP is the Kakao Maps
+	     WebView: MapService hands it http://localhost:5000 as its document
+	     origin (it has to match the JavaScript SDK domain registered on
+	     Kakao Developers), and the SDK then asks for its map tiles with
+	     protocol-relative URLs, which resolve against that http origin.
+	     Verified on Android with the equivalent restriction; iOS is not
+	     build-tested here (this repo's dev machine is Windows). -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
-		<true/>
-		<key>NSAllowsArbitraryLoadsInWebContent</key>
-		<true/>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>localhost</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+			</dict>
+			<key>daumcdn.net</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>kakaocdn.net</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>daum.net</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+			<key>kakao.com</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
+		</dict>
 	</dict>
 	<key>io.flutter.embedded_views_preview</key>
 	<true/>

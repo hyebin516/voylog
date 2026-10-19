@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Replaces android:usesCleartextTraffic="true", which allowed plain HTTP to
+  anywhere.
+
+  What still needs HTTP:
+  - localhost, because the Kakao Maps WebView is handed
+    http://localhost:5000 as its document origin (MapService.initialize).
+    Nothing is served from there; it only has to match the JavaScript SDK
+    domain registered on Kakao Developers.
+  - Kakao's map tiles. The SDK script itself comes over HTTPS, but it asks
+    for tiles with protocol-relative URLs, which resolve against that http
+    origin.
+
+  Everything else, including the backend, must be HTTPS.
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- The host machine as seen from the Android emulator. -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+
+        <!-- Kakao map tiles and their supporting hosts. -->
+        <domain includeSubdomains="true">daumcdn.net</domain>
+        <domain includeSubdomains="true">kakaocdn.net</domain>
+        <domain includeSubdomains="true">daum.net</domain>
+        <domain includeSubdomains="true">kakao.com</domain>
+    </domain-config>
+
+    <base-config cleartextTrafficPermitted="false" />
+</network-security-config>

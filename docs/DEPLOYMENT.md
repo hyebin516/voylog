@@ -187,55 +187,54 @@ Apple Developer Program(연 $99)과 Mac이 필요하다. CI에서
 
 ---
 
-## 7. 해결 못 한 문제 — 평문(HTTP) 통신 제한
+## 7. 평문(HTTP) 통신 제한 — 해결됨 (2026-10-19)
 
-앱은 지금 `android:usesCleartextTraffic="true"`(안드로이드)와
-`NSAllowsArbitraryLoads`(iOS)로 **아무 주소로나 평문 HTTP를 허용**한다.
-개발용으로 들어간 설정이고 스토어 출시 전에 좁혀야 하는데,
-**2026-10-12에 시도했다가 지도가 빈 화면이 되어 되돌렸다.**
+`usesCleartextTraffic="true"`(안드로이드)와 `NSAllowsArbitraryLoads`(iOS)를
+없애고 **필요한 호스트만** 예외로 두도록 좁혔다.
 
-### 확인된 사실
+### 무엇이 HTTP를 필요로 했나
 
-실기기(SM-A750N)에서, **네트워크 정상 + 지도 첫 로딩 버그 수정 적용 +
-감시 타이머 재시도 소진(45초 대기)** 조건으로 확인했다.
+지도는 WebView이고, `MapService.initialize`가 그 문서 origin을
+`http://localhost:5000`으로 지정한다(카카오 개발자 콘솔에 등록된
+JavaScript SDK 도메인과 일치해야 해서 http를 못 바꾼다).
 
-| 설정 | 지도 |
+SDK 스크립트 자체는 `https://dapi.kakao.com`에서 온다. 문제는 그 스크립트가
+**지도 타일을 프로토콜 상대 URL로 요청**한다는 것 — `//map.daumcdn.net/...`
+이 http origin에 대해 해석되면서 전부 http가 된다.
+
+그래서 예외는 두 묶음이다.
+
+| 호스트 | 이유 |
 | --- | --- |
-| `usesCleartextTraffic="true"` (현재) | **정상** |
-| localhost/127.0.0.1/10.0.2.2만 허용하는 network-security-config | **빈 화면** |
+| `localhost`, `127.0.0.1`, `10.0.2.2` | 지도 WebView의 문서 origin, 개발 중 로컬 백엔드 |
+| `daumcdn.net`, `kakaocdn.net`, `daum.net`, `kakao.com` | 지도 타일 |
 
-아래 둘은 지도 첫 로딩 버그를 고치기 **전에** 시도한 것이라 신뢰도가
-낮다. 다시 할 때는 재검증할 것.
+백엔드를 포함한 나머지는 전부 HTTPS여야 한다.
 
-| 추가 시도 (신뢰도 낮음) | 결과 |
-| --- | --- |
-| 위 + 지도 origin을 `https://localhost:5000`으로 변경 | 빈 화면 |
-| 위 + `daumcdn.net`·`kakaocdn.net`·`daum.net` 허용 | 빈 화면 |
+### 왜 세 번 실패했었나
 
-**logcat에 cleartext 차단 오류가 한 줄도 남지 않는다.** 조용히 비어버려서
-무엇이 막혔는지 로그로는 알 수 없었다. 이게 세 번의 시도가 전부 추측이
-될 수밖에 없었던 이유다.
+2026-10-12에 세 번 시도해서 세 번 다 "지도가 빈 화면"으로 실패했는데,
+**그중 한 번은 카카오 타일 도메인을 이미 예외에 넣은 상태였다.** 즉 설정은
+맞았는데 판정이 틀렸던 것이다.
 
-### 배경
+원인은 당시 **지도가 처음 열 때 간헐적으로 비는 버그**가 따로 있었던 것
+(2026-10-12에 수정, `KakaoMapWidget`). 모든 테스트가 그 버그에 오염돼
+있었고, logcat에 cleartext 차단 로그가 한 줄도 안 남아서 구분할 방법도
+없었다.
 
-지도는 WebView이고 `MapService.initialize`가 그 origin을
-`http://localhost:5000`으로 지정한다. 카카오 개발자 콘솔에 등록된
-JavaScript SDK 도메인과 일치해야 해서 http를 쓴다.
+**교훈**: 조용히 실패하는 WebView를 상대로 설정만 바꿔가며 추측하지 말 것.
+`MapService`에 디버그 빌드 전용으로 `AndroidWebViewController.enableDebugging`을
+넣어뒀으니, 다음에 같은 종류의 문제가 생기면 PC 크롬 `chrome://inspect`로
+붙어서 **실제로 차단된 요청**을 먼저 보면 된다.
 
-### 다음에 할 일 — 추측하지 말고 먼저 볼 것
+### 검증
 
-1. **WebView의 네트워크 오류를 먼저 확보한다.** 이것 없이 설정만 바꿔보는
-   건 시간 낭비였다. 방법은 두 가지다.
-   - `WebView.setWebContentsDebuggingEnabled(true)`를 켜고 PC 크롬의
-     `chrome://inspect`로 기기 WebView에 붙어 Network 탭에서 **실제로
-     차단된 요청**을 본다. (가장 확실)
-   - 또는 `KakaoMapWidget`에 임시로 콘솔 메시지 핸들러를 달아 로그를 본다.
-2. 차단된 호스트를 확인한 뒤 그 호스트만 예외에 추가한다.
-3. 카카오 개발자 콘솔에 `https://localhost:5000`을 **추가 등록**한 뒤
-   origin을 https로 바꾸는 것도 후보다(등록 없이 바꿨을 땐 실패했다).
+실기기(SM-A750N, Android)에서 제한 설정을 켠 채로 확인했다.
 
-### 급하지 않은 이유
+- 장소 지도: 타일·상호명·마커 정상 렌더링
+- 영상 플레이어(WebView): 재생 정상
+- 백엔드 통신: HTTPS로 정상
+- logcat: cleartext 차단 로그 없음
 
-서버 배포에는 영향이 없다. 백엔드가 HTTPS가 되면 앱이 평문으로 주고받는
-것은 지도 WebView뿐이고, 그건 공개된 지도 타일이라 가로채여도 잃을 것이
-없다. 스토어 심사 전에만 끝내면 된다.
+**iOS는 빌드 검증을 못 했다**(개발 머신이 Windows). `Info.plist`에 같은
+구성의 `NSExceptionDomains`를 넣어뒀으니 Mac에서 한 번 확인할 것.
