@@ -1,3 +1,8 @@
+# 서버를 껐다 켜면 Docker는 restart 정책이 붙은 컨테이너만 되살린다. 전에는
+# caddy에만 붙어 있어서, 서버를 켜면 caddy 혼자 올라와 /health가 502를
+# 돌려줬다 -- "서버는 켰는데 앱이 안 된다"로 보이는 상태다. 그래서 전부
+# unless-stopped다: 사람이 직접 멈춘 게 아니면 다시 올라온다.
+#
 # The whole stack, for running it the way a server will run it rather than
 # as four processes started by hand. The app still reaches the backend over
 # `adb reverse tcp:4000`, exactly as it does without Compose.
@@ -10,6 +15,7 @@
 services:
   db:
     image: postgres:17
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -27,6 +33,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -35,6 +42,7 @@ services:
 
   ai-worker:
     build: ./ai-worker
+    restart: unless-stopped
     env_file: ./ai-worker/.env
     # Deliberately no `ports:`. The worker is reachable from the backend
     # container and from nowhere else -- it has no user accounts and spends
@@ -45,6 +53,7 @@ services:
 
   backend:
     build: ./backend
+    restart: unless-stopped
     env_file: ./backend/.env
     environment:
       # Override whatever the local .env says: inside Compose these are
