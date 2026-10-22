@@ -51,3 +51,8 @@ app.*.map.json
 # Firebase (FCM) config downloaded from the console
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+
+# 벤더링한 플러그인을 빌드하면 생기는 것들. 7개 파일이 실제로 커밋돼 있었고,
+# 빌드할 때마다 잠금 파일이 수정된 걸로 떠서 변경 목록을 더럽혔다.
+third_party/*/android/.gradle/
+third_party/*/android/build/

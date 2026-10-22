@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -16,6 +18,18 @@ if (file("google-services.json").exists()) {
 // docs/KAKAO_SETUP.md) so the real Kakao native app key never has to be
 // hardcoded in a committed file. Used below for the Kakao Login manifest
 // placeholder (AndroidManifest.xml's redirect URI scheme).
+// Release signing. key.properties and the keystore itself are git-ignored
+// and live only on the machine that publishes, so a checkout without them
+// still builds -- it just falls back to the debug key, which the Play Store
+// refuses. The warning below is there because that fallback is silent
+// otherwise, and an unsigned-looking build is only noticed at upload time.
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("key.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
 fun readEnvValue(key: String): String {
     val envFile = rootProject.file("../.env")
     if (!envFile.exists()) return ""
@@ -50,11 +64,27 @@ android {
         manifestPlaceholders["kakaoNativeAppKey"] = readEnvValue("KAKAO_NATIVE_APP_KEY")
     }
 
+    signingConfigs {
+        if (keystoreProperties.containsKey("storeFile")) {
+            create("release") {
+                storeFile = file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning == null) {
+                logger.warn(
+                    "[voylog] android/key.properties가 없어 릴리스 빌드를 디버그 키로 서명합니다. " +
+                        "스토어에는 올릴 수 없는 빌드입니다 (docs/RELEASE.md 참고)."
+                )
+            }
+            signingConfig = releaseSigning ?: signingConfigs.getByName("debug")
         }
     }
 }
