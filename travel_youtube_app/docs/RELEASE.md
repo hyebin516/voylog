@@ -66,12 +66,22 @@ flutter build apk --release          # 기기에 직접 설치해 볼 .apk
 서명이 제대로 들어갔는지 확인:
 
 ```bash
-"/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe" \
-  -printcert -jarfile build/app/outputs/flutter-apk/app-release.apk
+/c/Android/Sdk/build-tools/36.0.0/apksigner.bat verify --print-certs -v build/app/outputs/flutter-apk/app-release.apk
 ```
 
-소유자(Owner)가 1번에서 입력한 정보면 된다. `Android Debug`로 나오면 아직
-디버그 키다.
+`Signer #1 certificate DN`이 1번에서 입력한 정보면 된다. `CN=Android Debug`면
+아직 디버그 키다.
+
+`keytool -printcert -jarfile`은 쓰지 말 것 -- "서명된 jar 파일이 아닙니다"가
+나온다. 그 옵션은 v1(JAR) 서명만 읽는데 요즘 빌드는 v2 스킴으로만 서명한다
+(minSdk 24 이상이면 v1은 꺼진다). 서명이 없는 게 아니라 읽는 도구가 틀린 것.
+
+### 한글 사용자 폴더에서 한 번 걸린다
+
+`storeFile`이 `C:/Users/김혜빈/...`처럼 한글을 포함하면 Java의
+`Properties.load(InputStream)`이 ISO-8859-1로 읽는 바람에 경로가 깨져
+`Keystore file ... not found`로 빌드가 실패한다. `build.gradle.kts`에서 UTF-8
+리더로 읽게 해뒀으니 지금은 문제없다.
 
 ## 4. 카카오 개발자 콘솔에 릴리스 키 해시 등록
 
@@ -82,6 +92,14 @@ flutter build apk --release          # 기기에 직접 설치해 볼 .apk
 "/c/Program Files/Android/Android Studio/jbr/bin/keytool.exe" \
   -exportcert -alias voylog -keystore "$HOME/voylog-upload-keystore.jks" \
   | openssl sha1 -binary | openssl base64
+```
+
+(키스토어 비밀번호를 묻는다.) 이 값은 공개 인증서에서 나온 것이라 비밀이
+아니다. 이미 빌드한 APK가 있으면 비밀번호 없이도 뽑을 수 있다:
+
+```bash
+/c/Android/Sdk/build-tools/36.0.0/apksigner.bat verify --print-certs -v build/app/outputs/flutter-apk/app-release.apk | grep -i "SHA-1 digest"
+python -c "import base64; print(base64.b64encode(bytes.fromhex('<나온 16진수>')).decode())"
 ```
 
 나온 값을 Kakao Developers → 내 애플리케이션 → 플랫폼 → Android → 키 해시에
