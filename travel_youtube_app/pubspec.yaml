@@ -85,6 +85,8 @@ flutter_launcher_icons:
   adaptive_icon_background: "assets/icon/app_icon_background.png"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
   min_sdk_android: 21
+  # 애플은 알파 채널이 있는 아이콘을 거부한다. 흰색으로 합성해서 내보낸다.
+  remove_alpha_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
