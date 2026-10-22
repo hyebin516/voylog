@@ -91,10 +91,10 @@ https://voylog.duckdns.org/privacy
 
 - [x] 앱 아이콘 512x512 — `store-assets/play-icon-512.png`
 - [x] 피처 그래픽 1024x500 — `store-assets/play-feature-graphic-1024x500.png`
-- [ ] 스크린샷 최소 2장 — `store-assets/screenshots/`
+- [x] 스크린샷 6장 — `store-assets/screenshots/` (실기기 1080x2220, 알파 없는 24비트 PNG)
 - [x] 짧은 설명 / 자세한 설명 — 위
 - [x] 개인정보처리방침 URL
-- [ ] 개발자 계정 등록 (25달러, 1회)
+- [x] 개발자 계정 등록 (25달러, 1회)
 - [ ] 비공개 테스트 요구사항 확인 — 개인 계정은 일정 인원이 일정 기간
       테스트해야 정식 출시를 신청할 수 있다. 기준이 몇 번 바뀌었으니
       콘솔에 표시되는 현재 조건을 볼 것
