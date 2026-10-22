@@ -26,7 +26,10 @@ if (file("google-services.json").exists()) {
 val keystoreProperties = Properties().apply {
     val file = rootProject.file("key.properties")
     if (file.exists()) {
-        file.inputStream().use { load(it) }
+        // Read as UTF-8, not with load(InputStream) -- that one decodes
+        // ISO-8859-1, so a keystore path under a Korean user folder came
+        // back mojibake and the build failed with "Keystore file not found".
+        file.reader(Charsets.UTF_8).use { load(it) }
     }
 }
 
