@@ -8,6 +8,7 @@ const path = require('path');
 const env = require('./config/env');
 const apiRoutes = require('./routes');
 const { generalLimiter } = require('./middlewares/rateLimit');
+const privacyController = require('./controllers/privacy.controller');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -35,6 +36,10 @@ app.use(
 );
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
+
+// Outside /api/v1 and outside the rate limiter: this is a page for people and
+// for Google Play's review, not an API call, and it has to answer every time.
+app.get('/privacy', privacyController.privacyPolicy);
 
 app.use('/api/v1', generalLimiter, apiRoutes);
 
