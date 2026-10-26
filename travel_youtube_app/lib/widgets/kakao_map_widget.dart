@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -74,6 +76,9 @@ const Duration _revealFallbackDelay = Duration(milliseconds: 400);
 
 class _KakaoMapWidgetState extends State<KakaoMapWidget> {
   kakao.KakaoMapController? _controller;
+
+  // 고른 핀으로 배율을 당긴 적이 있는지. 두 번째부터는 이동만 한다.
+  bool _hasZoomedToFocus = false;
 
   // Overlay id -> marker id, for turning a pin tap back into a marker id.
   final Map<String, String> _markerIdByOverlayId = {};
@@ -172,9 +177,14 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
     final positions = _displayPositions();
     for (final marker in widget.markers) {
       if (marker.id == id) {
-        // Panning alone kept the old zoom, where a whole course fits on
-        // screen and the selected pin barely stood out.
-        controller.setLevel(_focusedZoomLevel);
+        // 배율은 처음 고를 때 한 번만 바꾼다. 전체 코스가 들어오는 배율에서는
+        // 고른 핀이 묻히므로 한 번은 당겨줘야 하지만, 누를 때마다 당기면
+        // 사용자가 직접 맞춰 둔 화면을 매번 빼앗는다. 특히 지도를 끌고 있는
+        // 중에 배율이 바뀌면 손가락과 화면이 따로 노는 것처럼 느껴진다.
+        if (!_hasZoomedToFocus) {
+          controller.setLevel(_focusedZoomLevel);
+          _hasZoomedToFocus = true;
+        }
         controller.panTo(positions[marker.id]!);
         return;
       }
@@ -235,25 +245,117 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
       )
       .toList();
 
-  List<kakao.Polyline>? _routePolylines(BuildContext context) {
-    if (!widget.drawRoutePolyline || widget.markers.length < 2) return null;
-
-    final points = widget.routeLegPaths.isEmpty
+  List<kakao.LatLng> _routePoints() {
+    if (!widget.drawRoutePolyline || widget.markers.length < 2) return const [];
+    return widget.routeLegPaths.isEmpty
         // No geometry: join the stops directly, as the map always used to.
         ? widget.markers.map((m) => kakao.LatLng(m.latitude, m.longitude)).toList()
         : [
             for (final leg in widget.routeLegPaths)
               for (final point in leg) kakao.LatLng(point[0], point[1]),
           ];
+  }
 
+  List<kakao.Polyline>? _routePolylines(BuildContext context) {
+    final points = _routePoints();
+    if (points.length < 2) return null;
+
+    // 카카오·네이버 길찾기처럼 흰 테두리를 깐 두 겹 선으로 그린다. 한 겹
+    // 짜리 선은 비슷한 색의 도로나 하천 위에 올라가면 경계가 사라져서
+    // 어디까지가 경로인지 읽히지 않는다.
     return [
+      // 카카오 지도 SDK는 폴리라인을 타일 위에 그리므로 선 아래로 보낼 수
+      // 없다. 지도의 가게 이름을 덜 덮도록 두 가지를 한다 -- 굵기를 줄이고,
+      // 테두리를 반투명 흰색으로 둔다(불투명하면 테두리에 닿은 글자가
+      // 통째로 지워진다).
+      kakao.Polyline(
+        polylineId: 'route-casing',
+        points: points,
+        strokeColor: Colors.white,
+        strokeWidth: 12,
+        strokeOpacity: 0.75,
+        zIndex: 1,
+      ),
       kakao.Polyline(
         polylineId: 'route',
         points: points,
         strokeColor: Theme.of(context).colorScheme.primary,
-        strokeWidth: 4,
+        strokeWidth: 8,
+        strokeOpacity: 0.92,
+        zIndex: 2,
       ),
     ];
+  }
+
+  /// 경로 위에 진행 방향을 알려주는 작은 화살표. 카카오·네이버 길찾기와
+  /// 같은 장치다 -- 선만 있으면 어느 쪽으로 가는 경로인지 알 수 없고,
+  /// 번호 핀은 멀리 떨어져 있어 중간 구간에서는 도움이 되지 않는다.
+  ///
+  /// 간격을 미터로 고정하지 않고 전체 길이를 n등분한다. 지도는 경로 전체가
+  /// 보이도록 맞춰지므로, 코스가 길든 짧든 화면에 비슷한 간격으로 찍힌다.
+  List<kakao.CustomOverlay> _directionArrows() {
+    final points = _routePoints();
+    if (points.length < 2) return const [];
+
+    // 각 구간 길이(평면 근사)와 누적 길이
+    final segment = <double>[];
+    var total = 0.0;
+    for (var i = 0; i < points.length - 1; i++) {
+      final length = _planarDistance(points[i], points[i + 1]);
+      segment.add(length);
+      total += length;
+    }
+    if (total <= 0) return const [];
+
+    // 개수를 고정하면 짧고 구불구불한 코스에서는 화살표가 다닥다닥 붙고,
+    // 길게 뻗은 코스에서는 듬성듬성해진다. 지도는 경로 전체가 들어오도록
+    // 맞춰지므로, 경로 길이를 경계상자 대각선으로 나눈 값이 "화면에서 이
+    // 선이 얼마나 길어 보이는지"에 비례한다. 곧게 뻗은 경로면 1에 가깝고
+    // 꼬불꼬불할수록 커진다.
+    var minLat = points.first.latitude, maxLat = points.first.latitude;
+    var minLng = points.first.longitude, maxLng = points.first.longitude;
+    for (final point in points) {
+      minLat = math.min(minLat, point.latitude);
+      maxLat = math.max(maxLat, point.latitude);
+      minLng = math.min(minLng, point.longitude);
+      maxLng = math.max(maxLng, point.longitude);
+    }
+    final diagonal = _planarDistance(
+      kakao.LatLng(minLat, minLng),
+      kakao.LatLng(maxLat, maxLng),
+    );
+    final screenRatio = diagonal <= 0 ? 1.0 : total / diagonal;
+    final count = (7 * screenRatio).round().clamp(3, 18);
+    final overlays = <kakao.CustomOverlay>[];
+
+    for (var n = 1; n <= count; n++) {
+      // 양 끝은 핀에 가려지므로 구간 중앙 쪽에만 찍는다.
+      final target = total * n / (count + 1);
+      var walked = 0.0;
+      for (var i = 0; i < segment.length; i++) {
+        if (walked + segment[i] < target) {
+          walked += segment[i];
+          continue;
+        }
+        final t = segment[i] == 0 ? 0.0 : (target - walked) / segment[i];
+        final a = points[i];
+        final b = points[i + 1];
+        final at = kakao.LatLng(
+          a.latitude + (b.latitude - a.latitude) * t,
+          a.longitude + (b.longitude - a.longitude) * t,
+        );
+        overlays.add(kakao.CustomOverlay(
+          customOverlayId: 'arrow-$n',
+          latLng: at,
+          content: _arrowHtml(_bearing(a, b)),
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+          zIndex: 3,
+        ));
+        break;
+      }
+    }
+    return overlays;
   }
 
   /// kakao_map_plugin only draws markers, overlays and polylines when the
@@ -264,7 +366,7 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
   void _drawInitialShapes(kakao.KakaoMapController controller) {
     controller.addPolyline(polylines: _routePolylines(context));
     if (_useNumberedPins) {
-      controller.addCustomOverlay(customOverlays: _numberedPins());
+      controller.addCustomOverlay(customOverlays: [..._directionArrows(), ..._numberedPins()]);
     } else {
       controller.addMarker(markers: _plainMarkers());
     }
@@ -293,7 +395,7 @@ class _KakaoMapWidgetState extends State<KakaoMapWidget> {
       // same way any other embedded interactive map behaves.
       gestureRecognizers: {Factory(() => EagerGestureRecognizer())},
       markers: numbered ? const [] : _plainMarkers(),
-      customOverlays: numbered ? _numberedPins() : null,
+      customOverlays: numbered ? [..._directionArrows(), ..._numberedPins()] : null,
       polylines: _routePolylines(context),
       onMapCreated: (controller) {
         _mapCreated = true;
@@ -353,24 +455,47 @@ String _escapeHtml(String text) => text
 /// A round numbered pin, or a pill for the start point. The selected pin is
 /// larger, drawn in the accent color, and carries the place's name so the
 /// user can see exactly which spot they picked.
+/// 두 점 사이 거리(미터 아님, 비율만 맞는 평면 근사). 화살표를 균등하게
+/// 나누는 데만 쓰므로 정확한 미터값이 필요 없다.
+double _planarDistance(kakao.LatLng a, kakao.LatLng b) {
+  final dy = b.latitude - a.latitude;
+  final dx = (b.longitude - a.longitude) * math.cos(a.latitude * math.pi / 180);
+  return math.sqrt(dx * dx + dy * dy);
+}
+
+/// 북쪽을 0도로 한 시계방향 각도. CSS rotate와 같은 방향이라 그대로 쓴다.
+double _bearing(kakao.LatLng a, kakao.LatLng b) {
+  final dy = b.latitude - a.latitude;
+  final dx = (b.longitude - a.longitude) * math.cos(a.latitude * math.pi / 180);
+  return math.atan2(dx, dy) * 180 / math.pi;
+}
+
+/// 선 위에 얹는 흰 화살표. 테두리를 어둡게 줘서 틸색 선 위에서도 모양이
+/// 뭉개지지 않는다.
+String _arrowHtml(double bearingDegrees) {
+  final angle = bearingDegrees.toStringAsFixed(1);
+
+  // 바깥 상자를 0x0으로 두고 그림만 자기 크기의 절반만큼 끌어올린다.
+  // 카카오 CustomOverlay는 content의 크기를 재서 앵커(0.5, 0.5)를 적용하는데,
+  // SVG가 아직 배치되기 전에 재면 0으로 읽혀 화살표가 선 중앙이 아니라
+  // 한쪽으로 치우쳐 붙는다. 0x0이면 잴 것이 없으므로 그 타이밍에 영향받지
+  // 않고, translate(-50%,-50%)가 항상 정확히 가운데로 맞춘다.
+  return '<div style="position:relative;width:0;height:0;">'
+      '<svg width="7" height="7" viewBox="0 0 14 14" '
+      'style="position:absolute;left:0;top:0;display:block;'
+      'transform:translate(-50%,-50%) rotate(${angle}deg);">'
+      '<path d="M7 1.8L12 11.4a.7.7 0 0 1-.95.95L7 10.4l-4.05 1.95a.7.7 0 0 1-.95-.95z" '
+      'fill="#fff" fill-opacity="0.8"/>'
+      '</svg></div>';
+}
+
 String _pinHtml(MapMarkerData marker, bool selected) {
   final isStart = marker.kind == MapMarkerKind.start;
-  final size = selected ? 40 : 30;
-  final background = selected
-      ? _hex(AppColors.danger)
-      : (isStart ? _hex(AppColors.ink) : _hex(AppColors.primary));
   final label = _escapeHtml(marker.label ?? '');
-  final fontSize = selected ? 15 : 13;
 
-  final badge = isStart
-      ? '<div style="height:${size}px;padding:0 10px;border-radius:${size}px;'
-            'background:$background;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);'
-            'color:#fff;font:700 ${fontSize}px sans-serif;display:flex;align-items:center;'
-            'justify-content:center;white-space:nowrap;">$label</div>'
-      : '<div style="width:${size}px;height:${size}px;border-radius:50%;'
-            'background:$background;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);'
-            'color:#fff;font:700 ${fontSize}px sans-serif;display:flex;align-items:center;'
-            'justify-content:center;">$label</div>';
+  // 숙소/출발점은 이름이 들어가야 해서 알약 모양, 나머지 방문지는 핀 모양이다.
+  // 핀의 뾰족한 끝이 실제 좌표를 가리킨다(yAnchor: 1).
+  final badge = isStart ? _startPillHtml(label, selected) : _placePinHtml(label, selected);
 
   final nameBubble = selected
       ? '<div style="margin-bottom:6px;padding:5px 10px;border-radius:12px;background:#fff;'
@@ -380,4 +505,40 @@ String _pinHtml(MapMarkerData marker, bool selected) {
 
   return '<div style="display:flex;flex-direction:column;align-items:center;">'
       '$nameBubble$badge</div>';
+}
+
+/// 카카오맵 핀을 따른 모양 -- 둥근 머리 안에 흰 원, 아래로 뾰족한 끝.
+/// 원이 아니라 핀이어야 어디를 가리키는지가 분명하다(원은 중심이 좌표인지
+/// 아래쪽이 좌표인지 알 수 없다). 바깥 흰 테두리는 건물과 도로가 빽빽한
+/// 지도 위에서 핀이 묻히지 않게 한다.
+String _placePinHtml(String label, bool selected) {
+  final width = selected ? 40 : 32;
+  final height = (width * 1.4).round();
+  final fill = _hex(selected ? AppColors.primaryStrong : AppColors.primary);
+  final fontSize = selected ? 13 : 12;
+
+  // viewBox 32x45 기준: 머리 중심 (16, 16), 끝점 (16, 44).
+  const path = 'M16 2C8.3 2 2 8.3 2 16c0 9.5 11.5 22.6 13.2 24.5.4.5 1.2.5 1.6 0'
+      'C18.5 38.6 30 25.5 30 16 30 8.3 23.7 2 16 2z';
+
+  return '<svg width="${width}px" height="${height}px" viewBox="0 0 32 45" '
+      'style="display:block;filter:drop-shadow(0 2px 4px rgba(0,0,0,.3));">'
+      '<path d="$path" fill="$fill" stroke="#fff" stroke-width="2"/>'
+      '<circle cx="16" cy="16" r="8.5" fill="#fff"/>'
+      '<text x="16" y="16" text-anchor="middle" dominant-baseline="central" '
+      'fill="$fill" font-family="sans-serif" font-weight="700" '
+      'font-size="$fontSize">$label</text>'
+      '</svg>';
+}
+
+/// 출발·도착 지점은 숙소 이름처럼 긴 글자가 들어가므로 핀 대신 알약 모양이다.
+String _startPillHtml(String label, bool selected) {
+  final height = selected ? 36 : 30;
+  final fontSize = selected ? 14 : 13;
+  final background = _hex(AppColors.ink);
+
+  return '<div style="height:${height}px;padding:0 10px;border-radius:${height}px;'
+      'background:$background;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);'
+      'color:#fff;font:700 ${fontSize}px sans-serif;display:flex;align-items:center;'
+      'justify-content:center;white-space:nowrap;">$label</div>';
 }
