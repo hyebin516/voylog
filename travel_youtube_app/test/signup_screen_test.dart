@@ -326,4 +326,23 @@ void main() {
     expect(find.text('사용할 수 있는 닉네임이에요'), findsNothing);
     expect(find.byType(ErrorView), findsNothing);
   });
+
+  testWidgets('동의 문구에 약관과 방침을 여는 링크가 있다', (tester) async {
+    // 체크박스만 두고 내용을 못 보게 하면 받은 동의가 의미를 잃는다.
+    // 링크가 사라지면 이 테스트가 잡는다.
+    await tester.pumpWidget(_wrap(AuthProvider(repository: FakeAuthRepository(), pushRegistration: fakePushRegistration())));
+    await tester.pumpAndSettle();
+
+    final consent = tester.widget<Text>(
+      find.descendant(
+        of: find.byKey(const Key('signupTermsCheckbox')),
+        matching: find.byType(Text),
+      ),
+    );
+    final spans = (consent.textSpan! as TextSpan).children!.cast<TextSpan>();
+
+    expect(spans.first.text, contains('[필수]'));
+    expect(spans.where((s) => s.text == '이용약관' && s.recognizer != null), hasLength(1));
+    expect(spans.where((s) => s.text == '개인정보처리방침' && s.recognizer != null), hasLength(1));
+  });
 }
