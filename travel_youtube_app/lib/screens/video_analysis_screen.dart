@@ -577,7 +577,7 @@ class _EnrichmentNotice extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              '영상 화면 속 장소 이름을 더 찾고 있어요. 몇 분 안에 자동으로 추가됩니다.',
+              '영상 화면 속 장소 이름을 더 찾고 있어요. 잠시 후 자동으로 추가됩니다.',
               style: TextStyle(
                 fontSize: 11.5,
                 color: AppColors.textSecondary,

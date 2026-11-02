@@ -9,10 +9,12 @@ import '../repositories/video_repository.dart';
 import '../utils/view_state.dart';
 
 // How the screen keeps up with the backend's background on-screen-text
-// pass. The job takes minutes, so polling is spaced out; the limit stops
-// it from running forever if the job never reports done.
-const Duration _enrichmentPollInterval = Duration(seconds: 20);
-const int _enrichmentPollLimit = 15;
+// pass. 실측으로 보강은 20~40초면 끝나는데 20초 간격으로 묻다 보니 끝난
+// 뒤에도 평균 10초를 더 기다렸다. 폴링은 캐시 조회라 값이 싸므로 5초로
+// 좁히고, 대신 횟수를 늘려 5분이라는 전체 한도는 그대로 둔다 -- 작업이
+// 죽었을 때 영원히 도는 것을 막는 장치다.
+const Duration _enrichmentPollInterval = Duration(seconds: 5);
+const int _enrichmentPollLimit = 60;
 
 class VideoProvider extends ChangeNotifier {
   final VideoRepository _repository;
@@ -93,12 +95,13 @@ class VideoProvider extends ChangeNotifier {
 
       if (!refreshed.enrichmentPending) timer.cancel();
 
-      final foundMore =
-          refreshed.places.length > (_currentVideo?.places.length ?? 0);
-      if (foundMore) {
-        _currentVideo = refreshed;
-        notifyListeners();
-      }
+      // 받은 결과를 항상 채택한다. 전에는 "장소가 늘었을 때만" 바꿨는데,
+      // 그러면 두 가지가 깨진다. 첫째, 개수가 그대로면 옛 데이터의
+      // enrichmentPending=true가 남아 "더 찾고 있어요" 배너가 끝나도
+      // 사라지지 않는다. 둘째, 보강이 이름을 고치거나 좌표를 채워 넣어도
+      // (경포 해수역장 -> 경포 해수욕장) 개수가 같으면 버려진다.
+      _currentVideo = refreshed;
+      notifyListeners();
     });
   }
 
