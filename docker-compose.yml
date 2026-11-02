@@ -74,6 +74,11 @@ services:
       # Profile photos survive a rebuild; without this they vanish with the
       # container, and every avatar 404s.
       - uploads:/app/uploads
+      # 공공데이터 원본(상가정보 zip). 이미지에는 backend/만 들어가므로
+      # database/seed-data는 컨테이너 안에 없다. refresh-public-places.js가
+      # backend/scripts 기준 ../../database/seed-data를 보므로 /database로
+      # 올려 붙인다. 읽기 전용 -- 스크립트는 읽기만 한다.
+      - ./database/seed-data:/database/seed-data:ro
     depends_on:
       db:
         condition: service_healthy
