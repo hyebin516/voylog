@@ -79,6 +79,10 @@ services:
       # backend/scripts 기준 ../../database/seed-data를 보므로 /database로
       # 올려 붙인다. 읽기 전용 -- 스크립트는 읽기만 한다.
       - ./database/seed-data:/database/seed-data:ro
+      # FCM 서비스 계정 키. 이미지에 굽지 않고 붙인다 -- 비밀키가 이미지
+      # 레이어에 남으면 이미지를 가진 사람이 곧 키를 가진 것이 된다.
+      # 이 파일이 없으면 푸시는 경고 한 줄 남기고 조용히 꺼진다.
+      - ./backend/firebase-service-account.json:/app/firebase-service-account.json:ro
     depends_on:
       db:
         condition: service_healthy
