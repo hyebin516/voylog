@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../routes/app_routes.dart';
+import '../services/legal_document_launcher.dart';
 import '../widgets/error_view.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -15,6 +16,30 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _isDeleting = false;
+  final _legal = const LegalDocumentLauncher();
+
+  /// 문서는 서버가 서빙하므로 열리지 않을 수 있다(서버가 꺼져 있거나
+  /// 네트워크가 끊긴 경우). 조용히 아무 일도 일어나지 않으면 버튼이
+  /// 고장난 것처럼 보이므로 이유를 알린다.
+  Future<void> _openLegalDocument(Future<bool> Function() open) async {
+    final opened = await open();
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('문서를 열지 못했습니다. 네트워크를 확인해 주세요.')),
+      );
+    }
+  }
+
+  void _openLicenses() {
+    // Flutter가 모아둔 의존성 라이선스를 그대로 보여준다. 직접 목록을
+    // 관리하면 패키지를 추가할 때마다 빠뜨린다.
+    showLicensePage(
+      context: context,
+      applicationName: 'Voylog',
+      applicationVersion: '1.0.0',
+      applicationLegalese: '© 2026 럭키비키 (동서울대학교 컴퓨터소프트웨어과)',
+    );
+  }
 
   Future<void> _editNickname(String currentNickname) async {
     final controller = TextEditingController(text: currentNickname);
@@ -203,18 +228,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                         const _SettingsSectionLabel('기타'),
                         _SettingsRow(
-                          label: '이용약관 및 개인정보 처리방침',
+                          label: '이용약관',
                           showChevron: true,
-                          onTap: () => showDialog<void>(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: const Text('이용약관 및 개인정보 처리방침'),
-                              content: const Text('Voylog는 여행 브이로그 요약과 동선 계획을 위해 필요한 최소한의 정보만 수집·이용합니다.'),
-                              actions: [
-                                TextButton(onPressed: () => Navigator.pop(context), child: const Text('확인')),
-                              ],
-                            ),
-                          ),
+                          onTap: () => _openLegalDocument(_legal.openTermsOfService),
+                        ),
+                        const SizedBox(height: 8),
+                        _SettingsRow(
+                          label: '개인정보처리방침',
+                          showChevron: true,
+                          onTap: () => _openLegalDocument(_legal.openPrivacyPolicy),
+                        ),
+                        const SizedBox(height: 8),
+                        _SettingsRow(
+                          label: '오픈소스 라이선스',
+                          showChevron: true,
+                          onTap: _openLicenses,
                         ),
                         const SizedBox(height: 8),
                         _SettingsRow(

@@ -158,6 +158,8 @@ void main() {
     final repository = FakeAuthRepository();
     await _loggedIn(tester, repository);
 
+    await tester.ensureVisible(find.text('회원 탈퇴'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('회원 탈퇴'));
     await tester.pumpAndSettle();
     expect(find.textContaining('계속하시겠습니까'), findsOneWidget);
@@ -172,6 +174,8 @@ void main() {
     final repository = FakeAuthRepository();
     final authProvider = await _loggedIn(tester, repository);
 
+    await tester.ensureVisible(find.text('회원 탈퇴'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('회원 탈퇴'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('탈퇴'));
@@ -185,6 +189,8 @@ void main() {
     final repository = FakeAuthRepository()..deleteAccountError = const ApiException(code: 'INTERNAL_ERROR', message: 'boom');
     await _loggedIn(tester, repository);
 
+    await tester.ensureVisible(find.text('회원 탈퇴'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('회원 탈퇴'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('탈퇴'));

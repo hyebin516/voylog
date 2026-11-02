@@ -1,9 +1,11 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../providers/auth_provider.dart';
 import '../routes/app_routes.dart';
+import '../services/legal_document_launcher.dart';
 import '../utils/view_state.dart';
 import '../widgets/auth_backdrop.dart';
 import '../widgets/error_view.dart';
@@ -30,6 +32,14 @@ class _SignupScreenState extends State<SignupScreen> {
 
   String? _inputError;
   bool _agreedToTerms = false;
+
+  // 동의 문구의 약관·방침을 눌러 열기 위한 것. TapGestureRecognizer는
+  // 직접 dispose해야 한다.
+  final _legal = const LegalDocumentLauncher();
+  late final TapGestureRecognizer _termsTap =
+      TapGestureRecognizer()..onTap = () => _openLegalDocument(_legal.openTermsOfService);
+  late final TapGestureRecognizer _privacyTap =
+      TapGestureRecognizer()..onTap = () => _openLegalDocument(_legal.openPrivacyPolicy);
   String? _verifiedEmail;
   String? _checkedNickname;
   bool? _nicknameAvailable;
@@ -84,7 +94,20 @@ class _SignupScreenState extends State<SignupScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
+    _termsTap.dispose();
+    _privacyTap.dispose();
     super.dispose();
+  }
+
+  /// 문서는 서버가 서빙하므로 열리지 않을 수 있다. 조용히 넘어가면
+  /// 글자가 고장난 것처럼 보이므로 이유를 알린다.
+  Future<void> _openLegalDocument(Future<bool> Function() open) async {
+    final opened = await open();
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('문서를 열지 못했습니다. 네트워크를 확인해 주세요.')),
+      );
+    }
   }
 
   Future<void> _onCheckNicknamePressed(AuthProvider authProvider) async {
@@ -329,10 +352,52 @@ class _SignupScreenState extends State<SignupScreen> {
                                 : null,
                           ),
                           const SizedBox(width: AppSpacing.sm),
+                          // 동의를 받으려면 무엇에 동의하는지 열어볼 수
+                          // 있어야 한다. 체크박스만 두고 내용을 못 보게
+                          // 하면 받은 동의가 의미를 잃는다.
                           Expanded(
-                            child: Text(
-                              '이용약관 및 개인정보 처리방침에 동의합니다',
-                              style: textTheme.bodySmall?.copyWith(color: AppColors.primary.withValues(alpha: 0.7)),
+                            child: Text.rich(
+                              TextSpan(
+                                children: [
+                                  TextSpan(
+                                    text: '[필수] ',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '이용약관',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary,
+                                      decoration: TextDecoration.underline,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    recognizer: _termsTap,
+                                  ),
+                                  TextSpan(
+                                    text: ' 및 ',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: '개인정보처리방침',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary,
+                                      decoration: TextDecoration.underline,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                    recognizer: _privacyTap,
+                                  ),
+                                  TextSpan(
+                                    text: '에 동의합니다',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: AppColors.primary.withValues(alpha: 0.7),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
