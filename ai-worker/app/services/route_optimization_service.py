@@ -102,9 +102,27 @@ async def _kakao_travel_time(
     return float(summary["distance"]), float(summary["duration"]), _car_path(route)
 
 
+# 같은 지점으로 볼 오차 범위(위경도 약 0.1m). 왕복 코스는 출발 노드와 도착
+# 노드가 같은 좌표를 가리키므로, 거리 행렬에 그 조합이 들어온다.
+_SAME_POINT_DEG = 1e-6
+
+
+def _same_point(origin: dict, dest: dict) -> bool:
+    return (
+        abs(origin["latitude"] - dest["latitude"]) < _SAME_POINT_DEG
+        and abs(origin["longitude"] - dest["longitude"]) < _SAME_POINT_DEG
+    )
+
+
 async def _travel_time(
     client: httpx.AsyncClient, origin: dict, dest: dict, mode: str = "car"
 ) -> Tuple[float, float, List[List[float]]]:
+    # 좌표가 같으면 물어볼 것이 없다. 그냥 두면 카카오가 SAME_POINT로
+    # 거절하고 경고가 한 줄씩 쌓이는데, 왕복 코스마다 반복되므로 진짜
+    # 경고가 그 사이에 묻힌다. 호출 수도 그만큼 줄어든다.
+    if _same_point(origin, dest):
+        return 0.0, 0.0, []
+
     if KAKAO_REST_API_KEY:
         try:
             return await _kakao_travel_time(client, origin, dest, mode)

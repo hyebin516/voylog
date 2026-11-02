@@ -511,3 +511,24 @@ def test_transit_guidance_names_the_buses_and_the_stops():
 def test_bus_leg_is_none_without_an_api_key():
     # The autouse fixture removes the key: no straight-line "bus" is invented.
     assert asyncio.run(svc._bus_leg(None, {"latitude": 1, "longitude": 1}, {"latitude": 2, "longitude": 2})) is None
+
+
+def test_same_point_legs_never_call_kakao():
+    """왕복 코스는 출발 노드와 도착 노드가 같은 좌표다. 그 조합까지 카카오에
+    물으면 SAME_POINT로 거절당하고 경고만 쌓인다."""
+    import asyncio
+    from app.services import route_optimization_service as svc
+
+    called = []
+
+    async def fail_if_called(*args, **kwargs):
+        called.append(args)
+        raise AssertionError("동일 좌표인데 카카오를 호출했다")
+
+    same = {"latitude": 37.5, "longitude": 127.0}
+    distance, duration, path = asyncio.run(
+        svc._travel_time(None, same, dict(same), "walk")
+    )
+
+    assert (distance, duration, path) == (0.0, 0.0, [])
+    assert called == []
