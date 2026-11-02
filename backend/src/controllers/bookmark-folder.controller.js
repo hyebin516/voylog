@@ -43,7 +43,7 @@ async function addBookmark(req, res, next) {
     const { bookmarkId, place } = req.body;
     if (place) {
       const added = await bookmarkFolderService.addSearchedPlaceToFolder(req.user.userId, req.params.id, place);
-      return res.status(201).json(success(added));
+      return success(res, added, 201);
     }
     await bookmarkFolderService.addBookmarkToFolder(req.user.userId, req.params.id, bookmarkId);
     return res.status(204).send();

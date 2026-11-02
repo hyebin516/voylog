@@ -14,11 +14,10 @@ async function summary(req, res, next) {
 async function search(req, res, next) {
   try {
     const places = await placeSearchService.searchForFolder(req.user.userId, req.query.query);
-    return res.json(success({ places }));
+    return success(res, { places });
   } catch (err) {
     return next(err);
   }
 }
 
-module.exports = {
-  search, summary };
+module.exports = { search, summary };
