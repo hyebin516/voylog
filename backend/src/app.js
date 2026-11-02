@@ -8,7 +8,7 @@ const path = require('path');
 const env = require('./config/env');
 const apiRoutes = require('./routes');
 const { generalLimiter } = require('./middlewares/rateLimit');
-const privacyController = require('./controllers/privacy.controller');
+const staticDocController = require('./controllers/static-doc.controller');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -37,9 +37,11 @@ app.use(
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
-// Outside /api/v1 and outside the rate limiter: this is a page for people and
-// for Google Play's review, not an API call, and it has to answer every time.
-app.get('/privacy', privacyController.privacyPolicy);
+// Outside /api/v1 and outside the rate limiter: these are pages for people
+// and for Google Play's review, not API calls, and they have to answer every
+// time. 앱의 설정·회원가입 화면도 이 주소를 연다.
+app.get('/privacy', staticDocController.privacyPolicy);
+app.get('/terms', staticDocController.termsOfService);
 
 app.use('/api/v1', generalLimiter, apiRoutes);
 
