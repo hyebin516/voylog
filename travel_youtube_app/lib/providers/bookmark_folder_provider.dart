@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../models/api_exception.dart';
 import '../models/bookmark_folder_model.dart';
 import '../models/bookmark_model.dart';
+import '../models/place_search_result_model.dart';
 import '../repositories/bookmark_folder_repository.dart';
 import '../utils/view_state.dart';
 
@@ -105,6 +106,62 @@ class BookmarkFolderProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _detailErrorMessage = e.friendlyMessage;
       notifyListeners();
+    }
+  }
+
+  // ── 폴더에 넣을 장소 검색 ──────────────────────────────────
+  // 검색창은 하나지만 결과는 내 북마크와 카카오 양쪽에서 온다.
+  ViewState _searchState = ViewState.idle;
+  List<PlaceSearchResultModel> _searchResults = [];
+  String? _searchErrorMessage;
+
+  ViewState get searchState => _searchState;
+  List<PlaceSearchResultModel> get searchResults => _searchResults;
+  String? get searchErrorMessage => _searchErrorMessage;
+
+  Future<void> searchPlaces(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
+      clearSearch();
+      return;
+    }
+
+    _searchState = ViewState.loading;
+    _searchErrorMessage = null;
+    notifyListeners();
+
+    try {
+      _searchResults = await _repository.searchPlaces(trimmed);
+      _searchState = ViewState.success;
+    } on ApiException catch (e) {
+      _searchState = ViewState.error;
+      _searchErrorMessage = e.friendlyMessage;
+    }
+    notifyListeners();
+  }
+
+  void clearSearch() {
+    _searchResults = [];
+    _searchState = ViewState.idle;
+    _searchErrorMessage = null;
+    notifyListeners();
+  }
+
+  /// 검색 결과 한 줄을 폴더에 넣는다. 이미 북마크한 장소면 그 북마크를
+  /// 토글하고, 카카오에서 온 장소면 서버가 적재까지 해준다.
+  Future<bool> addSearchResultToFolder(String folderId, PlaceSearchResultModel place) async {
+    try {
+      if (place.isBookmarked) {
+        await _repository.addBookmarkToFolder(folderId, place.bookmarkId!);
+      } else {
+        await _repository.addSearchedPlaceToFolder(folderId, place);
+      }
+      await loadFolderBookmarks(folderId);
+      return true;
+    } on ApiException catch (e) {
+      _searchErrorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
     }
   }
 
