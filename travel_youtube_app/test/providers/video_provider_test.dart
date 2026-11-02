@@ -240,11 +240,12 @@ void _enrichmentTests() {
       async.flushMicrotasks();
       expect(provider.currentVideo!.places, hasLength(2));
 
-      async.elapse(const Duration(seconds: 25));
+      // 폴링 간격은 5초다(보강이 20~40초면 끝나므로).
+      async.elapse(const Duration(seconds: 6));
       async.flushMicrotasks();
       expect(provider.currentVideo!.places, hasLength(2)); // nothing new yet
 
-      async.elapse(const Duration(seconds: 25));
+      async.elapse(const Duration(seconds: 6));
       async.flushMicrotasks();
       expect(provider.currentVideo!.places, hasLength(7));
 
