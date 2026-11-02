@@ -40,7 +40,12 @@ async function remove(req, res, next) {
 
 async function addBookmark(req, res, next) {
   try {
-    await bookmarkFolderService.addBookmarkToFolder(req.user.userId, req.params.id, req.body.bookmarkId);
+    const { bookmarkId, place } = req.body;
+    if (place) {
+      const added = await bookmarkFolderService.addSearchedPlaceToFolder(req.user.userId, req.params.id, place);
+      return res.status(201).json(success(added));
+    }
+    await bookmarkFolderService.addBookmarkToFolder(req.user.userId, req.params.id, bookmarkId);
     return res.status(204).send();
   } catch (err) {
     return next(err);

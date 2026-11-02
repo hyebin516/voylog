@@ -1,5 +1,6 @@
 const folderRepository = require('../repositories/bookmark-folder.repository');
 const bookmarkRepository = require('../repositories/bookmark.repository');
+const kakaoPlaceRepository = require('../repositories/kakao-place.repository');
 const { callAiWorker } = require('./aiWorkerClient');
 const AppError = require('../utils/AppError');
 
@@ -36,6 +37,42 @@ async function addBookmarkToFolder(userId, folderId, bookmarkId) {
   await getOwnedFolder(userId, folderId);
   await getOwnedBookmark(userId, bookmarkId);
   await folderRepository.addItem(folderId, bookmarkId);
+}
+
+/**
+ * 카카오 검색으로 찾은 장소를 폴더에 넣는다.
+ *
+ * 그 장소는 아직 `places`에 없으므로 먼저 적재한다 -- 북마크는 place_id를
+ * 가리키는 외래키라 행이 없으면 넣을 수 없다. 적재는 뚜벅이 코스를 보관할
+ * 때 쓰는 것과 같은 (source, external_id) 멱등 upsert라, 같은 장소를 두
+ * 번 담아도 행이 늘지 않는다.
+ *
+ * 카테고리와 주소는 검색 결과에 있는 만큼만 채워진다(카카오 키워드 검색은
+ * 카테고리를 주지 않는 경우가 있다).
+ */
+async function addSearchedPlaceToFolder(userId, folderId, place) {
+  await getOwnedFolder(userId, folderId);
+
+  const ids = await kakaoPlaceRepository.upsertAll([
+    {
+      externalId: place.kakaoPlaceId,
+      name: place.name,
+      address: place.address ?? null,
+      latitude: place.latitude,
+      longitude: place.longitude,
+      category: place.category ?? null,
+    },
+  ]);
+  const placeId = ids.get(place.kakaoPlaceId);
+
+  // 이미 북마크한 장소면 그 북마크를 그대로 쓴다. bookmarkService.addBookmark는
+  // 중복이면 409를 던지는데, 여기서는 "이미 담아둔 곳을 폴더에도 넣는" 정상
+  // 동작이라 에러가 아니다. 폴더는 북마크를 가리키는 다대다 태그라 같은
+  // 장소로 북마크가 둘 생기면 한쪽만 폴더에 들어간 것처럼 보인다.
+  const existing = await bookmarkRepository.findByUserAndPlace(userId, placeId);
+  const bookmark = existing ?? (await bookmarkRepository.create(userId, placeId));
+  await folderRepository.addItem(folderId, bookmark.bookmark_id);
+  return { bookmarkId: bookmark.bookmark_id, placeId };
 }
 
 async function removeBookmarkFromFolder(userId, folderId, bookmarkId) {
@@ -102,6 +139,7 @@ module.exports = {
   listFolders,
   deleteFolder,
   addBookmarkToFolder,
+  addSearchedPlaceToFolder,
   removeBookmarkFromFolder,
   listBookmarksInFolder,
 };
