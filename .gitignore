@@ -34,3 +34,11 @@ Voylog UI/**/*.zip
 *.pem
 *.key
 id_rsa*
+
+# 내부 계획·보고 문서와 발표 자료는 공개 저장소에 두지 않는다.
+# 설계서만 예외 -- 이 프로젝트가 어떻게 설계됐는지 보여주는 문서라
+# 저장소에 있을 이유가 있다.
+docs/*.docx
+!docs/Voylog_시스템_설계서.docx
+docs/*.pptx
+docs/*.zip
