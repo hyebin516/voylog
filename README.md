@@ -73,10 +73,10 @@ OpenAI / Claude / YouTube / Kakao
 
 ## 사용한 API와 데이터
 
-**AI** — OpenAI GPT-4.1-mini(장소 추출·화면 글자 읽기·요약), Claude(전체 폴백), OpenAI Embeddings(장소·취향 벡터)
-**지도·경로** — Kakao Local, Kakao Maps SDK, Kakao 길찾기 3종(자동차·도보·대중교통)
-**영상** — YouTube Data API v3, youtube-transcript-api, yt-dlp
-**그 외** — Kakao OAuth, Firebase Cloud Messaging, SMTP
+- **AI** — OpenAI GPT-4.1-mini(장소 추출·화면 글자 읽기·요약), Claude(전체 폴백), OpenAI Embeddings(장소·취향 벡터)
+- **지도·경로** — Kakao Local, Kakao Maps SDK, Kakao 길찾기 3종(자동차·도보·대중교통)
+- **영상** — YouTube Data API v3, youtube-transcript-api, yt-dlp
+- **그 외** — Kakao OAuth, Firebase Cloud Messaging, SMTP
 
 영상 분석으로만 장소가 쌓이면 분석한 적 없는 지역에서는 추천이 비어 있습니다(테스트 당시 가장 가까운 장소가 10.7km). 그래서 공공데이터 **약 85만 건**을 함께 적재해 콜드 스타트를 해결했습니다.
 
@@ -132,6 +132,7 @@ cd ai-worker && pytest                    # 추출 · 점수화 · 경로
 ## 팀
 
 **럭키비키** — 김혜빈(팀장) · 최나경
+
 동서울대학교 컴퓨터소프트웨어과 졸업작품
 
 ## 데이터 출처
