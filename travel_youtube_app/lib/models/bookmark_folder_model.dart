@@ -11,6 +11,15 @@ class BookmarkFolderModel {
     required this.createdAt,
   });
 
+  BookmarkFolderModel copyWith({int? bookmarkCount}) {
+    return BookmarkFolderModel(
+      folderId: folderId,
+      name: name,
+      bookmarkCount: bookmarkCount ?? this.bookmarkCount,
+      createdAt: createdAt,
+    );
+  }
+
   factory BookmarkFolderModel.fromJson(Map<String, dynamic> json) {
     return BookmarkFolderModel(
       folderId: json['folderId'] as String,

@@ -93,6 +93,22 @@ class BookmarkFolderProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 폴더 목록이 들고 있는 장소 개수를 방금 바뀐 폴더만 맞춰 둔다.
+  ///
+  /// 목록의 `bookmarkCount`는 `loadFolders()`가 한 번 받아온 값이라, 폴더에
+  /// 장소를 담아도 목록 쪽 숫자는 그대로였다. 여행 날짜를 만들 때 고르는
+  /// 폴더 화면에서 방금 4곳을 담은 폴더가 "장소 0곳"으로 보였고, 앱을 다시
+  /// 띄워야 제 숫자가 나왔다. 개수는 방금 받아온 `_folderBookmarks`의
+  /// 길이와 같으므로 서버를 다시 부르지 않는다.
+  void _syncFolderCount(String folderId) {
+    _folders = [
+      for (final folder in _folders)
+        folder.folderId == folderId
+            ? folder.copyWith(bookmarkCount: _folderBookmarks.length)
+            : folder,
+    ];
+  }
+
   Future<void> toggleBookmarkInFolder(String folderId, String bookmarkId) async {
     final wasIn = _folderBookmarkIds.contains(bookmarkId);
 
@@ -103,6 +119,8 @@ class BookmarkFolderProvider extends ChangeNotifier {
         await _repository.addBookmarkToFolder(folderId, bookmarkId);
       }
       await loadFolderBookmarks(folderId);
+      _syncFolderCount(folderId);
+      notifyListeners();
     } on ApiException catch (e) {
       _detailErrorMessage = e.friendlyMessage;
       notifyListeners();
@@ -157,6 +175,8 @@ class BookmarkFolderProvider extends ChangeNotifier {
         await _repository.addSearchedPlaceToFolder(folderId, place);
       }
       await loadFolderBookmarks(folderId);
+      _syncFolderCount(folderId);
+      notifyListeners();
       return true;
     } on ApiException catch (e) {
       _searchErrorMessage = e.friendlyMessage;
