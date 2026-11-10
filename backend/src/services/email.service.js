@@ -44,4 +44,26 @@ async function sendSupportInquiryEmail(inquiry) {
   });
 }
 
-module.exports = { sendOtpEmail, sendSupportInquiryEmail };
+/**
+ * Forwards a FR-21 feed report to the support mailbox. There is no admin
+ * console, so this mail is how a report is actually seen. No `replyTo`: the
+ * reporter's address is not collected (a Kakao account may not have one).
+ */
+async function sendContentReportEmail(report, route) {
+  await getTransporter().sendMail({
+    from: env.smtpFrom,
+    to: env.supportEmail,
+    subject: `[Voylog 신고] ${report.reason} - ${report.report_id}`,
+    text: [
+      `사유: ${report.reason}`,
+      `신고한 사용자 ID: ${report.reporter_user_id}`,
+      `신고된 동선 ID: ${report.shared_route_id}`,
+      `동선 제목: ${route.title}`,
+      `게시자 ID: ${route.user_id}`,
+      '',
+      report.detail || '(추가 설명 없음)',
+    ].join('\n'),
+  });
+}
+
+module.exports = { sendOtpEmail, sendSupportInquiryEmail, sendContentReportEmail };

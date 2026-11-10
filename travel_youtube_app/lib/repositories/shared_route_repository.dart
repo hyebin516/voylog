@@ -39,6 +39,21 @@ class SharedRouteRepository {
     }
   }
 
+  /// FR-21 신고. Google Play's user-generated content policy requires a way
+  /// to flag what another user wrote -- the feed shows their titles.
+  /// Reporting the same route twice is accepted and changes nothing, so the
+  /// UI never has to explain a duplicate.
+  Future<void> report(String sharedRouteId, {required String reason, String? detail}) async {
+    try {
+      await _dio.post('/routes/$sharedRouteId/report', data: {
+        'reason': reason,
+        if (detail != null && detail.trim().isNotEmpty) 'detail': detail.trim(),
+      });
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
   Future<SharedRouteModel> updateTitle(String sharedRouteId, String title) async {
     try {
       final response = await _dio.patch('/routes/$sharedRouteId', data: {'title': title});

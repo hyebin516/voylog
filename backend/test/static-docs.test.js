@@ -62,3 +62,46 @@ describe('GET /terms', () => {
     expect(res.text).not.toMatch(/\[\s{2,}[^\]]*\s{2,}\]/);
   });
 });
+
+describe('GET /account-deletion', () => {
+  it('serves the deletion guide as a page anyone can open', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toMatch(/html/);
+  });
+
+  // The three things Google's console says this page must carry.
+  it('names the app, so a reviewer can tell which app it belongs to', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.text).toContain('Voylog');
+  });
+
+  it('spells out the steps for requesting deletion, in the app and by email', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.text).toContain('회원 탈퇴');
+    expect(res.text).toContain('voylog.help@gmail.com');
+  });
+
+  it('says what is deleted, what is kept, and for how long', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.text).toContain('지워지는 데이터');
+    expect(res.text).toContain('남는 데이터');
+    expect(res.text).toMatch(/보관 기간/);
+  });
+
+  it('links to the privacy policy', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.text).toContain('/privacy');
+  });
+
+  it('has no unfilled placeholders left in it', async () => {
+    const res = await request(app).get('/account-deletion');
+
+    expect(res.text).not.toMatch(/\[\s{2,}[^\]]*\s{2,}\]/);
+  });
+});

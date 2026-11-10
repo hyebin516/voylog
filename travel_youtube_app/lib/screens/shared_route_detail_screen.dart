@@ -7,6 +7,7 @@ import '../models/shared_route_model.dart';
 import '../repositories/map_repository.dart';
 import '../widgets/data_source_attribution.dart';
 import '../widgets/pinned_map_sliver.dart';
+import '../widgets/report_route_sheet.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/route_summary_card.dart';
 
@@ -34,6 +35,17 @@ class SharedRouteDetailScreen extends StatefulWidget {
 
 class _SharedRouteDetailScreenState extends State<SharedRouteDetailScreen> {
   String? _selectedMarkerId;
+
+  Future<void> _openReportSheet() async {
+    final reported = await showReportRouteSheet(
+      context,
+      sharedRouteId: widget.route.sharedRouteId,
+    );
+    if (reported != true || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('신고가 접수됐어요. 운영자가 확인할게요.')),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -80,14 +92,38 @@ class _SharedRouteDetailScreenState extends State<SharedRouteDetailScreen> {
                     ),
                   ),
                   const SizedBox(width: 12),
-                  const Text(
-                    '추천 동선',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink,
+                  const Expanded(
+                    child: Text(
+                      '추천 동선',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink,
+                      ),
                     ),
                   ),
+                  // UGC policy: the title below was written by another user,
+                  // so there has to be a way to flag it. Hidden on your own
+                  // post -- reporting yourself is not a thing.
+                  if (!route.isOwner)
+                    InkWell(
+                      onTap: _openReportSheet,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceTint2,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.flag_outlined,
+                          size: 17,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),

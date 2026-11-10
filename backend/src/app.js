@@ -42,6 +42,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 // time. 앱의 설정·회원가입 화면도 이 주소를 연다.
 app.get('/privacy', staticDocController.privacyPolicy);
 app.get('/terms', staticDocController.termsOfService);
+app.get('/account-deletion', staticDocController.accountDeletion);
 
 app.use('/api/v1', generalLimiter, apiRoutes);
 

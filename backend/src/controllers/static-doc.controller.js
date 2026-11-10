@@ -38,6 +38,9 @@ const PAGE_STYLE = `
 const DOCS = {
   privacy: { file: 'privacy-policy.md', title: '개인정보처리방침 - Voylog' },
   terms: { file: 'terms-of-service.md', title: '이용약관 - Voylog' },
+  // Google Play requires a public page describing how to request account
+  // deletion for any app that lets users create an account.
+  accountDeletion: { file: 'account-deletion.md', title: '계정 및 데이터 삭제 - Voylog' },
 };
 
 // 한 번만 읽는다. 파일은 이미지 안에 들어 있어 돌고 있는 컨테이너에서
@@ -58,7 +61,7 @@ function render(name) {
 <style>${PAGE_STYLE}</style>
 </head>
 <body>
-  <div class="nav"><a href="/privacy">개인정보처리방침</a><a href="/terms">이용약관</a></div>
+  <div class="nav"><a href="/privacy">개인정보처리방침</a><a href="/terms">이용약관</a><a href="/account-deletion">계정 삭제</a></div>
   <div class="container">
 ${markdownIt.render(markdown)}
   </div>
@@ -69,5 +72,6 @@ ${markdownIt.render(markdown)}
 
 const privacyPolicy = (req, res) => res.type('html').send(render('privacy'));
 const termsOfService = (req, res) => res.type('html').send(render('terms'));
+const accountDeletion = (req, res) => res.type('html').send(render('accountDeletion'));
 
-module.exports = { privacyPolicy, termsOfService };
+module.exports = { privacyPolicy, termsOfService, accountDeletion };

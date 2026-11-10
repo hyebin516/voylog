@@ -1,4 +1,5 @@
 const sharedRouteService = require('../services/shared-route.service');
+const contentReportService = require('../services/content-report.service');
 const { success } = require('../utils/response');
 
 const DEFAULT_FEED_LIMIT = 20;
@@ -85,4 +86,18 @@ async function unpublish(req, res, next) {
   }
 }
 
-module.exports = { feed, like, unlike, update, unpublish, toPublishedRouteResponse };
+async function report(req, res, next) {
+  try {
+    const created = await contentReportService.reportSharedRoute({
+      reporterUserId: req.user.userId,
+      sharedRouteId: req.params.id,
+      reason: req.body.reason,
+      detail: req.body.detail,
+    });
+    return success(res, { reportId: created.report_id, reason: created.reason }, 201);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { feed, like, unlike, update, unpublish, report, toPublishedRouteResponse };
