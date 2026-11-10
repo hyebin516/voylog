@@ -29,6 +29,22 @@ Flutter · Node.js · Python · PostgreSQL · Redis
 <img src="docs/store-assets/screenshots/02-home.png" width="200"> <img src="docs/store-assets/screenshots/04-analysis.png" width="200"> <img src="docs/store-assets/screenshots/06-walking-course.png" width="200"> <img src="docs/store-assets/screenshots/03-nearby.png" width="200">
 </div>
 
+## 직접 써보기
+
+안드로이드 기기에서 아래 QR을 찍거나 주소로 들어가면 바로 설치됩니다. 계정 등록이나 테스터 신청은 필요 없습니다.
+
+<div align="center">
+<img src="docs/Voylog_설치_QR.png" width="180">
+
+**https://voylog.duckdns.org/uploads/voylog.apk**
+</div>
+
+- 설치 시 "출처를 알 수 없는 앱" 허용을 한 번 눌러야 합니다 (스토어를 거치지 않는 직접 설치이므로 안드로이드가 매번 묻습니다).
+- 로그인 없이도 **영상 분석 · 내 주변 추천 · 뚜벅이 코스**를 쓸 수 있습니다. 북마크와 여행 일정만 카카오 로그인이 필요합니다.
+- 서버는 네이버 클라우드에서 상시 가동 중입니다 — [서비스 상태](https://voylog.duckdns.org/health) · [개인정보처리방침](https://voylog.duckdns.org/privacy) · [이용약관](https://voylog.duckdns.org/terms)
+
+**배포 상태**: Google Play **내부 테스트 트랙**으로 배포 중이며, 정식 출시는 심사 준비 단계입니다. 개인 개발자 계정은 프로덕션 액세스 신청 전에 비공개 테스트(테스터 12명 · 14일 연속)를 거쳐야 하므로, 그동안은 위 APK로 동일한 빌드를 받을 수 있습니다.
+
 ## 주요 기능
 
 - **영상 분석** — 자막에서 장소명·카테고리·영업시간·태그를 추출하고, 타임스탬프를 누르면 영상의 그 장면으로 이동합니다. 공식 자막이 없는 영상은 프레임을 샘플링해 **화면에 박힌 글자를 비전 LLM으로 읽습니다.**
