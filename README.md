@@ -36,7 +36,7 @@ Flutter · Node.js · Python · PostgreSQL · Redis
 <div align="center">
 <img src="docs/Voylog_설치_QR.png" width="180">
 
-**https://voylog.duckdns.org/uploads/voylog.apk**
+**https://voylog.duckdns.org/get**
 </div>
 
 - 설치 시 "출처를 알 수 없는 앱" 허용을 한 번 눌러야 합니다 (스토어를 거치지 않는 직접 설치이므로 안드로이드가 매번 묻습니다).

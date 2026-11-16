@@ -105,3 +105,20 @@ describe('GET /account-deletion', () => {
     expect(res.text).not.toMatch(/\[\s{2,}[^\]]*\s{2,}\]/);
   });
 });
+
+describe('GET /get', () => {
+  it('redirects to the APK so the exhibition QR can stay short', async () => {
+    const res = await request(app).get('/get');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('/uploads/voylog.apk');
+  });
+
+  // 302, not 301: a permanent redirect gets cached by phones and by Chrome,
+  // and then a moved file would need a new QR on an already printed poster.
+  it('redirects temporarily, so the target can move without reprinting', async () => {
+    const res = await request(app).get('/get');
+
+    expect(res.status).not.toBe(301);
+  });
+});
