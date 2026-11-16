@@ -50,6 +50,13 @@ app.get('/account-deletion', staticDocController.accountDeletion);
 // 302(임시)인 이유는 파일 경로가 바뀌어도 QR은 그대로 쓰기 위해서다.
 app.get('/get', (req, res) => res.redirect(302, '/uploads/voylog.apk'));
 
+// 전시에서 아이폰 관람객에게 보여줄 예시 동선. 설치가 불가능한 기기에서도
+// 앱이 실제로 짠 일정을 브라우저로 확인할 수 있어야 한다. 가리키는 곳은
+// 심사용 계정(voylog.help+review)의 "제주 1박 2일" 여행이고, FR-20의 공개
+// 조회 페이지라 로그인 없이 열린다 -- 그 여행을 지우면 이 주소도 깨진다.
+const DEMO_TRIP_ID = '90981936-2a37-4c19-9c97-5447e1a7c79b';
+app.get('/demo', (req, res) => res.redirect(302, `/api/v1/trips/${DEMO_TRIP_ID}/share`));
+
 app.use('/api/v1', generalLimiter, apiRoutes);
 
 app.use((req, res) => {

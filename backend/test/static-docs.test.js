@@ -122,3 +122,12 @@ describe('GET /get', () => {
     expect(res.status).not.toBe(301);
   });
 });
+
+describe('GET /demo', () => {
+  it('redirects to a public trip share page for devices that cannot install', async () => {
+    const res = await request(app).get('/demo');
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toMatch(/^\/api\/v1\/trips\/[0-9a-f-]{36}\/share$/);
+  });
+});
