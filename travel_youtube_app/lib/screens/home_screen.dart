@@ -650,7 +650,9 @@ class _SimilarTastePlaceCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               gradient: const LinearGradient(colors: [AppColors.surfaceSoft, AppColors.surfaceTint3Alt]),
             ),
-            child: const Icon(Icons.image_outlined, size: 20, color: AppColors.textTertiary),
+            // 장소에는 사진이 없다. 빈 이미지 아이콘은 "못 불러왔다"로 보여서
+            // 카테고리 아이콘으로 바꿨다 (place_category_label.dart 참고).
+            child: Icon(placeCategoryIcon(rec.category), size: 26, color: AppColors.primaryStrong),
           ),
           const SizedBox(width: 12),
           Expanded(
