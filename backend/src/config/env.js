@@ -22,7 +22,7 @@ module.exports = {
   tourApiKey: process.env.TOUR_API_KEY,
   // Where FR-13 고객센터 inquiries are forwarded. Same address the app
   // shows on the customer service screen.
-  supportEmail: process.env.SUPPORT_EMAIL || 'support@voylog.app',
+  supportEmail: process.env.SUPPORT_EMAIL || 'voylog.help@gmail.com',
   // FR-12 push notifications. Without this the app still works; pushes are
   // skipped with a warning (src/services/push.service.js).
   firebaseServiceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,

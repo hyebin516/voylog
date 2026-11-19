@@ -33,5 +33,5 @@ class CustomerServiceContent {
     ),
   ];
 
-  static const String contactEmail = 'support@voylog.app';
+  static const String contactEmail = 'voylog.help@gmail.com';
 }
