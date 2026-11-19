@@ -44,8 +44,10 @@ class _FakeRepository extends BookmarkFolderRepository {
   }
 
   @override
-  Future<void> addSearchedPlaceToFolder(String folderId, PlaceSearchResultModel place) async {
+  Future<({String bookmarkId, String? placeId})?> addSearchedPlaceToFolder(
+      String folderId, PlaceSearchResultModel place) async {
     folderBookmarks = [...folderBookmarks, _bookmark(place.name)];
+    return (bookmarkId: 'b-${place.name}', placeId: 'p-${place.name}');
   }
 }
 

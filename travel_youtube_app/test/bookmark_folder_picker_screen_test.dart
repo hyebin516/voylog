@@ -63,9 +63,11 @@ class FakeBookmarkFolderRepository extends BookmarkFolderRepository {
   }
 
   @override
-  Future<void> addSearchedPlaceToFolder(String folderId, PlaceSearchResultModel place) async {
+  Future<({String bookmarkId, String? placeId})?> addSearchedPlaceToFolder(
+      String folderId, PlaceSearchResultModel place) async {
     addedPlaces.add(place);
     folderBookmarksToReturn = [...folderBookmarksToReturn, _bookmark('b-new', place.name)];
+    return (bookmarkId: 'b-new', placeId: 'p-new');
   }
 }
 
@@ -162,9 +164,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('전주객사'));
+    // pumpAndSettle이 아니라 pump다 -- 스낵바가 떠 있는 동안을 봐야 한다.
     await tester.pumpAndSettle();
 
     expect(folderRepository.addedPlaces.single.kakaoPlaceId, '1234');
     expect(find.textContaining('폴더에 담았어요'), findsOneWidget);
+    // 담은 줄은 "+"가 아니라 체크 표시로 바뀌어야 한다 (담긴 건지 알 수 없던 문제).
+    expect(find.byIcon(Icons.check_circle_rounded), findsOneWidget);
   });
 }

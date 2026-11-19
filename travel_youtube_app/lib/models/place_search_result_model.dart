@@ -60,4 +60,21 @@ class PlaceSearchResultModel {
         'longitude': longitude,
         if (category != null) 'category': category,
       };
+
+  /// 카카오 결과를 폴더에 담은 직후, 서버가 만들어 준 북마크 식별자를 붙여
+  /// "이미 담긴 곳"으로 바꿔 놓기 위한 것. 목록을 다시 불러오지 않고도
+  /// 그 줄만 체크 표시로 바뀐다.
+  PlaceSearchResultModel asAddedBookmark({required String bookmarkId, String? placeId}) {
+    return PlaceSearchResultModel(
+      origin: 'bookmark',
+      bookmarkId: bookmarkId,
+      placeId: placeId ?? this.placeId,
+      kakaoPlaceId: kakaoPlaceId,
+      name: name,
+      address: address,
+      latitude: latitude,
+      longitude: longitude,
+      category: category,
+    );
+  }
 }

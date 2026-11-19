@@ -172,7 +172,23 @@ class BookmarkFolderProvider extends ChangeNotifier {
       if (place.isBookmarked) {
         await _repository.addBookmarkToFolder(folderId, place.bookmarkId!);
       } else {
-        await _repository.addSearchedPlaceToFolder(folderId, place);
+        // 카카오 결과에는 bookmarkId가 없다. 서버가 만들어 준 걸 받아 그 줄에
+        // 붙여놓지 않으면 isInCurrentFolder가 영영 false라, 담은 뒤에도 화면이
+        // 그대로여서 됐는지 안 됐는지 알 수 없다.
+        final created = await _repository.addSearchedPlaceToFolder(folderId, place);
+        if (created != null) {
+          final index = _searchResults.indexOf(place);
+          if (index != -1) {
+            // 제자리 수정이 아니라 새 리스트다 -- 검색 결과는 수정 불가 리스트로
+            // 올 수 있어서, 자리만 바꿔치기하면 UnsupportedError로 터진다.
+            final updated = List<PlaceSearchResultModel>.of(_searchResults);
+            updated[index] = place.asAddedBookmark(
+              bookmarkId: created.bookmarkId,
+              placeId: created.placeId,
+            );
+            _searchResults = updated;
+          }
+        }
       }
       await loadFolderBookmarks(folderId);
       _syncFolderCount(folderId);

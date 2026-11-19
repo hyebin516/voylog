@@ -89,12 +89,23 @@ class BookmarkFolderRepository {
 
   /// 카카오에서 찾은 장소를 폴더에 넣는다. 아직 저장된 적 없는 장소라
   /// 서버가 적재하고 북마크까지 만들어 준다.
-  Future<void> addSearchedPlaceToFolder(String folderId, PlaceSearchResultModel place) async {
+  ///
+  /// 서버가 만들어 준 북마크 식별자를 돌려준다 -- 이걸 버리면 방금 담은 줄이
+  /// 여전히 "+" 상태로 남아, 담긴 건지 아닌지 화면만 봐서는 알 수 없다.
+  Future<({String bookmarkId, String? placeId})?> addSearchedPlaceToFolder(
+    String folderId,
+    PlaceSearchResultModel place,
+  ) async {
     try {
-      await _dio.post(
+      final response = await _dio.post(
         '/bookmark-folders/$folderId/bookmarks',
         data: {'place': place.toAddPlaceBody()},
       );
+      final data = response.data?['data'];
+      if (data is Map && data['bookmarkId'] is String) {
+        return (bookmarkId: data['bookmarkId'] as String, placeId: data['placeId'] as String?);
+      }
+      return null;
     } on DioException catch (e) {
       throwApiException(e);
     }
