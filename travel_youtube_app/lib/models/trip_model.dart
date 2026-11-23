@@ -32,6 +32,15 @@ class TripModel {
       createdAt: DateTime.parse(json['createdAt'] as String),
     );
   }
+
+  TripModel copyWithDayCount(int dayCount) => TripModel(
+    tripId: tripId,
+    name: name,
+    dayCount: dayCount,
+    startDate: startDate,
+    endDate: endDate,
+    createdAt: createdAt,
+  );
 }
 
 /// Full shape returned by `GET /trips/:id` (detail), including each day's

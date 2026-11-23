@@ -86,4 +86,18 @@ async function publishItinerary(userId, itineraryId, title) {
   });
 }
 
-module.exports = { createItinerary, getOwnedItinerary, publishItinerary };
+/**
+ * Deletes one day of a trip (FR-07). Later days move up, so the trip keeps
+ * its days numbered 1..N. A route already published from this day stays in
+ * the feed -- the feed holds its own snapshot (FR-21).
+ */
+async function deleteItinerary(userId, itineraryId) {
+  const itinerary = await getOwnedItinerary(userId, itineraryId);
+  await itineraryRepository.softDeleteDayAndRenumber(
+    itinerary.itinerary_id,
+    itinerary.trip_id,
+    itinerary.day_number
+  );
+}
+
+module.exports = { createItinerary, getOwnedItinerary, publishItinerary, deleteItinerary };

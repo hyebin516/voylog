@@ -24,17 +24,25 @@ class TripDetailScreen extends StatefulWidget {
   /// `FakeMapRepository()` instead.
   final MapRepository mapRepository;
 
-  const TripDetailScreen({
-    super.key,
-    required this.tripId,
-    this.mapRepository = const KakaoMapRepository(),
-  });
+  const TripDetailScreen({super.key, required this.tripId, this.mapRepository = const KakaoMapRepository()});
 
   @override
   State<TripDetailScreen> createState() => _TripDetailScreenState();
 }
 
 class _TripDetailScreenState extends State<TripDetailScreen> {
+  /// The day the map shows. Null means "the first day" -- so the default
+  /// follows the trip as days are loaded, added or removed.
+  int? _selectedDayNumber;
+
+  ItineraryModel? _selectedDay(List<ItineraryModel> days) {
+    if (days.isEmpty) return null;
+    for (final day in days) {
+      if (day.dayNumber == _selectedDayNumber) return day;
+    }
+    return days.reduce((a, b) => a.dayNumber <= b.dayNumber ? a : b);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -43,7 +51,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     });
   }
 
-  /// One marker per located stop across every day, numbered within its day.
+  /// One marker per located stop of [days], numbered within its day.
   List<MapMarkerData> _tripMarkers(List<ItineraryModel> days) {
     final markers = <MapMarkerData>[];
     for (final day in days) {
@@ -86,9 +94,37 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
     if (!mounted) return;
     if (!success) {
       final message = tripProvider.errorMessage ?? '여행 날짜를 저장하지 못했습니다.';
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    }
+  }
+
+  Future<void> _confirmDeleteDay(ItineraryModel day, int dayCount) async {
+    final tripProvider = context.read<TripProvider>();
+    final isLast = day.dayNumber == dayCount;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('${day.dayNumber}일차 삭제'),
+        content: Text(
+          isLast
+              ? '${day.dayNumber}일차 동선을 삭제하시겠습니까?'
+              : '${day.dayNumber}일차 동선을 삭제하시겠습니까? 뒤의 날짜는 하루씩 앞당겨집니다.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final success = await tripProvider.deleteDay(widget.tripId, day.itineraryId);
+    if (!mounted) return;
+    if (success) {
+      // Day numbers shift after a delete; go back to showing the first day.
+      setState(() => _selectedDayNumber = null);
+    } else {
+      showErrorDialog(context, tripProvider.errorMessage ?? '날짜 삭제에 실패했습니다.');
     }
   }
 
@@ -129,54 +165,32 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             color: AppColors.surfaceTint2,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            size: 17,
-                            color: AppColors.textSecondary,
-                          ),
+                          child: const Icon(Icons.arrow_back_ios_new_rounded, size: 17, color: AppColors.textSecondary),
                         ),
                       ),
                       const SizedBox(width: 12),
                       const Expanded(
                         child: Text(
                           '여행',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.ink,
-                          ),
+                          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.ink),
                         ),
                       ),
                       if (trip != null)
                         InkWell(
-                          onTap: () => Navigator.pushNamed(
-                            context,
-                            AppRoutes.tripOverview,
-                            arguments: widget.tripId,
-                          ),
+                          onTap: () => Navigator.pushNamed(context, AppRoutes.tripOverview, arguments: widget.tripId),
                           borderRadius: BorderRadius.circular(999),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 9,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: AppColors.surfaceTint3,
-                                width: 1.5,
-                              ),
+                              border: Border.all(color: AppColors.surfaceTint3, width: 1.5),
                               boxShadow: AppColors.cardShadow(),
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  Icons.reorder_rounded,
-                                  size: 14,
-                                  color: AppColors.primaryStrong,
-                                ),
+                                Icon(Icons.reorder_rounded, size: 14, color: AppColors.primaryStrong),
                                 SizedBox(width: 6),
                                 Text(
                                   '전체 일정',
@@ -199,11 +213,9 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                       if (tripProvider.isLoading && trip == null) {
                         return const LoadingIndicator();
                       }
-                      if (tripProvider.state == ViewState.error &&
-                          trip == null) {
+                      if (tripProvider.state == ViewState.error && trip == null) {
                         return ErrorView(
-                          message:
-                              tripProvider.errorMessage ?? '여행을 불러오지 못했습니다.',
+                          message: tripProvider.errorMessage ?? '여행을 불러오지 못했습니다.',
                           onRetry: () => tripProvider.loadTrip(widget.tripId),
                         );
                       }
@@ -215,10 +227,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                           // Trip name -- read-only for now (no rename API).
                           Container(
                             width: double.infinity,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 15,
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                             decoration: BoxDecoration(
                               color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
@@ -226,11 +235,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             ),
                             child: Text(
                               trip.name,
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.ink,
-                              ),
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.ink),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -240,11 +245,8 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                             children: [
                               Expanded(
                                 child: _DateField(
-                                  label: trip.startDate != null
-                                      ? formatTripDate(trip.startDate!)
-                                      : '시작일',
-                                  onTap: () =>
-                                      _editDates(trip.startDate, trip.endDate),
+                                  label: trip.startDate != null ? formatTripDate(trip.startDate!) : '시작일',
+                                  onTap: () => _editDates(trip.startDate, trip.endDate),
                                 ),
                               ),
                               const Padding(
@@ -260,22 +262,22 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                               ),
                               Expanded(
                                 child: _DateField(
-                                  label: trip.endDate != null
-                                      ? formatTripDate(trip.endDate!)
-                                      : '종료일',
-                                  onTap: () =>
-                                      _editDates(trip.startDate, trip.endDate),
+                                  label: trip.endDate != null ? formatTripDate(trip.endDate!) : '종료일',
+                                  onTap: () => _editDates(trip.startDate, trip.endDate),
                                 ),
                               ),
                             ],
                           ),
-                          // Every located stop of every day, so the trip
-                          // reads as one shape before the day cards break it
-                          // apart. Hidden until a day has been planned --
-                          // an empty map box says nothing.
+                          // One day at a time: the selected day (the first
+                          // by default; tap a day card to switch). Every day
+                          // at once drew two loops over each other from the
+                          // same hotel, and the numbered pins of different
+                          // days collided. Hidden until a day has been
+                          // planned -- an empty map box says nothing.
                           Builder(
                             builder: (context) {
-                              final markers = _tripMarkers(trip.days);
+                              final selected = _selectedDay(trip.days);
+                              final markers = selected == null ? const <MapMarkerData>[] : _tripMarkers([selected]);
                               if (markers.isEmpty) return const SizedBox.shrink();
                               return Padding(
                                 padding: const EdgeInsets.only(top: AppSpacing.sm),
@@ -283,11 +285,17 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                                   borderRadius: BorderRadius.circular(AppRadius.lg),
                                   child: SizedBox(
                                     height: 150,
-                                    child: widget.mapRepository.buildMap(
-                                      initialLatitude: markers.first.latitude,
-                                      initialLongitude: markers.first.longitude,
-                                      markers: markers,
-                                      drawRoutePolyline: true,
+                                    // Keyed by day: the map widget doesn't
+                                    // clear pins it already drew, so a new
+                                    // day gets a fresh map.
+                                    child: KeyedSubtree(
+                                      key: ValueKey('trip-map-day-${selected!.dayNumber}'),
+                                      child: widget.mapRepository.buildMap(
+                                        initialLatitude: markers.first.latitude,
+                                        initialLongitude: markers.first.longitude,
+                                        markers: markers,
+                                        drawRoutePolyline: true,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -297,27 +305,23 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                           const SizedBox(height: AppSpacing.md),
                           const Text(
                             '날짜',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.ink,
-                            ),
+                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.ink),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           if (trip.days.isEmpty)
                             const Padding(
                               padding: EdgeInsets.only(bottom: 16),
                               child: Center(
-                                child: Text(
-                                  '아직 저장된 일차가 없습니다.',
-                                  style: TextStyle(color: AppColors.textMuted),
-                                ),
+                                child: Text('아직 저장된 일차가 없습니다.', style: TextStyle(color: AppColors.textMuted)),
                               ),
                             ),
                           for (final day in trip.days) ...[
                             _TripDayCard(
                               day: day,
                               date: trip.startDate?.add(Duration(days: day.dayNumber - 1)),
+                              selected: day.dayNumber == _selectedDay(trip.days)?.dayNumber,
+                              onTap: () => setState(() => _selectedDayNumber = day.dayNumber),
+                              onDelete: () => _confirmDeleteDay(day, trip.days.length),
                             ),
                             const SizedBox(height: AppSpacing.sm),
                           ],
@@ -329,11 +333,7 @@ class _TripDetailScreenState extends State<TripDetailScreen> {
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const Icon(
-                                    Icons.add_rounded,
-                                    size: 15,
-                                    color: AppColors.primaryStrong,
-                                  ),
+                                  const Icon(Icons.add_rounded, size: 15, color: AppColors.primaryStrong),
                                   const SizedBox(width: 8),
                                   const Text(
                                     '날짜 추가',
@@ -383,11 +383,7 @@ class _DateField extends StatelessWidget {
         ),
         child: Text(
           label,
-          style: const TextStyle(
-            fontSize: 13.5,
-            fontWeight: FontWeight.w600,
-            color: AppColors.ink,
-          ),
+          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600, color: AppColors.ink),
         ),
       ),
     );
@@ -401,109 +397,127 @@ class _DateField extends StatelessWidget {
 const List<String> _koreanWeekdays = ['월', '화', '수', '목', '금', '토', '일'];
 
 class _TripDayCard extends StatelessWidget {
-  const _TripDayCard({required this.day, this.date});
+  const _TripDayCard({
+    required this.day,
+    this.date,
+    required this.selected,
+    required this.onTap,
+    required this.onDelete,
+  });
 
   final ItineraryModel day;
   final DateTime? date;
 
+  /// Whether the map above is showing this day.
+  final bool selected;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
   @override
   Widget build(BuildContext context) {
-    final badgeColor = day.dayNumber.isOdd
-        ? AppColors.primary
-        : AppColors.accentWarm;
+    final badgeColor = day.dayNumber.isOdd ? AppColors.primary : AppColors.accentWarm;
     final hotelName = day.routeData.isNotEmpty ? day.routeData.first.name : '-';
     final placeCount = day.routeData.where((p) => !p.isHotel).length;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: AppColors.cardShadow(),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: '${day.dayNumber}일차 동선 지도에 표시',
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            // The selected day is the one drawn on the map above.
+            border: Border.all(color: selected ? badgeColor : Colors.transparent, width: 1.5),
+            boxShadow: AppColors.cardShadow(),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  '${day.dayNumber}일차',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(999)),
+                    child: Text(
+                      '${day.dayNumber}일차',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white),
+                    ),
                   ),
+                  if (date != null) ...[
+                    const SizedBox(width: 8),
+                    Text(
+                      '${date!.month}/${date!.day} (${_koreanWeekdays[date!.weekday - 1]})',
+                      style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ],
+                  const Spacer(),
+                  // Same round red button as deleting a whole trip in the
+                  // trip list.
+                  Semantics(
+                    button: true,
+                    label: '${day.dayNumber}일차 삭제',
+                    child: InkWell(
+                      onTap: onDelete,
+                      borderRadius: BorderRadius.circular(999),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        decoration: const BoxDecoration(color: AppColors.dangerBg, shape: BoxShape.circle),
+                        child: const Icon(Icons.delete_outline_rounded, size: 16, color: AppColors.danger),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(color: AppColors.surfaceTint1, borderRadius: BorderRadius.circular(14)),
+                child: Row(
+                  children: [
+                    const Icon(Icons.home_rounded, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 9),
+                    Expanded(
+                      child: Text(
+                        hotelName,
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.ink),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceTint3Alt,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        day.isRoundTrip ? '왕복' : '호텔 → 호텔',
+                        style: const TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              if (date != null) ...[
-                const SizedBox(width: 8),
-                Text(
-                  '${date!.month}/${date!.day} (${_koreanWeekdays[date!.weekday - 1]})',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-                ),
-              ],
+              const SizedBox(height: 7),
+              Text(
+                '저장된 장소 $placeCount곳 · ${formatRouteDuration(day.totalDurationSec)} · ${formatRouteDistance(day.totalDistanceM)}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceTint1,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.home_rounded,
-                  size: 14,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    hotelName,
-                    style: const TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.ink,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surfaceTint3Alt,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    day.isRoundTrip ? '왕복' : '호텔 → 호텔',
-                    style: const TextStyle(
-                      fontSize: 10.5,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            '저장된 장소 $placeCount곳 · ${formatRouteDuration(day.totalDurationSec)} · ${formatRouteDistance(day.totalDistanceM)}',
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
-          ),
-        ],
+        ),
       ),
     );
   }

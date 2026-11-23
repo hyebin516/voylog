@@ -10,5 +10,6 @@ router.use(authenticate);
 
 router.post('/', validateCreateItinerary, itineraryController.create);
 router.post('/:id/publish', validateItineraryId, validatePublishTitle, itineraryController.publish);
+router.delete('/:id', validateItineraryId, itineraryController.remove);
 
 module.exports = router;

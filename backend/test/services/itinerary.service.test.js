@@ -242,3 +242,24 @@ describe('publishItinerary', () => {
     expect(sharedRouteRepository.create).not.toHaveBeenCalled();
   });
 });
+
+describe('deleteItinerary', () => {
+  const { deleteItinerary } = require('../../src/services/itinerary.service');
+
+  it('soft-deletes the owned day and renumbers the later days of its trip', async () => {
+    itineraryRepository.findById.mockResolvedValue({ itinerary_id: 'it-1', user_id: USER_ID, trip_id: TRIP_ID, day_number: 1 });
+    itineraryRepository.softDeleteDayAndRenumber.mockResolvedValue();
+
+    await deleteItinerary(USER_ID, 'it-1');
+
+    expect(itineraryRepository.softDeleteDayAndRenumber).toHaveBeenCalledWith('it-1', TRIP_ID, 1);
+  });
+
+  it("answers 404 for someone else's day, without touching it", async () => {
+    itineraryRepository.findById.mockResolvedValue({ itinerary_id: 'it-1', user_id: 'someone-else', trip_id: TRIP_ID, day_number: 1 });
+    itineraryRepository.softDeleteDayAndRenumber.mockClear();
+
+    await expect(deleteItinerary(USER_ID, 'it-1')).rejects.toMatchObject({ statusCode: 404, code: 'ITINERARY_NOT_FOUND' });
+    expect(itineraryRepository.softDeleteDayAndRenumber).not.toHaveBeenCalled();
+  });
+});

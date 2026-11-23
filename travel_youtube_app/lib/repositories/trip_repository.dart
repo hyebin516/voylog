@@ -75,6 +75,16 @@ class TripRepository {
     }
   }
 
+  /// Deletes one day of a trip. The server moves the later days up by one,
+  /// so the trip should be reloaded afterwards.
+  Future<void> deleteDay(String itineraryId) async {
+    try {
+      await _dio.delete('/itineraries/$itineraryId');
+    } on DioException catch (e) {
+      throwApiException(e);
+    }
+  }
+
   Future<void> updateTripDates(
     String tripId, {
     required DateTime startDate,

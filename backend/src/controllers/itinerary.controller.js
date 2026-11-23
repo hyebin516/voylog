@@ -46,4 +46,13 @@ async function publish(req, res, next) {
   }
 }
 
-module.exports = { create, publish, toItineraryResponse };
+async function remove(req, res, next) {
+  try {
+    await itineraryService.deleteItinerary(req.user.userId, req.params.id);
+    return res.status(204).send();
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = { create, publish, remove, toItineraryResponse };

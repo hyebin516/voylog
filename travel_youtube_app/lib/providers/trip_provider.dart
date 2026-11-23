@@ -126,6 +126,26 @@ class TripProvider extends ChangeNotifier {
     return true;
   }
 
+  /// Deletes one day of [tripId]'s trip and reloads it -- the server renumbers
+  /// the later days, so the local list can't just drop the one card.
+  Future<bool> deleteDay(String tripId, String itineraryId) async {
+    try {
+      await _repository.deleteDay(itineraryId);
+    } on ApiException catch (e) {
+      _errorMessage = e.friendlyMessage;
+      notifyListeners();
+      return false;
+    }
+
+    // The trip list shows "N일차 저장됨" per trip.
+    _trips = [
+      for (final t in _trips)
+        if (t.tripId == tripId && t.dayCount > 0) t.copyWithDayCount(t.dayCount - 1) else t,
+    ];
+    await loadTrip(tripId);
+    return true;
+  }
+
   void clearCurrentTrip() {
     _currentTrip = null;
     notifyListeners();
