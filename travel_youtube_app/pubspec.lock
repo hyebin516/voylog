@@ -1163,10 +1163,9 @@ packages:
   webview_flutter_android:
     dependency: "direct main"
     description:
-      name: webview_flutter_android
-      sha256: a97db7a44f8e71af2f3971c45550a08cce1fb60059c1b8e534251e6cfb753490
-      url: "https://pub.dev"
-    source: hosted
+      path: "third_party/webview_flutter_android"
+      relative: true
+    source: path
     version: "4.13.0"
   webview_flutter_platform_interface:
     dependency: transitive

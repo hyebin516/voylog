@@ -58,6 +58,13 @@ dependencies:
   firebase_messaging: ^16.7.0
   image_picker: ^1.2.3
 
+dependency_overrides:
+  # Vendored with one patch: claim onRenderProcessGone so a killed WebView
+  # renderer no longer takes the whole app down. Applies to every WebView
+  # (YouTube player, Kakao map). See third_party/webview_flutter_android/VENDOR_NOTES.md
+  webview_flutter_android:
+    path: third_party/webview_flutter_android
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
