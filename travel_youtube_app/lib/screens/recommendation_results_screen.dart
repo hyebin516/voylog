@@ -8,6 +8,7 @@ import '../providers/video_provider.dart';
 import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
+import '../widgets/guest_analyze_limit_dialog.dart';
 import '../widgets/loading_indicator.dart';
 import '../widgets/responsive_center.dart';
 import '../widgets/video_search_result_card.dart';
@@ -25,6 +26,14 @@ class RecommendationResultsScreen extends StatelessWidget {
     if (!context.mounted) return;
     if (videoProvider.state == ViewState.success) {
       Navigator.pushNamed(context, AppRoutes.videoAnalysis);
+      return;
+    }
+
+    if (videoProvider.needsLoginToAnalyzeMore) {
+      videoProvider.dismissAnalysisError();
+      final wantsLogin = await showGuestAnalyzeLimitDialog(context);
+      if (!context.mounted) return;
+      if (wantsLogin) Navigator.pushNamed(context, AppRoutes.login);
     }
   }
 

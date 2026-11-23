@@ -25,11 +25,19 @@ class VideoProvider extends ChangeNotifier {
   ViewState _state = ViewState.idle;
   VideoModel? _currentVideo;
   String? _errorMessage;
+  String? _errorCode;
 
   ViewState get state => _state;
   VideoModel? get currentVideo => _currentVideo;
   String? get errorMessage => _errorMessage;
   bool get isLoading => _state == ViewState.loading;
+
+  /// The last analysis was refused because a guest used up the guest
+  /// allowance. Screens show a login prompt for this instead of the generic
+  /// error -- logging in is the way forward, not retrying. Whether a caller
+  /// counts as a guest and how many analyses they get is the backend's call;
+  /// this only reads the code it answered with.
+  bool get needsLoginToAnalyzeMore => _state == ViewState.error && _errorCode == 'ANALYZE_LIMIT_GUEST';
 
   ViewState _searchState = ViewState.idle;
   List<VideoSearchResultModel> _searchResults = [];
@@ -45,6 +53,7 @@ class VideoProvider extends ChangeNotifier {
   Future<void> analyze(String youtubeUrl) async {
     _state = ViewState.loading;
     _errorMessage = null;
+    _errorCode = null;
     _enrichmentTimer?.cancel();
     notifyListeners();
 
@@ -54,6 +63,7 @@ class VideoProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _state = ViewState.error;
       _errorMessage = e.friendlyMessage;
+      _errorCode = e.code;
     }
 
     notifyListeners();
@@ -168,6 +178,7 @@ class VideoProvider extends ChangeNotifier {
     if (_state != ViewState.error) return;
     _state = _currentVideo != null ? ViewState.success : ViewState.idle;
     _errorMessage = null;
+    _errorCode = null;
     notifyListeners();
   }
 
@@ -176,6 +187,7 @@ class VideoProvider extends ChangeNotifier {
     _state = ViewState.idle;
     _currentVideo = null;
     _errorMessage = null;
+    _errorCode = null;
     notifyListeners();
   }
 }

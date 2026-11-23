@@ -47,6 +47,10 @@ class ApiException implements Exception {
         return '위치 정보를 가져오지 못했습니다.';
       case 'NETWORK_ERROR':
         return '네트워크 연결을 확인해 주세요.';
+      case 'ANALYZE_LIMIT_GUEST':
+        return '로그인하지 않고 쓸 수 있는 분석 횟수를 모두 사용했어요.\n로그인하면 계속 분석할 수 있어요.';
+      case 'TOO_MANY_REQUESTS':
+        return '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.';
       default:
         return '요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.';
     }

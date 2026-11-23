@@ -99,6 +99,40 @@ void main() {
       expect(provider.errorMessage, '이 영상에는 자막이 없어 분석할 수 없습니다.');
       expect(provider.currentVideo, isNull);
     });
+
+    // A guest out of analyses should be offered login, not a retry -- the
+    // screens read this flag to show the login dialog instead of the error.
+    test('flags a used-up guest allowance so screens can offer login', () async {
+      repository.error = const ApiException(code: 'ANALYZE_LIMIT_GUEST', message: 'limit');
+
+      await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+      expect(provider.state, ViewState.error);
+      expect(provider.needsLoginToAnalyzeMore, isTrue);
+    });
+
+    test('does not ask a logged-in user to log in when they hit their limit', () async {
+      repository.error = const ApiException(code: 'TOO_MANY_REQUESTS', message: 'limit');
+
+      await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+      expect(provider.needsLoginToAnalyzeMore, isFalse);
+      expect(provider.errorMessage, '요청이 너무 많아요. 잠시 후 다시 시도해 주세요.');
+    });
+
+    test('clears the login prompt flag once the error is dismissed or a new analysis starts', () async {
+      repository.error = const ApiException(code: 'ANALYZE_LIMIT_GUEST', message: 'limit');
+      await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+      provider.dismissAnalysisError();
+      expect(provider.needsLoginToAnalyzeMore, isFalse);
+
+      await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+      repository.error = null;
+      repository.videoToReturn = const VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: 'Trip', isCached: false, places: []);
+      await provider.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+      expect(provider.needsLoginToAnalyzeMore, isFalse);
+    });
   });
 
   test('reset clears the current video, error, and returns to idle', () async {

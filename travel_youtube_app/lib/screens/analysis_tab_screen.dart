@@ -5,8 +5,10 @@ import '../core/theme/app_theme.dart';
 import '../providers/video_provider.dart';
 import '../repositories/map_repository.dart';
 import '../repositories/video_player_repository.dart';
+import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
 import '../widgets/error_view.dart';
+import '../widgets/guest_analyze_limit_dialog.dart';
 import '../widgets/nav_icons.dart';
 import '../widgets/responsive_center.dart';
 import 'video_analysis_screen.dart';
@@ -58,6 +60,14 @@ class _AnalysisTabScreenState extends State<AnalysisTabScreen> {
     // content with the result.
     if (!mounted) return;
     if (videoProvider.state == ViewState.success) _urlController.clear();
+
+    if (videoProvider.needsLoginToAnalyzeMore) {
+      // Not an error to retry: offer login instead of the error view.
+      videoProvider.dismissAnalysisError();
+      final wantsLogin = await showGuestAnalyzeLimitDialog(context);
+      if (!mounted) return;
+      if (wantsLogin) Navigator.pushNamed(context, AppRoutes.login);
+    }
   }
 
   @override
@@ -153,7 +163,7 @@ class _AnalysisTabScreenState extends State<AnalysisTabScreen> {
                     child: Text(_inputError!, style: const TextStyle(fontSize: 12, color: AppColors.danger)),
                   ),
                 ],
-                if (videoProvider.state == ViewState.error) ...[
+                if (videoProvider.state == ViewState.error && !videoProvider.needsLoginToAnalyzeMore) ...[
                   const SizedBox(height: AppSpacing.lg),
                   ErrorView(
                     message: videoProvider.errorMessage ?? '분석에 실패했습니다.',

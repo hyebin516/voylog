@@ -90,7 +90,7 @@ GradudtionProject/
 
 | Method | Endpoint | 인증 | 설명 |
 | --- | --- | --- | --- |
-| POST | `/api/v1/videos/analyze` | 불필요 | YouTube URL 분석. body: `{ youtubeUrl }` |
+| POST | `/api/v1/videos/analyze` | 불필요 | YouTube URL 분석. body: `{ youtubeUrl }`. 호출마다 AI 비용이 들어 횟수 제한이 있다(`createAnalyzeLimiter`, `middlewares/rateLimit.js`): 비로그인은 **IP당** 1시간 20번(초과 시 429 `ANALYZE_LIMIT_GUEST` → 앱이 로그인 안내 창), 로그인은 **계정당** 100번(429 `TOO_MANY_REQUESTS`). **이미 분석된 영상(Redis/DB 캐시)은 세지 않는다** — 앱이 보강을 기다리며 5초마다 이 API를 다시 부르기 때문에, 예전처럼 전부 IP로 세면 새 영상 하나로 2분 만에 20번이 차서 시연 중 분석이 막혔다. 그래서 라우트 순서가 `optionalAuthenticate → validateAnalyzeRequest → 제한 → 컨트롤러`다(누가·어떤 영상인지 알아야 셀지 정할 수 있음) |
 | GET | `/api/v1/videos/search` | 불필요 | 해시태그로 브이로그 탐색 (FR-02). query: `?hashtag=`. AI Worker의 YouTube Data API 검색 결과(영상 후보 목록)를 그대로 전달, DB 저장 없음 |
 | POST | `/api/v1/videos/recommendations` | 불필요 | 지역/테마/기간 선택 기반 브이로그 추천 마법사. body: `{ regions[], themes[], duration }` (`duration`은 `당일치기 / 1박 2일 / 2박 3일 / 3박 4일 / 4박 5일 이상` 중 하나). 서버가 지역+테마+기간을 하나의 검색어로 조합해 AI Worker의 YouTube Data API 키워드 검색(`/search-videos`)을 호출 — 해시태그 탐색과 동일한 검색 인프라 재사용, 응답 형식도 동일(`{ videos: [] }`), DB 저장 없음 |
 | POST | `/api/v1/bookmarks` | 필수 (JWT) | 북마크 저장. body: `{ placeId }` |

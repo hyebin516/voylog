@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
+import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/place_model.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/providers/bookmark_provider.dart';
@@ -41,6 +42,12 @@ class FakeVideoRepository extends VideoRepository {
   }
 }
 
+class GuestLimitVideoRepository extends VideoRepository {
+  @override
+  Future<VideoModel> analyze(String youtubeUrl) async =>
+      throw const ApiException(code: 'ANALYZE_LIMIT_GUEST', message: 'limit');
+}
+
 Widget _wrap(VideoProvider videoProvider) {
   return MultiProvider(
     providers: [
@@ -48,6 +55,7 @@ Widget _wrap(VideoProvider videoProvider) {
       ChangeNotifierProvider(create: (_) => BookmarkProvider()),
     ],
     child: MaterialApp(
+      routes: {'/login': (_) => const Scaffold(body: Text('LOGIN SCREEN'))},
       home: AnalysisTabScreen(
         mapRepository: const FakeMapRepository(),
         videoPlayerRepository: FakeVideoPlayerRepository(),
@@ -110,5 +118,24 @@ void main() {
 
     expect(repository.lastUrl, 'https://youtu.be/v1');
     expect(find.text('아산 브이로그'), findsOneWidget);
+  });
+
+  // Retrying cannot get past the guest allowance; logging in can.
+  testWidgets('a guest out of analyses gets a login dialog, not the error view', (tester) async {
+    usePhoneViewport(tester);
+    await tester.pumpWidget(_wrap(VideoProvider(repository: GuestLimitVideoRepository())));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byKey(const Key('analysisTabUrlField')), 'https://youtu.be/v1');
+    await tester.tap(find.byIcon(Icons.arrow_forward_rounded));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이용 횟수를 다 사용했어요'), findsOneWidget);
+    expect(find.text('다시 시도'), findsNothing);
+
+    await tester.tap(find.text('로그인하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('LOGIN SCREEN'), findsOneWidget);
   });
 }

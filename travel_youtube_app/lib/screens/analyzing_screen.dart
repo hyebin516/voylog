@@ -5,7 +5,9 @@ import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
 import '../providers/video_provider.dart';
+import '../routes/app_routes.dart';
 import '../utils/view_state.dart';
+import '../widgets/guest_analyze_limit_dialog.dart';
 
 /// How long the first pass usually takes. Measured at 15-27s for a typical
 /// video (see CLAUDE.md's "장소 추출 모델"), so the handoff's 20 is a fair
@@ -52,6 +54,7 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
   Timer? _timer;
   Duration _elapsed = Duration.zero;
   bool _closing = false;
+  bool _promptingLogin = false;
 
   @override
   void initState() {
@@ -105,6 +108,26 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
     unawaited(videoProvider.analyze(widget.youtubeUrl));
   }
 
+  /// Guest allowance used up: ask about logging in, then leave this screen
+  /// either way -- there is no analysis left to wait for.
+  void _promptLoginOnce(VideoProvider videoProvider) {
+    if (_promptingLogin) return;
+    _promptingLogin = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final wantsLogin = await showGuestAnalyzeLimitDialog(context);
+      if (!mounted) return;
+      // Mark this screen as closing first: clearing the error rebuilds it as
+      // "not loading", which otherwise reads as a finished analysis and pops
+      // a second time -- taking the login screen pushed below with it.
+      _closing = true;
+      videoProvider.dismissAnalysisError();
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) navigator.pop(false);
+      if (wantsLogin) navigator.pushNamed(AppRoutes.login);
+    });
+  }
+
   void _cancel() {
     // Drop the failure before leaving, so nothing downstream treats this
     // abandoned attempt as the current state of the 분석 tab.
@@ -121,6 +144,17 @@ class _AnalyzingScreenState extends State<AnalyzingScreen> {
     if (videoProvider.state == ViewState.error) {
       // Stop the countdown: it is measuring a request that is already over.
       _timer?.cancel();
+      if (videoProvider.needsLoginToAnalyzeMore) {
+        _promptLoginOnce(videoProvider);
+        // Just the background while the dialog is up -- the failure view's
+        // 다시 시도 would only hit the same limit.
+        return const Scaffold(
+          body: DecoratedBox(
+            decoration: BoxDecoration(gradient: AppColors.analyzingGradient),
+            child: SizedBox.expand(),
+          ),
+        );
+      }
       return _buildFailure(videoProvider.errorMessage);
     }
 

@@ -50,6 +50,8 @@ Widget _wrap(VideoProvider provider) => ChangeNotifierProvider.value(
     );
 
 void main() {
+  group('guest analysis allowance used up', _guestLimitTests);
+
   testWidgets('shows the countdown and the four steps while analyzing', (
     tester,
   ) async {
@@ -203,5 +205,74 @@ void main() {
     expect(find.text('open'), findsOneWidget);
     // The abandoned attempt must not linger as the current state.
     expect(provider.errorMessage, isNull);
+  });
+}
+
+class GuestLimitVideoRepository extends VideoRepository {
+  @override
+  Future<VideoModel> analyze(String youtubeUrl) async =>
+      throw const ApiException(code: 'ANALYZE_LIMIT_GUEST', message: 'limit');
+}
+
+/// Opens the waiting screen on top of a stand-in 홈, the way the app does,
+/// so the test can see it close and where the user lands.
+Widget _wrapOverHome(VideoProvider provider) => ChangeNotifierProvider.value(
+      value: provider,
+      child: MaterialApp(
+        routes: {'/login': (_) => const Scaffold(body: Text('LOGIN SCREEN'))},
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () {
+                unawaited(provider.analyze('https://youtu.be/abc'));
+                Navigator.of(context).push(
+                  MaterialPageRoute<bool>(builder: (_) => const AnalyzingScreen(youtubeUrl: 'https://youtu.be/abc')),
+                );
+              },
+              child: const Text('HOME'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+void _guestLimitTests() {
+  testWidgets('a guest out of analyses gets a login dialog instead of the failure view', (tester) async {
+    final provider = VideoProvider(repository: GuestLimitVideoRepository());
+    await tester.pumpWidget(_wrapOverHome(provider));
+
+    await tester.tap(find.text('HOME'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('이용 횟수를 다 사용했어요'), findsOneWidget);
+    expect(find.text('분석하지 못했어요'), findsNothing);
+    expect(find.text('다시 시도'), findsNothing);
+  });
+
+  testWidgets('로그인하기 closes the waiting screen and opens login', (tester) async {
+    final provider = VideoProvider(repository: GuestLimitVideoRepository());
+    await tester.pumpWidget(_wrapOverHome(provider));
+    await tester.tap(find.text('HOME'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('로그인하기'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('LOGIN SCREEN'), findsOneWidget);
+    expect(find.byType(AnalyzingScreen), findsNothing);
+    expect(provider.needsLoginToAnalyzeMore, isFalse);
+  });
+
+  testWidgets('나중에 goes back to 홈', (tester) async {
+    final provider = VideoProvider(repository: GuestLimitVideoRepository());
+    await tester.pumpWidget(_wrapOverHome(provider));
+    await tester.tap(find.text('HOME'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('나중에'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('HOME'), findsOneWidget);
+    expect(find.byType(AnalyzingScreen), findsNothing);
   });
 }

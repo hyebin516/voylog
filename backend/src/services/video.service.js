@@ -370,6 +370,25 @@ async function runAnalysis(rawYoutubeUrl) {
 }
 
 /**
+ * True when [rawYoutubeUrl] would be answered without calling the AI worker
+ * -- the same two lookups `runAnalysis` starts with. The analysis rate limit
+ * uses it to stop counting requests that cost nothing (FR-09 cache hits,
+ * and the app's polling while the background pass runs).
+ *
+ * A video analyzed before enrichment existed (`enrichment_status` null) is
+ * not free: opening it starts the paid on-screen-text pass.
+ */
+async function isAlreadyAnalyzed(rawYoutubeUrl) {
+  const youtubeUrl = normalizeYoutubeUrl(rawYoutubeUrl);
+  const youtubeVideoId = extractYoutubeVideoId(youtubeUrl);
+
+  if (await cacheGet(`video:${youtubeVideoId}`)) return true;
+
+  const existingVideo = await videoRepository.findByUrl(youtubeUrl);
+  return Boolean(existingVideo && existingVideo.is_analyzed && existingVideo.enrichment_status != null);
+}
+
+/**
  * [watcherUserId] is the logged-in caller, if any -- analysis works for
  * guests, so it can be null. They only get remembered while the background
  * pass is still running: there is nothing left to tell them otherwise.
@@ -406,6 +425,7 @@ async function getRecommendations(regions, themes, duration) {
 
 module.exports = {
   analyzeVideo,
+  isAlreadyAnalyzed,
   searchByHashtag,
   getRecommendations,
   generateAndStorePlaceEmbeddings,

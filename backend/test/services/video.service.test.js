@@ -524,3 +524,37 @@ describe('push notifications for the background enrichment (FR-12)', () => {
     await expect(done).resolves.toBe('done');
   });
 });
+
+describe('isAlreadyAnalyzed', () => {
+  // The analysis rate limit counts only requests this returns false for,
+  // so a wrong "true" would hand out free paid analyses.
+  const { isAlreadyAnalyzed } = require('../../src/services/video.service');
+
+  it('is true when the result is in Redis, without touching the database', async () => {
+    redis.get.mockResolvedValue('{"videoId":"v1"}');
+
+    await expect(isAlreadyAnalyzed(`${YOUTUBE_URL}&si=share-token`)).resolves.toBe(true);
+
+    expect(redis.get).toHaveBeenCalledWith('video:dQw4w9WgXcQ');
+    expect(videoRepository.findByUrl).not.toHaveBeenCalled();
+  });
+
+  it('is true for a video already analyzed and enriched in the database', async () => {
+    videoRepository.findByUrl.mockResolvedValue({ is_analyzed: true, enrichment_status: 'done' });
+
+    await expect(isAlreadyAnalyzed(YOUTUBE_URL)).resolves.toBe(true);
+    expect(videoRepository.findByUrl).toHaveBeenCalledWith(YOUTUBE_URL);
+  });
+
+  it('is false for a video never enriched -- opening it starts the paid pass', async () => {
+    videoRepository.findByUrl.mockResolvedValue({ is_analyzed: true, enrichment_status: null });
+
+    await expect(isAlreadyAnalyzed(YOUTUBE_URL)).resolves.toBe(false);
+  });
+
+  it('is false for a video that was never analyzed', async () => {
+    videoRepository.findByUrl.mockResolvedValue(null);
+
+    await expect(isAlreadyAnalyzed(YOUTUBE_URL)).resolves.toBe(false);
+  });
+});
