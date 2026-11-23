@@ -7,6 +7,7 @@ import 'package:travel_youtube_app/models/api_exception.dart';
 import 'package:travel_youtube_app/models/video_model.dart';
 import 'package:travel_youtube_app/models/video_search_result_model.dart';
 import 'package:travel_youtube_app/providers/app_shell_provider.dart';
+import 'package:travel_youtube_app/providers/bookmark_provider.dart';
 import 'package:travel_youtube_app/providers/recommendation_wizard_provider.dart';
 import 'package:travel_youtube_app/providers/shared_route_provider.dart';
 import 'package:travel_youtube_app/providers/similar_taste_provider.dart';
@@ -47,9 +48,12 @@ class FakeVideoRepository extends VideoRepository {
 // HomeScreen loads the similar-taste and shared-route feeds on open; these
 // keep that off the network.
 class FakeSimilarTasteRepository extends SimilarTasteRepository {
+  FakeSimilarTasteRepository({this.result = const SimilarTasteResultModel(hasPreference: false, recommendations: [])});
+
+  final SimilarTasteResultModel result;
+
   @override
-  Future<SimilarTasteResultModel> getRecommendations({int? limit}) async =>
-      const SimilarTasteResultModel(hasPreference: false, recommendations: []);
+  Future<SimilarTasteResultModel> getRecommendations({int? limit}) async => result;
 }
 
 class FakeSharedRouteRepository extends SharedRouteRepository {
@@ -61,13 +65,15 @@ Widget _wrap({
   required FakeVideoRepository videoRepository,
   RecommendationWizardProvider? wizard,
   AppShellProvider? shell,
+  FakeSimilarTasteRepository? similarTaste,
 }) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider(create: (_) => VideoProvider(repository: videoRepository)),
       ChangeNotifierProvider.value(value: shell ?? AppShellProvider()),
       ChangeNotifierProvider.value(value: wizard ?? RecommendationWizardProvider()),
-      ChangeNotifierProvider(create: (_) => SimilarTasteProvider(repository: FakeSimilarTasteRepository())),
+      ChangeNotifierProvider(create: (_) => SimilarTasteProvider(repository: similarTaste ?? FakeSimilarTasteRepository())),
+      ChangeNotifierProvider(create: (_) => BookmarkProvider()),
       ChangeNotifierProvider(create: (_) => SharedRouteProvider(repository: FakeSharedRouteRepository())),
     ],
     child: MaterialApp(
@@ -206,4 +212,39 @@ void main() {
     expect(wizard.selectedRegions, isEmpty);
     expect(find.text('route:${AppRoutes.recommendationRegion}'), findsOneWidget);
   });
+
+  // The carousel had a fixed 92px height while its text grows with the OS
+  // font size; at 1.1 on a real phone the card overflowed by 9px.
+  for (final scale in [1.0, 1.15]) {
+    testWidgets('similar-taste cards fit at text scale $scale', (tester) async {
+      usePhoneViewport(tester);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final similarTaste = FakeSimilarTasteRepository(
+        result: const SimilarTasteResultModel(
+          hasPreference: true,
+          recommendations: [
+            SimilarTasteRecommendationModel(
+              placeId: '11111111-1111-1111-1111-111111111111',
+              name: '협재해수욕장',
+              latitude: 33.39,
+              longitude: 126.24,
+              category: 'beach',
+              score: 0.82,
+              contributorCount: 2,
+              reason: '비슷한 취향의 사용자 2명이 저장',
+            ),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(_wrap(videoRepository: FakeVideoRepository(), similarTaste: similarTaste));
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('협재해수욕장'), 200, scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('협재해수욕장'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

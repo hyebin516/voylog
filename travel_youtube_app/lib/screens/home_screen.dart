@@ -335,7 +335,11 @@ class _HomeScreenState extends State<HomeScreen> {
                       // Full-bleed carousel: the negative padding undoes the
                       // sheet's 24px side padding so cards run to the edge.
                       SizedBox(
-                        height: 92,
+                        // The card's text grows with the OS font size
+                        // (AppTextScaling, up to 1.15) but this height was a
+                        // fixed 92, so cards overflowed -- by 9px at 1.1 on a
+                        // real phone. Scale the height with the text.
+                        height: MediaQuery.textScalerOf(context).scale(100),
                         child: OverflowBox(
                           maxWidth: MediaQuery.sizeOf(context).width,
                           child: ListView.separated(
@@ -668,10 +672,19 @@ class _SimilarTastePlaceCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(color: AppColors.surfaceTint3Alt, borderRadius: BorderRadius.circular(999)),
-                      child: Text('취향 일치 $matchPercent%', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong)),
+                    // Flexible so a large font shrinks the chip with an
+                    // ellipsis instead of pushing past the bookmark button.
+                    Flexible(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(color: AppColors.surfaceTint3Alt, borderRadius: BorderRadius.circular(999)),
+                        child: Text(
+                          '취향 일치 $matchPercent%',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primaryStrong),
+                        ),
+                      ),
                     ),
                   ],
                 ),
