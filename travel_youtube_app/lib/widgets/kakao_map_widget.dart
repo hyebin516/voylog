@@ -531,14 +531,28 @@ String _placePinHtml(String label, bool selected) {
       '</svg>';
 }
 
-/// 출발·도착 지점은 숙소 이름처럼 긴 글자가 들어가므로 핀 대신 알약 모양이다.
+/// 숙소·출발 지점: 흰 바탕에 틸색 테두리와 집 아이콘(날짜 카드의 숙소 표시와
+/// 같은 아이콘). 글자("출발")가 있으면 아이콘 옆에 붙여 알약이 되고, 없으면
+/// 동그라미다.
+///
+/// 예전엔 짙은 남색(ink) 알약이었는데, 여행 동선은 숙소에 글자를 넣지 않아
+/// 지도 위에 글자 없는 검은 덩어리로 보였다. 채운 틸색 번호 핀(방문지)과도
+/// 한눈에 구분되도록 색을 뒤집었다.
 String _startPillHtml(String label, bool selected) {
   final height = selected ? 36 : 30;
   final fontSize = selected ? 14 : 13;
-  final background = _hex(AppColors.ink);
+  final iconSize = selected ? 18 : 16;
+  final color = _hex(selected ? AppColors.primaryStrong : AppColors.primary);
+  final hasLabel = label.isNotEmpty;
 
-  return '<div style="height:${height}px;padding:0 10px;border-radius:${height}px;'
-      'background:$background;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35);'
-      'color:#fff;font:700 ${fontSize}px sans-serif;display:flex;align-items:center;'
-      'justify-content:center;white-space:nowrap;">$label</div>';
+  final house = '<svg width="${iconSize}px" height="${iconSize}px" viewBox="0 0 24 24" style="display:block;flex:none;">'
+      '<path d="M3 10.6 12 3.2l9 7.4V20a1 1 0 0 1-1 1h-5.2v-6.2H9.2V21H4a1 1 0 0 1-1-1z" fill="$color"/>'
+      '</svg>';
+  final text = hasLabel ? '<span style="margin-left:4px;">$label</span>' : '';
+
+  return '<div style="height:${height}px;min-width:${height}px;box-sizing:border-box;'
+      'padding:0 ${hasLabel ? 10 : 0}px;border-radius:${height}px;'
+      'background:#fff;border:2.5px solid $color;box-shadow:0 2px 6px rgba(0,0,0,.3);'
+      'color:$color;font:700 ${fontSize}px sans-serif;display:flex;align-items:center;'
+      'justify-content:center;white-space:nowrap;">$house$text</div>';
 }
