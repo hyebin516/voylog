@@ -217,4 +217,44 @@ void main() {
 
     expect(playerRepository.seekCalls, [125]);
   });
+
+  // A timestamp far down the list used to seek a player scrolled out of
+  // sight; Android doesn't advance an off-screen WebView, so scrolling back
+  // found the video stopped. The list now scrolls up to the player first.
+  testWidgets('tapping a timestamp lower in the list scrolls up to the player, then seeks', (tester) async {
+    usePhoneViewport(tester);
+    final places = [
+      for (var i = 0; i < 12; i++)
+        PlaceModel(
+          placeId: 'p$i',
+          name: '장소 $i',
+          timestampSec: 60 * (i + 1),
+          latitude: null,
+          longitude: null,
+          address: null,
+          source: 'transcript',
+          confidence: 0.9,
+        ),
+    ];
+    final repository = FakeVideoRepository()
+      ..videoToReturn = VideoModel(videoId: 'v1', youtubeVideoId: 'v1', title: '긴 브이로그', isCached: false, places: places);
+    final videoProvider = VideoProvider(repository: repository);
+    await videoProvider.analyze('https://youtu.be/v1');
+    final playerRepository = FakeVideoPlayerRepository();
+
+    await tester.pumpWidget(_wrap(videoProvider: videoProvider, videoPlayerRepository: playerRepository));
+    final list = find.byType(Scrollable).last;
+    await tester.scrollUntilVisible(find.textContaining('12:00'), 300, scrollable: list);
+    await tester.pumpAndSettle();
+    expect(find.text('fake-player video=v1', skipOffstage: false), findsOneWidget,
+        reason: 'the player must stay alive while scrolled away');
+
+    await tester.tap(find.textContaining('12:00'));
+    await tester.pumpAndSettle();
+
+    final position = tester.state<ScrollableState>(list).position;
+    expect(position.pixels, 0);
+    expect(find.text('fake-player video=v1'), findsOneWidget);
+    expect(playerRepository.seekCalls, [720]);
+  });
 }

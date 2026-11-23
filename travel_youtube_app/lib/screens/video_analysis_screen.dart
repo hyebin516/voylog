@@ -45,6 +45,7 @@ class VideoAnalysisScreen extends StatefulWidget {
 
 class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
   late final VideoPlayerInstance _player;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -59,10 +60,24 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
   @override
   void dispose() {
     _player.handle.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _seekTo(int seconds) {
+  /// Brings the player into view, then jumps it to [seconds] (FR-04).
+  ///
+  /// The player is the first item of the place list. Tapping a timestamp far
+  /// down the list used to seek a player that was scrolled out of sight --
+  /// and Android does not advance a WebView that is off screen, so scrolling
+  /// back up found the video stopped. Scrolling up first means the user sees
+  /// the moment they asked for, and the seek reaches a visible player.
+  Future<void> _seekTo(int seconds) async {
+    if (_scrollController.hasClients && _scrollController.offset > 0) {
+      await _scrollController.animateTo(0, duration: const Duration(milliseconds: 350), curve: Curves.easeOutCubic);
+      // Let the player finish laying out at the top before it gets the seek.
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted) return;
+    }
     _player.handle.seekTo(seconds);
   }
 
@@ -185,6 +200,7 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
               ),
               Expanded(
                 child: ListView(
+                  controller: _scrollController,
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
                     AppSpacing.md,
@@ -192,11 +208,16 @@ class _VideoAnalysisScreenState extends State<VideoAnalysisScreen> {
                     AppSpacing.lg,
                   ),
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(20),
-                      child: AspectRatio(
-                        aspectRatio: 16 / 9,
-                        child: _player.widget,
+                    // Kept alive: a ListView drops items scrolled far away,
+                    // and dropping this one tears the player's WebView out
+                    // of the screen mid-playback.
+                    _KeepAlive(
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: AspectRatio(
+                          aspectRatio: 16 / 9,
+                          child: _player.widget,
+                        ),
                       ),
                     ),
                     const SizedBox(height: AppSpacing.md),
@@ -637,5 +658,26 @@ class _RoundCardButton extends StatelessWidget {
         constraints: const BoxConstraints.tightFor(width: 34, height: 34),
       ),
     );
+  }
+}
+
+/// Keeps [child] alive in a lazily built list when it scrolls out of view.
+class _KeepAlive extends StatefulWidget {
+  const _KeepAlive({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_KeepAlive> createState() => _KeepAliveState();
+}
+
+class _KeepAliveState extends State<_KeepAlive> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
   }
 }
