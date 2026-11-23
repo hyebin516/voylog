@@ -84,6 +84,9 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
 
   Future<void> _toggleFolder(String folderId) async {
     final isMember = _memberFolderIds.contains(folderId);
+    // 시트는 Repository를 직접 부르므로, 성공한 뒤 Provider에도 알려줘야
+    // 북마크 탭의 폴더 목록 숫자가 따라온다. await 전에 잡아둔다.
+    final folderProvider = context.read<BookmarkFolderProvider>();
     setState(() {
       if (isMember) {
         _memberFolderIds.remove(folderId);
@@ -100,6 +103,7 @@ class _BookmarkFolderSheetState extends State<BookmarkFolderSheet> {
       } else {
         await _repository.addBookmarkToFolder(folderId, widget.bookmarkId);
       }
+      folderProvider.applyBookmarkCountDelta(folderId, isMember ? -1 : 1);
     } catch (_) {
       if (!mounted) return;
       setState(() {

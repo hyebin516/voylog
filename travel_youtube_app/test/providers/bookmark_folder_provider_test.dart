@@ -205,4 +205,56 @@ void main() {
     expect(provider.folderBookmarks, isEmpty);
     expect(provider.detailState, ViewState.idle);
   });
+
+  // 북마크 시트는 Provider를 거치지 않고 Repository를 직접 불러서 폴더에
+  // 담는다. 그래서 담긴 사실을 Provider에 따로 알려주지 않으면, 북마크 탭의
+  // 폴더 목록이 예전 숫자("장소 12곳")를 계속 보여준다.
+  group('applyBookmarkCountDelta', () {
+    test('해당 폴더의 개수만 올린다', () async {
+      final repository = FakeBookmarkFolderRepository()
+        ..foldersToReturn = [_folder('f1', bookmarkCount: 12), _folder('f2', bookmarkCount: 3)];
+      final provider = BookmarkFolderProvider(repository: repository);
+      await provider.loadFolders();
+
+      provider.applyBookmarkCountDelta('f1', 1);
+
+      expect(provider.folders.firstWhere((f) => f.folderId == 'f1').bookmarkCount, 13);
+      expect(provider.folders.firstWhere((f) => f.folderId == 'f2').bookmarkCount, 3);
+    });
+
+    test('폴더에서 뺀 경우 개수를 내린다', () async {
+      final repository = FakeBookmarkFolderRepository()
+        ..foldersToReturn = [_folder('f1', bookmarkCount: 2)];
+      final provider = BookmarkFolderProvider(repository: repository);
+      await provider.loadFolders();
+
+      provider.applyBookmarkCountDelta('f1', -1);
+
+      expect(provider.folders.single.bookmarkCount, 1);
+    });
+
+    test('0 아래로는 내려가지 않는다', () async {
+      // 시트와 서버 상태가 어긋나도 "장소 -1곳"이 화면에 뜨면 안 된다.
+      final repository = FakeBookmarkFolderRepository()..foldersToReturn = [_folder('f1')];
+      final provider = BookmarkFolderProvider(repository: repository);
+      await provider.loadFolders();
+
+      provider.applyBookmarkCountDelta('f1', -1);
+
+      expect(provider.folders.single.bookmarkCount, 0);
+    });
+
+    test('목록에 없는 폴더면 아무 일도 하지 않는다', () async {
+      final repository = FakeBookmarkFolderRepository()..foldersToReturn = [_folder('f1')];
+      final provider = BookmarkFolderProvider(repository: repository);
+      await provider.loadFolders();
+      var notified = 0;
+      provider.addListener(() => notified++);
+
+      provider.applyBookmarkCountDelta('없는폴더', 1);
+
+      expect(notified, 0);
+      expect(provider.folders.single.bookmarkCount, 0);
+    });
+  });
 }

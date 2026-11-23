@@ -109,6 +109,28 @@ class BookmarkFolderProvider extends ChangeNotifier {
     ];
   }
 
+  /// 폴더 목록의 장소 개수를 서버를 다시 부르지 않고 그 자리에서 맞춘다.
+  ///
+  /// 북마크 시트(`BookmarkFolderSheet`)는 이 Provider를 거치지 않고 Repository를
+  /// 직접 불러서 폴더에 담는다. 그래서 목록이 들고 있는 `bookmarkCount`는 시트가
+  /// 열릴 때 받아온 값에 머물러 있었고, 탭은 `IndexedStack`으로 살아 있어
+  /// `initState`의 `loadFolders()`도 다시 돌지 않는다 -- 분석 화면에서 장소를
+  /// 담고 북마크 탭으로 오면 폴더에는 18곳이 들어 있는데 목록은 12곳이라고
+  /// 적혀 있었다.
+  ///
+  /// 개수 변화는 ±1로 이미 알고 있으므로 목록 전체를 다시 받아올 이유가 없다.
+  void applyBookmarkCountDelta(String folderId, int delta) {
+    final index = _folders.indexWhere((f) => f.folderId == folderId);
+    if (index == -1) return;
+
+    final folder = _folders[index];
+    final next = folder.bookmarkCount + delta;
+    final updated = List<BookmarkFolderModel>.of(_folders);
+    updated[index] = folder.copyWith(bookmarkCount: next < 0 ? 0 : next);
+    _folders = updated;
+    notifyListeners();
+  }
+
   Future<void> toggleBookmarkInFolder(String folderId, String bookmarkId) async {
     final wasIn = _folderBookmarkIds.contains(bookmarkId);
 
