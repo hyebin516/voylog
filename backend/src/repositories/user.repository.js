@@ -37,8 +37,31 @@ async function updateKakaoProfile(userId, { email, profileImage }) {
   return rows[0];
 }
 
-async function softDelete(userId) {
-  await pool.query('UPDATE users SET deleted_at = now() WHERE user_id = $1', [userId]);
+/**
+ * 회원 탈퇴. 행 자체는 남긴다 -- 북마크·여행·동선이 `user_id`를 참조하고
+ * 있어서 지우면 그쪽이 깨진다. 대신 **사람을 가리키는 값은 전부 덮는다.**
+ *
+ * `deleted_at`만 찍던 시절에는 탈퇴한 뒤에도 이메일·닉네임·카카오 회원번호가
+ * 그대로 남아 있었다. 로그인은 막히니 기능상 문제는 없었지만, "탈퇴하면
+ * 개인정보는 어떻게 되나"에 "남아 있습니다"라고 답해야 했다.
+ *
+ * `nickname`과 `provider_id`는 NOT NULL이라 비울 수 없어 식별 불가능한 값으로
+ * 덮는다. 둘 다 유니크 제약은 `deleted_at IS NULL` 범위의 부분 인덱스라(027),
+ * 같은 카카오 계정·이메일로 다시 가입하는 데는 영향이 없다.
+ */
+async function softDeleteAndAnonymize(userId) {
+  await pool.query(
+    `UPDATE users
+        SET deleted_at = now(),
+            updated_at = now(),
+            email = NULL,
+            password_hash = NULL,
+            profile_image = NULL,
+            nickname = '탈퇴한 사용자',
+            provider_id = 'deleted:' || user_id
+      WHERE user_id = $1 AND deleted_at IS NULL`,
+    [userId]
+  );
 }
 
 async function updateNickname(userId, nickname) {
@@ -90,7 +113,7 @@ module.exports = {
   updateKakaoProfile,
   findById,
   create,
-  softDelete,
+  softDeleteAndAnonymize,
   findByEmail,
   findByNickname,
   createEmailUser,

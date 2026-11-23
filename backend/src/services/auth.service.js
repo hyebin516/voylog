@@ -120,7 +120,14 @@ async function getProfile(userId) {
 }
 
 async function deleteAccount(userId) {
-  await userRepository.softDelete(userId);
+  const user = await userRepository.findById(userId);
+
+  // 프로필 사진은 DB 행이 아니라 uploads/ 에 있는 파일이다. 행만 익명화하면
+  // 사용자가 올린 얼굴 사진이 디스크에 그대로 남는다. 지우기 전에 먼저
+  // 치운다 -- 익명화하고 나면 경로를 알 수 없다.
+  if (user) await profileImageService.removeStoredFile(user.profile_image);
+
+  await userRepository.softDeleteAndAnonymize(userId);
 }
 
 async function updateNickname(userId, nickname) {

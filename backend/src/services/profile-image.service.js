@@ -79,6 +79,7 @@ function toPublicUrl(profileImage, req) {
 module.exports = {
   replaceProfileImage,
   clearProfileImage,
+  removeStoredFile,
   toPublicUrl,
   UPLOAD_DIR,
   PUBLIC_PREFIX,

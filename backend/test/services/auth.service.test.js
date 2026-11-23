@@ -1,5 +1,6 @@
 jest.mock('axios');
 jest.mock('../../src/repositories/user.repository');
+jest.mock('../../src/services/profile-image.service');
 jest.mock('../../src/repositories/email-otp.repository');
 jest.mock('../../src/services/email.service');
 
@@ -8,6 +9,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const userRepository = require('../../src/repositories/user.repository');
+const profileImageService = require('../../src/services/profile-image.service');
 const emailOtpRepository = require('../../src/repositories/email-otp.repository');
 const emailService = require('../../src/services/email.service');
 const authService = require('../../src/services/auth.service');
@@ -193,11 +195,11 @@ describe('getProfile', () => {
 
 describe('deleteAccount', () => {
   it('soft-deletes the user by id', async () => {
-    userRepository.softDelete.mockResolvedValue();
+    userRepository.findById.mockResolvedValue({ user_id: 'u1', profile_image: null });
 
     await authService.deleteAccount('u1');
 
-    expect(userRepository.softDelete).toHaveBeenCalledWith('u1');
+    expect(userRepository.softDeleteAndAnonymize).toHaveBeenCalledWith('u1');
   });
 });
 
@@ -574,5 +576,35 @@ describe('resetPassword', () => {
     const newHash = userRepository.updatePasswordHash.mock.calls[0][1];
     expect(await bcrypt.compare('new-password123', newHash)).toBe(true);
     expect(emailOtpRepository.deleteByEmail).toHaveBeenCalledWith('a@b.com');
+  });
+});
+
+describe('deleteAccount', () => {
+  // 탈퇴는 행을 남기지만(북마크·여행이 user_id를 참조한다) 사람을 가리키는
+  // 값은 남기지 않는다. 예전에는 deleted_at만 찍어서 이메일·닉네임·카카오
+  // 회원번호가 그대로 남아 있었다.
+  it('올린 프로필 사진 파일도 함께 지운다', async () => {
+    // 행만 익명화하면 uploads/ 에 사용자 얼굴이 남는다.
+    userRepository.findById.mockResolvedValue({
+      user_id: 'u1',
+      profile_image: '/uploads/profile-images/u1-abc123.jpg',
+    });
+
+    await authService.deleteAccount('u1');
+
+    expect(profileImageService.removeStoredFile).toHaveBeenCalledWith(
+      '/uploads/profile-images/u1-abc123.jpg'
+    );
+    expect(userRepository.softDeleteAndAnonymize).toHaveBeenCalledWith('u1');
+  });
+
+  it('이미 없는 사용자여도 터지지 않는다', async () => {
+    // 같은 탈퇴 요청이 두 번 와도 500을 내지 않아야 한다.
+    userRepository.findById.mockResolvedValue(null);
+
+    await expect(authService.deleteAccount('gone')).resolves.toBeUndefined();
+
+    expect(profileImageService.removeStoredFile).not.toHaveBeenCalled();
+    expect(userRepository.softDeleteAndAnonymize).toHaveBeenCalledWith('gone');
   });
 });
